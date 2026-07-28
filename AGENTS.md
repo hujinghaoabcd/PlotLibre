@@ -1,81 +1,85 @@
 # PlotLibre Development Contract
 
-This file defines mandatory rules for any developer, coding agent, or future conversation working on PlotLibre.
+This file defines mandatory rules for every developer, coding agent, or future conversation.
 
-## 1. Product definition
+## 1. Product model
 
-PlotLibre is not a generic GeoJSON draw toolbar and not a thin wrapper around another drawing library. It is a MapLibre-native framework for semantic, parametric situation plots and tactical graphics.
+PlotLibre is a semantic parametric plotting framework, not a generic GeoJSON toolbar.
 
-The semantic source of truth is always:
+Canonical state:
 
 ```text
 plot definition + control points + parameters + style + metadata
 ```
 
-Rendered GeoJSON is derived output. Never replace semantic control points with generated polygon vertices as the canonical model.
+Rendered GeoJSON is derived output and must never replace semantic source data.
 
-## 2. Architectural boundaries
-
-The dependency direction is mandatory:
+## 2. Dependency direction
 
 ```text
 core <- geometry <- symbols
 core <- interaction
 core + interaction <- maplibre
-public packages <- playground / framework wrappers
+public packages <- playground / wrappers
 ```
 
-Future packages may depend on these public layers, but:
+Rules:
 
-- `core` must never depend on MapLibre or DOM APIs;
-- `geometry` must never depend on MapLibre, UI frameworks, or browser events;
-- `symbols` must define behavior through `PlotDefinition` registration;
-- `interaction` must remain engine-independent and must not import MapLibre or DOM APIs;
-- `maplibre` must translate semantic render bundles and interaction snapshots into MapLibre sources, layers and events;
-- the Playground and UI packages must call public APIs and must not mutate stores or MapLibre sources directly.
-
-Avoid circular package dependencies.
+- `core` cannot depend on MapLibre or DOM;
+- `geometry` cannot depend on MapLibre, Store, UI, or events;
+- `symbols` register behavior through `PlotDefinition`;
+- `interaction` remains engine-independent;
+- `maplibre` translates semantic state to Sources/Layers/events;
+- Playground consumes only public APIs;
+- avoid circular package dependencies.
 
 ## 3. Geometry rules
 
-- Do not perform Euclidean geometry directly on longitude/latitude values except for explicitly documented approximations.
-- Use a local projection for short-range symbols and geodesic algorithms for large-range symbols.
-- Every geometry generator must define behavior for degenerate, coincident, collinear, antimeridian, and high-latitude inputs.
-- Every symbol must have numerical tests and, when the visual test system exists, golden image tests.
-- Generated polygon rings must be closed and finite.
-- Algorithm parameters must be explicit, validated, versioned, and serializable.
-- Shared Arrow primitives must remain pure and worker-ready.
-- New Arrow symbols must use the shared polyline, curve, offset, ring, geodesic, and arrow-component APIs before adding symbol-specific mathematics.
-- Related symbols must share internal components instead of copying complete generators.
-- Tail variants must use a shared body/frame or tail strategy; copying an entire base generator is prohibited.
-- Parameters that can cause topology failure must be validated dynamically and tested with self-intersection checks.
+- Do not run undocumented Euclidean geometry directly on lon/lat.
+- Use local metre projection for short symbols and explicit geodesic policies for large symbols.
+- Validate coincident, collinear, antimeridian, high-latitude and non-finite inputs.
+- Rings must be finite, closed and topologically validated where parameters may cause self-intersection.
+- Parameters must be explicit, versioned, validated and serializable.
+- Shared primitives must remain pure and worker-ready.
+- Related variants must share components, frames or strategies; copying complete generators is prohibited.
+- A new public symbol needs a real semantic or structural distinction, not only new default values.
 
-## 4. Clean-room and licensing rules
+## 4. Clean-room and licensing
 
-Reference libraries may be studied for public behavior, terminology, architecture, and documented formulas. Before code is reused or translated:
+Reference libraries may be studied for public behavior, terminology and documented mathematics.
 
-1. identify the exact source file and repository revision;
-2. verify its license;
-3. record provenance in `docs/ALGORITHM_POLICY.md` or a symbol-specific algorithm record;
-4. preserve required notices;
-5. avoid code from incompatible or unclear licenses;
-6. prefer independent implementation from published mathematical descriptions and behavior tests.
+Before code reuse:
 
-Never copy proprietary Mapbox code released after its open-source license change.
+1. identify source and revision;
+2. verify license;
+3. record provenance;
+4. preserve notices;
+5. avoid unclear or incompatible code;
+6. prefer independent implementation from mathematical descriptions and behavioral tests.
 
-## 5. API rules
+Never copy proprietary Mapbox code. Current project packages remain `UNLICENSED` until the owner chooses a license.
 
-- Public identifiers use stable dotted names such as `arrow.straight`, `arrow.fine`, and `arrow.fine.tailed`.
-- Public data structures must be serializable unless explicitly documented otherwise.
-- Public APIs require TypeScript declarations and focused tests.
-- Breaking changes require a migration note and a PlotJSON migration strategy.
+## 5. API and PlotJSON
+
+- Public types use stable dotted identifiers.
+- Public state must be serializable unless documented otherwise.
+- Breaking changes require migration notes and a PlotJSON migration plan.
 - MapLibre remains a peer dependency.
-- Framework wrappers must remain optional packages.
-- Playground code is a consumer example, not a privileged internal client.
+- Framework wrappers remain optional.
+- Definition defaults are part of the visual/data contract.
+
+Current public Arrow identifiers:
+
+```text
+arrow.straight
+arrow.fine
+arrow.fine.tailed
+arrow.assault-direction
+```
 
 ## 6. Testing requirements
 
-Before publishing a development milestone, run:
+Required before a milestone is merged:
 
 ```bash
 npm run typecheck
@@ -85,66 +89,77 @@ npm run playground:build
 npm run handover:check
 ```
 
-When browser-facing behavior changes, also run:
+Browser-facing changes also require:
 
 ```bash
 npm run playground:e2e
 ```
 
-A milestone is incomplete if required checks fail. Browser interaction changes require Playwright coverage. New geometry primitives require numerical, degenerate-input, property, and golden-fixture tests as appropriate.
+For MapLibre symbols, Store size is not sufficient. Tests must verify:
 
-For MapLibre symbols, Store size is not a sufficient browser assertion. Tests must also verify committed Source data and at least one actual rendered feature from the relevant fill/line layers.
+- committed Source data;
+- correct `plotType`;
+- relevant fill/line Layers;
+- at least one actual `queryRenderedFeatures()` result.
 
-## 7. Playground and GitHub Pages rules
+New geometry requires numerical, degenerate, parameter-isolation and golden-fixture tests. Multi-point geometry must add property tests where practical.
 
-- The project-site base path is `/PlotLibre/`.
-- Production examples must not require private API keys.
-- E2E must remain independent of remote tile services.
-- The Pages workflow deploys only from `main`.
-- Do not claim the public site is live until the deployment workflow succeeds and the URL is verified.
-- Every new public symbol must receive a Playground selector/catalog entry and browser test in the same slice.
-- MapLibre GL JS 6 Worker and shared modules must remain version-aligned with the installed package.
+## 7. Playground and Pages
 
-## 8. Documentation requirements
+- GitHub Pages base is `/PlotLibre/`.
+- Production cannot require private API keys.
+- Online basemap failure cannot block plotting.
+- E2E cannot depend on remote tiles.
+- MapLibre 6 Worker and Shared modules remain aligned with the installed package.
+- Every public symbol gets a selector/catalog entry and browser test in the same slice.
+- Pages deploys only from `main`.
 
-Architecture, data format, public API, Playground workflow, symbol algorithms, and roadmap documents must match the code. Do not leave major architectural decisions only in source comments or chat messages.
+## 8. Documentation and handover
 
-## 9. Mandatory handover after every completed task
-
-Every completed development task must update:
+Every completed task must update:
 
 ```text
 docs/handover/LATEST.md
 ```
 
-and add a dated immutable milestone file:
+and add an immutable file:
 
 ```text
 docs/handover/YYYY-MM-DD-milestone-NNN.md
 ```
 
-Each handover must contain:
+Each handover includes:
 
-- current repository, branch, PR, and deployment state;
-- exact completed files and capabilities;
-- validation commands and results;
-- architectural decisions made;
-- known limitations and risks;
-- next tasks in priority order;
-- instructions sufficient for another developer to continue without chat history.
+- branch, PR and deployment state;
+- completed files and capabilities;
+- validation commands and exact results;
+- architecture decisions;
+- limitations and risks;
+- prioritized next tasks;
+- continuation instructions.
 
-Never delete prior milestone handovers. `LATEST.md` is replaced each time; dated milestone files are append-only.
+Never delete earlier handovers.
 
-## 10. Scope control
+## 9. Scope control
 
-Do not implement many symbol types before the shared geometry primitives, registry, validation, editing model, and tests are stable. A vertical slice with one high-quality symbol is preferred over many untested copied algorithms.
+One complete high-quality vertical slice is preferred to many incomplete symbols. Do not develop multiple new Arrow types in parallel.
 
-## 11. Current priority
+## 10. Current priority
 
-Read `docs/handover/LATEST.md` before starting.
+Milestone 005C completes `arrow.assault-direction` as a broad, angle-defined geometry that is structurally different from FineArrow.
 
-Milestone 005B completes `arrow.fine.tailed` through a shared internal fine-arrow frame, dynamic notch validation, golden and PlotJSON tests, Playground selection, semantic editing and real Chromium rendered-feature coverage.
+The next priority is Milestone 005D: `arrow.curved`, the first multi-point symbol.
 
-The next priority is Milestone 005C: `arrow.assault-direction`. Before implementation, its algorithm document must define a real visual and semantic distinction from `arrow.fine`; it must not be created merely by changing default width ratios. Implement only this single vertical slice next.
+Before curved-arrow geometry, implement and test an engine-independent `MultiPointDrawSession` with:
 
-Do not implement `arrow.curved`, `arrow.attack`, or other complex arrows in parallel with `arrow.assault-direction`.
+- minimum-point validation;
+- click-to-append;
+- pointer preview;
+- double-click or Enter completion;
+- Backspace removal;
+- Escape cancellation;
+- generic snapshots usable by future attack/route/corridor symbols.
+
+Then implement only `arrow.curved` using shared polyline cleaning, curve sampling, offsets, ring validation and real Chromium rendered-feature tests.
+
+Do not implement attack, double, pincer, route or corridor arrows in parallel.
