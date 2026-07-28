@@ -38,6 +38,64 @@ test("starts immediately when the optional basemap is disabled", async ({ page }
   expect(isReady).toBe(true);
 });
 
+test("renders sample GeoJSON through committed fill and line layers", async ({ page }) => {
+  await page.goto("/PlotLibre/?basemap=none");
+  await expect(page.getByTestId("plot-count")).toHaveText("3 个标绘");
+
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const playground = window.__plotlibrePlayground;
+          if (!playground) throw new Error("Playground API is unavailable.");
+
+          const map = playground.map;
+          const sourceFeatures = map.querySourceFeatures("plotlibre-committed");
+          const renderedFeatures = map.queryRenderedFeatures(undefined, {
+            layers: ["plotlibre-fill", "plotlibre-line"],
+          });
+          const sourceRoles = sourceFeatures.map(
+            (feature) => feature.properties?.role,
+          );
+          const renderedRoles = renderedFeatures.map(
+            (feature) => feature.properties?.role,
+          );
+
+          return {
+            sourceExists: map.getSource("plotlibre-committed") !== undefined,
+            fillLayerExists: map.getLayer("plotlibre-fill") !== undefined,
+            lineLayerExists: map.getLayer("plotlibre-line") !== undefined,
+            fillLayerVisible:
+              (map.getLayoutProperty("plotlibre-fill", "visibility") ??
+                "visible") === "visible",
+            lineLayerVisible:
+              (map.getLayoutProperty("plotlibre-line", "visibility") ??
+                "visible") === "visible",
+            sourceHasExpectedFeatures: sourceFeatures.length >= 6,
+            sourceHasFill: sourceRoles.includes("fill"),
+            sourceHasOutline: sourceRoles.includes("outline"),
+            canvasHasRenderedFeatures: renderedFeatures.length > 0,
+            canvasHasFill: renderedRoles.includes("fill"),
+            canvasHasOutline: renderedRoles.includes("outline"),
+          };
+        }),
+      { timeout: 10_000 },
+    )
+    .toEqual({
+      sourceExists: true,
+      fillLayerExists: true,
+      lineLayerExists: true,
+      fillLayerVisible: true,
+      lineLayerVisible: true,
+      sourceHasExpectedFeatures: true,
+      sourceHasFill: true,
+      sourceHasOutline: true,
+      canvasHasRenderedFeatures: true,
+      canvasHasFill: true,
+      canvasHasOutline: true,
+    });
+});
+
 test("draws a straight arrow and supports undo and redo", async ({ page }) => {
   await openPlayground(page);
   await drawArrow(page);
