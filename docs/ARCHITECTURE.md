@@ -111,8 +111,8 @@ hitAreas
 │ registry · store · commands · history        │
 │ validation · transactions · PlotJSON         │
 ├──────────────────────────────────────────────┤
-│ Interaction Engine                           │
-│ sessions · gestures · handles · snapping     │
+│ @plotlibre/interaction                       │
+│ draw sessions · semantic state machines      │
 ├──────────────────────────────────────────────┤
 │ @plotlibre/symbols / @plotlibre/milstd       │
 │ declarative plot definitions                 │
@@ -171,22 +171,34 @@ hitAreas
 
 当前已实现：`arrow.straight`。
 
-### 4.4 `@plotlibre/maplibre`
+### 4.4 `@plotlibre/interaction`
 
 职责：
 
-- 创建和维护 GeoJSON Source；
-- 创建 fill、line、circle、symbol 图层；
+- engine-independent `DrawSession` 契约；
+- 状态快照和完成结果；
+- 两点、后续多点和参数化绘制会话；
+- 键盘行为；
+- 不依赖 MapLibre、DOM 或 WebGL。
+
+当前已实现：`TwoPointDrawSession`，支持 ready/drawing/completed/cancelled、pointer preview、Enter 完成、Escape 取消和 Backspace/Delete 重置。
+
+### 4.5 `@plotlibre/maplibre`
+
+职责：
+
+- 创建和维护 committed、draft、handles GeoJSON Source；
+- 创建 fill、line、circle 和 handles 图层；
 - 把 `RenderBundle` 转换为 MapLibre 数据；
+- 把 MapLibre 点击、移动、拖动、键盘和 style 事件转换为语义交互；
 - 高层 `PlotLibre` 控制器；
-- 后续 hit testing、style reload 恢复和事件适配。
+- hit testing、选择和控制点编辑。
 
-当前已实现：committed source、三个渲染图层、创建/删除/撤销/重做、PlotJSON 导入导出。
+当前已实现：三套 Source、七个图层、两点交互绘制、动态预览、对象选择、语义控制点拖动、单命令撤销、`style.load` 恢复和 PlotJSON 导入导出。
 
-### 4.5 计划包
+### 4.6 计划包
 
 ```text
-@plotlibre/interaction
 @plotlibre/ui
 @plotlibre/io
 @plotlibre/milstd
@@ -195,7 +207,7 @@ hitAreas
 @plotlibre/collab
 ```
 
-Interaction 是否独立成包将在完成首个交互垂直切片后决定。若其完全不依赖 MapLibre，可独立；若需要大量屏幕坐标和地图事件桥接，则由 engine-independent state machine 与 MapLibre gesture adapter 两部分组成。
+交互内核已经确认独立为 `@plotlibre/interaction`。MapLibre 包只保留地图事件、命中测试、cursor、dragPan 和 Source/Layer 生命周期适配。
 
 ## 5. 数据流
 
@@ -333,7 +345,7 @@ interface PlotHandle {
 
 ## 9. MapLibre 渲染
 
-### 9.1 目标 Source
+### 9.1 Source 规划
 
 完整版本计划：
 
@@ -346,7 +358,7 @@ plotlibre-labels
 plotlibre-hitareas
 ```
 
-当前里程碑只实现 `plotlibre-committed`，并通过 feature role 过滤 fill、line 和 point。
+当前已经实现前三套 Source：`committed` 保存 Store 派生结果，`draft` 承担高频预览，`handles` 显示语义控制点。`guides`、独立标签和扩大命中区域将在后续里程碑增加。
 
 ### 9.2 图层顺序
 
@@ -368,11 +380,11 @@ handles
 
 ### 9.3 Style reload
 
-MapLibre `setStyle()` 会删除自定义 source/layer。适配器必须监听 style 生命周期，在新样式加载后安全恢复基础设施和数据。恢复逻辑必须是幂等的。
+MapLibre `setStyle()` 会删除自定义 source/layer。适配器监听 `style.load`，幂等恢复三套 Source、七个图层、Store 数据、活动 draft 和选择 handles。
 
 ### 9.4 增量更新
 
-大量标绘对象时，应保持稳定的 Feature ID，优先更新变化对象。当前 `setData()` 全量更新仅作为第一阶段实现，后续评估 MapLibre `updateData()` 和分块 source。
+大量标绘对象时，应保持稳定的 Feature ID，优先更新变化对象。当前 `setData()` 全量更新适用于基础阶段，后续评估 MapLibre `updateData()`、分块 Source 和 dirty-feature 更新。
 
 ## 10. 坐标和尺寸模式
 
@@ -565,26 +577,40 @@ PlotJSON 的 `schemaVersion` 与各符号的 `definitionVersion` 独立。算法
 
 ## 16. 当前实现与下一步
 
-当前已经完成最小纵向切片：
+当前已完成两个纵向里程碑：
 
 ```text
 PlotFeature
 → Registry
 → StraightArrow geometry
 → RenderBundle
-→ MapLibre source/layers
-→ Store/History
+→ committed / draft / handles sources
+→ engine-independent TwoPointDrawSession
+→ MapLibre event adapter
+→ semantic handle editing
+→ Store / CommandHistory
 → PlotJSON
-→ Tests
+→ 15 tests
 ```
 
-下一里程碑应完成浏览器可运行的交互直箭头：
+当前交互保证：
 
-1. Draft source；
-2. MapLibre pointer event adapter；
-3. 两点 DrawSession；
-4. 动态预览；
-5. Escape 取消；
-6. 完成后进入 committed store；
-7. 控制点 handles；
-8. Playwright 最小交互测试。
+1. 首次点击只采集起点，不生成无效几何；
+2. pointermove 只更新 draft，不写 Store；
+3. 第二次点击或 Enter 只提交一个 CreatePlotCommand；
+4. Escape 取消并清理 draft；
+5. 拖动控制点期间只渲染 preview；
+6. mouseup 只提交一个 ReplacePlotCommand；
+7. undo/redo 后 handles 跟随 Store；
+8. `style.load` 后幂等恢复全部 PlotLibre 图层和状态。
+
+下一里程碑是浏览器示例与 GitHub Pages：
+
+1. 建立 `apps/playground`；
+2. 使用真实 MapLibre GL JS 6 ESM 构建；
+3. 增加工具栏、状态提示和 JSON 导入导出；
+4. 加入 Playwright Chromium 测试；
+5. 建立 MapLibre 5/6 测试矩阵；
+6. 建立 GitHub Pages 构建与部署；
+7. 示例应用仅调用公开 API；
+8. 完成后再进入箭头公共几何基础和攻击箭头系列。

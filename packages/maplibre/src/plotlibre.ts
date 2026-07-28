@@ -7,16 +7,24 @@ import {
   parsePlotDocument,
   PlotRegistry,
   PlotStore,
+  ReplacePlotCommand,
   serializePlotDocument,
   type PlotDefinition,
   type PlotDocument,
   type PlotFeature,
   type PlotFeatureInput,
 } from "@plotlibre/core";
+import {
+  MapLibrePlotInteraction,
+  type MapLibrePlotInteractionOptions,
+  type StartPlotDrawOptions,
+} from "./interaction.js";
 import { MapLibrePlotRenderer } from "./renderer.js";
 import type { MapLibreMapLike, PlotLibreRendererOptions } from "./types.js";
 
-export interface PlotLibreOptions extends PlotLibreRendererOptions {
+export interface PlotLibreOptions
+  extends PlotLibreRendererOptions,
+    MapLibrePlotInteractionOptions {
   readonly definitions?: readonly PlotDefinition[];
   readonly historySize?: number;
   readonly autoInitialize?: boolean;
@@ -27,6 +35,7 @@ export class PlotLibre {
   public readonly store: PlotStore;
   public readonly history: CommandHistory;
   public readonly renderer: MapLibrePlotRenderer;
+  public readonly interaction: MapLibrePlotInteraction;
   readonly #unsubscribe: () => void;
 
   public constructor(map: MapLibreMapLike, options: PlotLibreOptions = {}) {
@@ -45,6 +54,20 @@ export class PlotLibre {
     this.#unsubscribe = this.store.subscribe(() => {
       this.renderer.render(this.store.list(), this.registry);
     });
+
+    this.interaction = new MapLibrePlotInteraction(
+      map,
+      this.registry,
+      this.store,
+      this.renderer,
+      {
+        create: (input) => this.create(input),
+        replace: (feature) => this.replace(feature),
+      },
+      options.idFactory !== undefined
+        ? { idFactory: options.idFactory }
+        : {},
+    );
   }
 
   public register(definition: PlotDefinition): this {
@@ -76,8 +99,31 @@ export class PlotLibre {
     return this.store.get(feature.id);
   }
 
+  public replace(feature: PlotFeature): PlotFeature {
+    const current = this.store.get(feature.id);
+    const next = createPlotFeature({
+      ...feature,
+      revision: current.revision + 1,
+    });
+    this.registry.assertValid(next);
+    this.history.execute(new ReplacePlotCommand(this.store, next));
+    return this.store.get(next.id);
+  }
+
   public remove(id: string): void {
     this.history.execute(new DeletePlotCommand(this.store, id));
+  }
+
+  public draw(plotType: string, options: StartPlotDrawOptions = {}): string {
+    return this.interaction.startDraw(plotType, options);
+  }
+
+  public cancelDrawing(): boolean {
+    return this.interaction.cancelDraw();
+  }
+
+  public select(id: string | undefined): void {
+    this.interaction.select(id);
   }
 
   public undo(): boolean {
@@ -89,6 +135,8 @@ export class PlotLibre {
   }
 
   public clear(): void {
+    this.interaction.cancelDraw();
+    this.interaction.select(undefined);
     this.store.clear();
     this.history.clear();
   }
@@ -111,6 +159,8 @@ export class PlotLibre {
 
   public importDocument(value: PlotDocument | string | unknown): PlotDocument {
     const document = parsePlotDocument(value);
+    this.interaction.cancelDraw();
+    this.interaction.select(undefined);
     this.store.clear();
     for (const feature of document.features) {
       this.registry.assertValid(feature);
@@ -125,6 +175,7 @@ export class PlotLibre {
   }
 
   public destroy(): void {
+    this.interaction.destroy();
     this.#unsubscribe();
     this.renderer.destroy();
   }

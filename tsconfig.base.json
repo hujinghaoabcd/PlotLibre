@@ -17,10 +17,21 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@plotlibre/core": ["packages/core/src/index.ts"],
-      "@plotlibre/geometry": ["packages/geometry/src/index.ts"],
-      "@plotlibre/symbols": ["packages/symbols/src/index.ts"],
-      "@plotlibre/maplibre": ["packages/maplibre/src/index.ts"]
+      "@plotlibre/core": [
+        "packages/core/src/index.ts"
+      ],
+      "@plotlibre/geometry": [
+        "packages/geometry/src/index.ts"
+      ],
+      "@plotlibre/symbols": [
+        "packages/symbols/src/index.ts"
+      ],
+      "@plotlibre/maplibre": [
+        "packages/maplibre/src/index.ts"
+      ],
+      "@plotlibre/interaction": [
+        "packages/interaction/src/index.ts"
+      ]
     }
   }
 }

@@ -108,7 +108,8 @@ export type PlotRenderRole =
   | "line"
   | "point"
   | "label"
-  | "hit-area";
+  | "hit-area"
+  | "handle";
 
 export interface PlotRenderProperties extends Record<string, JsonValue> {
   readonly plotId: string;
@@ -121,6 +122,9 @@ export interface PlotRenderProperties extends Record<string, JsonValue> {
   readonly lineWidth?: number;
   readonly pointColor?: string;
   readonly pointRadius?: number;
+  readonly handleKind?: string;
+  readonly handleIndex?: number;
+  readonly plotRenderId?: string;
 }
 
 export interface RenderBundle {

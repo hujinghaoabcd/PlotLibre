@@ -1,7 +1,7 @@
 {
-  "name": "@plotlibre/symbols",
+  "name": "@plotlibre/interaction",
   "version": "0.0.2",
-  "description": "Built-in parametric symbol definitions for PlotLibre.",
+  "description": "Engine-independent drawing sessions and interaction state machines for PlotLibre.",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",
@@ -12,12 +12,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "dependencies": {
-    "@plotlibre/core": "0.0.2",
-    "@plotlibre/geometry": "0.0.2"
+    "@plotlibre/core": "0.0.2"
   },
   "license": "UNLICENSED"
 }

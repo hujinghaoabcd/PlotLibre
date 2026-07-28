@@ -1,9 +1,20 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/core" },
-    { "path": "./packages/geometry" },
-    { "path": "./packages/symbols" },
-    { "path": "./packages/maplibre" }
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/geometry"
+    },
+    {
+      "path": "./packages/symbols"
+    },
+    {
+      "path": "./packages/interaction"
+    },
+    {
+      "path": "./packages/maplibre"
+    }
   ]
 }

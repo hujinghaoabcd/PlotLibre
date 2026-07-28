@@ -1,0 +1,147 @@
+import type { PlotFeatureInput, Position } from "@plotlibre/core";
+import type {
+  DrawSession,
+  DrawSessionSnapshot,
+  DrawSessionStatus,
+  TwoPointDrawSessionOptions,
+} from "./types.js";
+
+export class TwoPointDrawSession implements DrawSession {
+  readonly #options: TwoPointDrawSessionOptions;
+  #status: DrawSessionStatus = "ready";
+  #start: Position | undefined;
+  #cursor: Position | undefined;
+  #completed: PlotFeatureInput | undefined;
+
+  public constructor(options: TwoPointDrawSessionOptions) {
+    if (!options.id.trim()) {
+      throw new TypeError("TwoPointDrawSession id must not be empty.");
+    }
+    if (!options.plotType.trim()) {
+      throw new TypeError("TwoPointDrawSession plotType must not be empty.");
+    }
+    this.#options = options;
+  }
+
+  public get status(): DrawSessionStatus {
+    return this.#status;
+  }
+
+  public snapshot(): DrawSessionSnapshot {
+    if (this.#status === "completed" && this.#completed) {
+      return { status: this.#status, completed: this.#completed };
+    }
+
+    const draft = this.#createDraft();
+    return draft ? { status: this.#status, draft } : { status: this.#status };
+  }
+
+  public click(position: Position): DrawSessionSnapshot {
+    if (this.#isTerminal()) {
+      return this.snapshot();
+    }
+
+    const point = clonePosition(position);
+    if (!this.#start) {
+      this.#start = point;
+      this.#cursor = undefined;
+      this.#status = "drawing";
+      return this.snapshot();
+    }
+
+    if (samePosition(this.#start, point)) {
+      return this.snapshot();
+    }
+
+    this.#completed = this.#createFeature([this.#start, point]);
+    this.#status = "completed";
+    this.#cursor = point;
+    return this.snapshot();
+  }
+
+  public pointerMove(position: Position): DrawSessionSnapshot {
+    if (this.#isTerminal() || !this.#start) {
+      return this.snapshot();
+    }
+
+    const point = clonePosition(position);
+    this.#cursor = samePosition(this.#start, point) ? undefined : point;
+    return this.snapshot();
+  }
+
+  public keyDown(key: string): DrawSessionSnapshot {
+    if (this.#isTerminal()) {
+      return this.snapshot();
+    }
+
+    if (key === "Escape") {
+      return this.cancel();
+    }
+
+    if (key === "Backspace" || key === "Delete") {
+      this.#start = undefined;
+      this.#cursor = undefined;
+      this.#status = "ready";
+      return this.snapshot();
+    }
+
+    if (key === "Enter" && this.#start && this.#cursor) {
+      this.#completed = this.#createFeature([this.#start, this.#cursor]);
+      this.#status = "completed";
+    }
+
+    return this.snapshot();
+  }
+
+  public cancel(): DrawSessionSnapshot {
+    if (this.#status !== "completed") {
+      this.#status = "cancelled";
+      this.#start = undefined;
+      this.#cursor = undefined;
+    }
+    return this.snapshot();
+  }
+
+  #createDraft(): PlotFeatureInput | undefined {
+    if (!this.#start || !this.#cursor || this.#isTerminal()) {
+      return undefined;
+    }
+    return this.#createFeature([this.#start, this.#cursor]);
+  }
+
+  #createFeature(controlPoints: readonly Position[]): PlotFeatureInput {
+    const input: PlotFeatureInput = {
+      id: this.#options.id,
+      plotType: this.#options.plotType,
+      controlPoints: controlPoints.map(clonePosition),
+    };
+
+    return {
+      ...input,
+      ...(this.#options.definitionVersion !== undefined
+        ? { definitionVersion: this.#options.definitionVersion }
+        : {}),
+      ...(this.#options.parameters !== undefined
+        ? { parameters: { ...this.#options.parameters } }
+        : {}),
+      ...(this.#options.style !== undefined
+        ? { style: { ...this.#options.style } }
+        : {}),
+      ...(this.#options.metadata !== undefined
+        ? { metadata: { ...this.#options.metadata } }
+        : {}),
+    };
+  }
+
+  #isTerminal(): boolean {
+    return this.#status === "completed" || this.#status === "cancelled";
+  }
+}
+
+function clonePosition([longitude, latitude]: Position): Position {
+  return [longitude, latitude];
+}
+
+function samePosition(left: Position, right: Position): boolean {
+  return left[0] === right[0] && left[1] === right[1];
+}

@@ -20,7 +20,8 @@ The dependency direction is mandatory:
 
 ```text
 core <- geometry <- symbols
-core <- maplibre
+core <- interaction
+core + interaction <- maplibre
 ```
 
 Future packages may depend on these public layers, but:
@@ -28,7 +29,8 @@ Future packages may depend on these public layers, but:
 - `core` must never depend on MapLibre or DOM APIs;
 - `geometry` must never depend on MapLibre, UI frameworks, or browser events;
 - `symbols` must define behavior through `PlotDefinition` registration;
-- `maplibre` must translate semantic render bundles into MapLibre sources and layers;
+- `interaction` must remain engine-independent and must not import MapLibre or DOM APIs;
+- `maplibre` must translate semantic render bundles and interaction snapshots into MapLibre sources, layers and events;
 - UI packages must call public controller APIs and must not mutate stores directly.
 
 Avoid circular package dependencies.
@@ -112,4 +114,4 @@ Do not implement many symbol types before the shared geometry primitives, regist
 
 ## 10. Current priority
 
-Read `docs/handover/LATEST.md` before starting. The current next milestone is the authoritative task list.
+Read `docs/handover/LATEST.md` before starting. The current next milestone is the authoritative task list. After Milestone 002, prioritize the real MapLibre browser playground and GitHub Pages deployment before expanding the symbol catalog.

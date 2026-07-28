@@ -24,7 +24,7 @@ A pull request should contain one coherent vertical improvement. It must explain
 - why the architecture needs it;
 - public API impact;
 - PlotJSON impact;
-- geometry and interaction edge cases;
+- geometry and interaction state-machine edge cases;
 - validation commands;
 - license/provenance considerations.
 
@@ -39,6 +39,7 @@ A new symbol is incomplete without:
 - degenerate input behavior;
 - geometry tests;
 - PlotJSON round-trip coverage;
+- interaction behavior or a documented reason it is non-interactive;
 - a handover update.
 
 ## Documentation and handover
