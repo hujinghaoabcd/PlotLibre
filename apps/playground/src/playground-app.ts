@@ -1,9 +1,13 @@
 import type { PlotFeature, PlotStyle } from "@plotlibre/core";
 import type { PlotLibre } from "@plotlibre/maplibre";
-import { STRAIGHT_ARROW_TYPE } from "@plotlibre/symbols";
+import {
+  FINE_ARROW_TYPE,
+  STRAIGHT_ARROW_TYPE,
+} from "@plotlibre/symbols";
 import type { Map } from "maplibre-gl";
 
 interface PlaygroundElements {
+  readonly symbolSelect: HTMLSelectElement;
   readonly drawButton: HTMLButtonElement;
   readonly cancelButton: HTMLButtonElement;
   readonly undoButton: HTMLButtonElement;
@@ -53,7 +57,7 @@ export class PlaygroundApp {
     if (!this.#e2e && this.#plot.store.size === 0) {
       this.loadSample();
     } else {
-      this.setStatus("准备就绪。点击“绘制直箭头”开始标绘。", "ready");
+      this.setStatus("准备就绪。选择符号后点击“开始绘制”。", "ready");
       this.refresh();
     }
   }
@@ -72,6 +76,7 @@ export class PlaygroundApp {
     this.#elements.selectionState.textContent = selected ? "已选择" : "未选择";
     this.#elements.selectionState.dataset.state = selected ? "active" : "idle";
 
+    this.#elements.symbolSelect.disabled = isDrawing;
     this.#elements.drawButton.disabled = isDrawing;
     this.#elements.cancelButton.disabled = !isDrawing;
     this.#elements.undoButton.disabled = !this.#plot.history.canUndo;
@@ -107,6 +112,7 @@ export class PlaygroundApp {
     const samples = [
       {
         id: "sample-main-direction",
+        plotType: STRAIGHT_ARROW_TYPE,
         controlPoints: [
           [118.755, 32.035],
           [118.835, 32.095],
@@ -114,20 +120,22 @@ export class PlaygroundApp {
         style: sampleStyle,
       },
       {
-        id: "sample-secondary-direction",
+        id: "sample-fine-direction",
+        plotType: FINE_ARROW_TYPE,
         controlPoints: [
           [118.77, 32.105],
           [118.855, 32.065],
         ] as const,
         style: {
           fillColor: "#f29e38",
-          fillOpacity: 0.42,
+          fillOpacity: 0.56,
           lineColor: "#9a5512",
           lineWidth: 2,
         },
       },
       {
         id: "sample-support-direction",
+        plotType: STRAIGHT_ARROW_TYPE,
         controlPoints: [
           [118.735, 32.075],
           [118.795, 32.125],
@@ -144,7 +152,7 @@ export class PlaygroundApp {
     for (const sample of samples) {
       this.#plot.create({
         id: sample.id,
-        plotType: STRAIGHT_ARROW_TYPE,
+        plotType: sample.plotType,
         controlPoints: sample.controlPoints,
         style: sample.style,
         metadata: { source: "PlotLibre playground sample" },
@@ -160,15 +168,29 @@ export class PlaygroundApp {
       ],
       { padding: 72, duration: 500 },
     );
-    this.setStatus("已加载南京示例箭头。可拖动控制点或修改右侧样式。", "ready");
+    this.setStatus(
+      "已加载南京直箭头和细箭头示例。可拖动控制点或修改右侧样式。",
+      "ready",
+    );
     this.refresh();
   }
 
   #bindToolbar(): void {
+    this.#elements.symbolSelect.addEventListener("change", () => {
+      this.setStatus(
+        `已选择${this.#selectedSymbolLabel()}。点击“开始绘制”后在地图上确定箭尾和箭尖。`,
+        "ready",
+      );
+    });
+
     this.#elements.drawButton.addEventListener("click", () => {
       try {
-        this.#plot.draw(STRAIGHT_ARROW_TYPE, { style: this.#currentInputStyle() });
-        this.setStatus("请在地图上点击箭尾，再移动鼠标并点击箭头终点。", "drawing");
+        const plotType = this.#elements.symbolSelect.value;
+        this.#plot.draw(plotType, { style: this.#currentInputStyle() });
+        this.setStatus(
+          `正在绘制${this.#selectedSymbolLabel()}：请点击箭尾，再移动鼠标并点击箭尖。`,
+          "drawing",
+        );
         this.refresh();
       } catch (error) {
         this.#reportError("无法开始绘制", error);
@@ -283,6 +305,11 @@ export class PlaygroundApp {
     return selectedId ? this.#plot.store.find(selectedId) : undefined;
   }
 
+  #selectedSymbolLabel(): string {
+    return this.#elements.symbolSelect.selectedOptions[0]?.textContent?.trim() ??
+      this.#elements.symbolSelect.value;
+  }
+
   #syncStyleInputs(feature: PlotFeature): void {
     const fillColor = feature.style.fillColor ?? "#d32f2f";
     const fillOpacity = feature.style.fillOpacity ?? 0.45;
@@ -353,6 +380,7 @@ export class PlaygroundApp {
 
 function collectElements(): PlaygroundElements {
   return {
+    symbolSelect: required("symbol-select", HTMLSelectElement),
     drawButton: required("draw-button", HTMLButtonElement),
     cancelButton: required("cancel-button", HTMLButtonElement),
     undoButton: required("undo-button", HTMLButtonElement),
