@@ -148,10 +148,13 @@ export function buildCurvedArrowRing(
     measuredCenterline,
     Math.max(0, totalLength - headLength),
   );
+  // Do not retain both the arc-length trim point and the tangent-defined neck
+  // center. Their slightly different tangents can create a short reverse bend
+  // whose offset crosses the arrow shoulder. The last pre-trim curve sample
+  // connects directly to the semantic head neck instead.
   const shaftCenterline = cleanPolyline(
     [
       ...measuredCenterline.points.slice(0, trimSample.segmentIndex + 1),
-      trimSample.point,
       head.neckCenter,
     ],
     1e-6,
