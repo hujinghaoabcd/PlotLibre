@@ -6,21 +6,21 @@
 
 ## Live playground
 
-The GitHub Pages workflow targets:
-
 **https://hujinghaoabcd.github.io/PlotLibre/**
 
-The playground supports straight-arrow drawing, live preview, semantic control-point editing, undo/redo, deletion, style editing, sample data, and PlotJSON import/export. The deployment URL should be treated as verified only after the Pages workflow succeeds and the page is opened successfully.
+The playground supports a symbol selector, straight-arrow and fine-arrow drawing, live preview, semantic control-point editing, undo/redo, deletion, style editing, mixed sample data, and PlotJSON import/export.
+
+The application starts from a local MapLibre style. The optional online basemap never blocks PlotLibre. MapLibre GL JS 6 Worker modules are packaged explicitly and verified by Chromium tests.
 
 ## Project status
 
-Workspace baseline `0.0.4` adds the shared Arrow geometry foundation required before implementing multi-point tactical symbols:
+Workspace baseline `0.0.5` completes the first traditional-arrow vertical slice on top of the shared geometry foundation:
 
 - engine-independent plot definitions, registry, Store and CommandHistory;
 - PlotJSON 1.0 semantic serialization;
 - interactive MapLibre drawing and semantic control-point editing;
 - Vite 8 / MapLibre GL JS 6 browser playground;
-- Playwright Chromium end-to-end tests;
+- explicit Worker and shared-module packaging for GitHub Pages;
 - reusable finite `Vec2` operations;
 - polyline cleaning, cumulative lengths and along-line sampling;
 - cubic Bezier and Catmull-Rom interpolation;
@@ -29,15 +29,17 @@ Workspace baseline `0.0.4` adds the shared Arrow geometry foundation required be
 - Haversine distance, bearing, destination point and geodesic paths;
 - antimeridian normalization and local/geodesic policy analysis;
 - reusable arrow-head construction;
-- deterministic golden fixtures and fixed-seed property-style tests.
+- `arrow.straight` and independent `arrow.fine` definitions;
+- deterministic golden fixtures, parameter tests and PlotJSON round trips;
+- Chromium tests that query actual committed fill/line features.
 
-The next development stage is Milestone 005: the first traditional multi-point Arrow family, beginning with a narrow vertical slice rather than adding all six symbol types at once.
+The next symbol slice is `arrow.fine.tailed`. Other Arrow types will continue one at a time rather than being added as an untested batch.
 
 ## Why PlotLibre
 
-Most drawing libraries treat final GeoJSON as the source of truth. That works for ordinary points, lines, and polygons, but it is insufficient for tactical graphics.
+Most drawing libraries treat final GeoJSON as the source of truth. That is insufficient for tactical graphics.
 
-An attack arrow may render as a polygon with dozens of vertices, while its true semantic model is:
+An arrow may render as a polygon with many vertices, while its true semantic model is:
 
 ```text
 plot type + control points + parameters + style + metadata
@@ -65,7 +67,7 @@ The geometry package operates in two explicit coordinate layers:
 - planar algorithms consume local metre-based `Vec2` values;
 - geographic algorithms consume WGS84 `Position` values.
 
-Example: measure and sample a projected centerline.
+Measure and sample a projected centerline:
 
 ```ts
 import {
@@ -87,7 +89,7 @@ const midpoint = sampleMeasuredPolyline(
 );
 ```
 
-Example: construct variable-width boundaries.
+Construct variable-width boundaries:
 
 ```ts
 import { offsetPolyline } from "@plotlibre/geometry";
@@ -95,11 +97,9 @@ import { offsetPolyline } from "@plotlibre/geometry";
 const boundaries = offsetPolyline(centerline, [4, 8, 12], {
   miterLimit: 4,
 });
-
-console.log(boundaries.left, boundaries.right);
 ```
 
-Example: choose local or geodesic processing explicitly.
+Choose local or geodesic processing explicitly:
 
 ```ts
 import { analyzeCoordinateMode } from "@plotlibre/geometry";
@@ -109,39 +109,74 @@ const analysis = analyzeCoordinateMode([
   [-179.9, 10],
 ]);
 
-// "geodesic" because the path crosses the antimeridian.
-console.log(analysis.mode);
+console.log(analysis.mode); // "geodesic"
 ```
 
 See [`docs/GEOMETRY_FOUNDATION.md`](docs/GEOMETRY_FOUNDATION.md).
 
+## Built-in arrows
+
+### Straight arrow
+
+```ts
+import { buildStraightArrowRing } from "@plotlibre/geometry";
+
+const ring = buildStraightArrowRing(
+  [118.78, 32.04],
+  [118.86, 32.1],
+);
+```
+
+### Fine arrow
+
+`arrow.fine` is a separate narrow, tapered two-point symbol. It has its own parameter contract and golden fixture rather than being an alias for `arrow.straight`.
+
+```ts
+import { buildFineArrowRing } from "@plotlibre/geometry";
+
+const ring = buildFineArrowRing(
+  [118.78, 32.04],
+  [118.86, 32.1],
+  {
+    tailWidthRatio: 0.055,
+    headLengthRatio: 0.22,
+  },
+);
+```
+
+See [`docs/algorithms/arrow-fine.md`](docs/algorithms/arrow-fine.md).
+
 ## Programmatic creation
 
-MapLibre GL JS 6 is ESM-only, so use named imports or a namespace import:
+MapLibre GL JS 6 is ESM-only. The GitHub Pages application also sets an explicit Worker URL before creating the first map.
 
 ```ts
 import { Map } from "maplibre-gl";
 import { PlotLibre } from "@plotlibre/maplibre";
 import {
-  straightArrowDefinition,
-  STRAIGHT_ARROW_TYPE,
+  builtInSymbols,
+  FINE_ARROW_TYPE,
 } from "@plotlibre/symbols";
 
 const map = new Map({
   container: "map",
-  style: "https://demotiles.maplibre.org/style.json",
+  style: {
+    version: 8,
+    sources: {},
+    layers: [],
+  },
   center: [118.8, 32.06],
   zoom: 10,
 });
 
 map.on("load", () => {
   const plot = new PlotLibre(map, {
-    definitions: [straightArrowDefinition],
+    definitions: builtInSymbols,
   });
 
   plot.create({
-    id: "main-direction",
-    plotType: STRAIGHT_ARROW_TYPE,
+    id: "fine-direction",
+    plotType: FINE_ARROW_TYPE,
     controlPoints: [
       [118.78, 32.04],
       [118.86, 32.1],
@@ -152,8 +187,10 @@ map.on("load", () => {
 
 ## Interactive drawing
 
+All exactly-two-point definitions currently reuse the engine-independent `TwoPointDrawSession` and two semantic edit handles.
+
 ```ts
-const id = plot.draw(STRAIGHT_ARROW_TYPE, {
+const id = plot.draw(FINE_ARROW_TYPE, {
   style: {
     fillColor: "#d32f2f",
     fillOpacity: 0.5,
@@ -186,8 +223,6 @@ Requirements:
 - Node.js 20.19 or newer;
 - a browser with WebGL2.
 
-Install and start:
-
 ```bash
 npm install
 npm run playground:dev
@@ -206,7 +241,7 @@ npx playwright install --with-deps chromium
 npm run playground:e2e
 ```
 
-See [`docs/PLAYGROUND.md`](docs/PLAYGROUND.md) for the complete workflow.
+See [`docs/PLAYGROUND.md`](docs/PLAYGROUND.md).
 
 ## Rendering model
 
@@ -218,7 +253,7 @@ plotlibre-draft
 plotlibre-handles
 ```
 
-This keeps pointer previews small and fast, prevents draft state from polluting persistent data, and allows handles to be regenerated from semantic control points.
+This keeps pointer previews small, prevents draft state from polluting persistent data, and allows handles to be regenerated from semantic control points.
 
 ## PlotJSON
 
@@ -226,16 +261,18 @@ A PlotLibre feature stores semantic source data rather than only the generated p
 
 ```json
 {
-  "id": "main-direction",
-  "plotType": "arrow.straight",
+  "id": "fine-direction",
+  "plotType": "arrow.fine",
   "definitionVersion": "1.0.0",
   "controlPoints": [
     [118.78, 32.04],
     [118.86, 32.1]
   ],
   "parameters": {
-    "tailWidthRatio": 0.08,
-    "headLengthRatio": 0.28
+    "tailWidthRatio": 0.055,
+    "headLengthRatio": 0.22,
+    "headWidthRatio": 1.9,
+    "neckWidthRatio": 0.42
   },
   "style": {
     "fillColor": "#d32f2f"
@@ -263,6 +300,8 @@ npm run handover:check
 - [Architecture](docs/ARCHITECTURE.md)
 - [Interaction model](docs/INTERACTION_MODEL.md)
 - [Shared geometry foundation](docs/GEOMETRY_FOUNDATION.md)
+- [Fine arrow algorithm](docs/algorithms/arrow-fine.md)
+- [MapLibre Worker packaging](docs/MAPLIBRE_WORKER_PACKAGING.md)
 - [Playground and GitHub Pages](docs/PLAYGROUND.md)
 - [PlotJSON specification](docs/PLOTJSON_SPEC.md)
 - [Reference library matrix](docs/REFERENCE_LIBRARY_MATRIX.md)
@@ -281,7 +320,7 @@ Every completed milestone must:
 
 ## Compatibility target
 
-The library adapter targets MapLibre GL JS 5.x and 6.x. The current playground pins MapLibre GL JS 6.0.0 and validates the GitHub Pages `/PlotLibre/` project path.
+The adapter targets MapLibre GL JS 5.x and 6.x. The current playground pins MapLibre GL JS 6.0.0 and validates the `/PlotLibre/` project path, Worker module graph, committed source data and actual rendered features.
 
 ## License
 
