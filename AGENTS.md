@@ -43,6 +43,8 @@ Rules:
 - Shared primitives must remain pure and worker-ready.
 - Related variants must share components, frames or strategies; copying complete generators is prohibited.
 - A new public symbol needs a real semantic or structural distinction, not only new default values.
+- Multi-point arrow geometry must preserve semantic controls separately from curve samples and polygon vertices.
+- Self-intersection checks must not be removed merely to make a difficult path render.
 
 ## 4. Clean-room and licensing
 
@@ -67,6 +69,8 @@ Never copy proprietary Mapbox code. Current project packages remain `UNLICENSED`
 - MapLibre remains a peer dependency.
 - Framework wrappers remain optional.
 - Definition defaults are part of the visual/data contract.
+- Every semantic path control must survive PlotJSON round trip.
+- Derived centerline samples, offset vertices and polygon vertices must not be serialized as semantic controls.
 
 Current public Arrow identifiers:
 
@@ -75,9 +79,23 @@ arrow.straight
 arrow.fine
 arrow.fine.tailed
 arrow.assault-direction
+arrow.curved
 ```
 
-## 6. Testing requirements
+## 6. Interaction rules
+
+- Exact two-point definitions use `TwoPointDrawSession`.
+- Definitions requiring three or more points use `MultiPointDrawSession`.
+- Session choice is derived from `PlotDefinition.controlSchema`, not hard-coded symbol IDs.
+- Draft output is allowed only after minimum semantic validity is reached.
+- Enter and double-click completion must preserve all semantic controls.
+- Backspace/Delete removes one uncommitted multi-point control at a time.
+- Drawing-state point removal is not Store history.
+- MapLibre double-click zoom must be restored after complete, cancel or destroy.
+- One completed handle drag produces one `ReplacePlotCommand`.
+- Invalid handle previews do not enter Store.
+
+## 7. Testing requirements
 
 Required before a milestone is merged:
 
@@ -102,9 +120,21 @@ For MapLibre symbols, Store size is not sufficient. Tests must verify:
 - relevant fill/line Layers;
 - at least one actual `queryRenderedFeatures()` result.
 
-New geometry requires numerical, degenerate, parameter-isolation and golden-fixture tests. Multi-point geometry must add property tests where practical.
+New geometry requires numerical, degenerate, parameter-isolation and golden-fixture tests. Multi-point geometry must additionally test:
 
-## 7. Playground and Pages
+- minimum point count;
+- exact semantic tip;
+- interior-control influence;
+- duplicate-control cleanup;
+- self-intersection policy;
+- full-path PlotJSON round trip;
+- double-click completion;
+- zoom restoration;
+- interior semantic handle edit and undo.
+
+MapLibre `querySourceFeatures()` may return duplicate tile copies. Semantic handle counts must be validated by unique `plotId + handleIndex`, not raw Feature count.
+
+## 8. Playground and Pages
 
 - GitHub Pages base is `/PlotLibre/`.
 - Production cannot require private API keys.
@@ -112,9 +142,10 @@ New geometry requires numerical, degenerate, parameter-isolation and golden-fixt
 - E2E cannot depend on remote tiles.
 - MapLibre 6 Worker and Shared modules remain aligned with the installed package.
 - Every public symbol gets a selector/catalog entry and browser test in the same slice.
+- Multi-point symbols require visible instructions for completion and point removal.
 - Pages deploys only from `main`.
 
-## 8. Documentation and handover
+## 9. Documentation and handover
 
 Every completed task must update:
 
@@ -138,28 +169,41 @@ Each handover includes:
 - prioritized next tasks;
 - continuation instructions.
 
+The handover contract requires these exact headings:
+
+```text
+## Completed in this milestone
+## Next tasks
+## Risks and decisions
+```
+
 Never delete earlier handovers.
 
-## 9. Scope control
+## 10. Scope control
 
 One complete high-quality vertical slice is preferred to many incomplete symbols. Do not develop multiple new Arrow types in parallel.
 
-## 10. Current priority
+## 11. Current priority
 
-Milestone 005C completes `arrow.assault-direction` as a broad, angle-defined geometry that is structurally different from FineArrow.
+Milestone 005E completes `arrow.curved`, the first multi-point symbol, with:
 
-The next priority is Milestone 005D: `arrow.curved`, the first multi-point symbol.
+- reusable `MultiPointDrawSession` integration;
+- Catmull–Rom/Hermite semantic centerline;
+- arc-length variable-width shaft;
+- tangent-aligned head;
+- explicit self-intersection rejection;
+- double-click/Enter completion;
+- interior semantic handle editing;
+- real Chromium rendered-feature validation.
 
-Before curved-arrow geometry, implement and test an engine-independent `MultiPointDrawSession` with:
+The next priority is Milestone 005F: `arrow.attack`.
 
-- minimum-point validation;
-- click-to-append;
-- pointer preview;
-- double-click or Enter completion;
-- Backspace removal;
-- Escape cancellation;
-- generic snapshots usable by future attack/route/corridor symbols.
+Before implementation:
 
-Then implement only `arrow.curved` using shared polyline cleaning, curve sampling, offsets, ring validation and real Chromium rendered-feature tests.
+1. research public attack-arrow semantics and record clean-room provenance;
+2. establish a structural distinction from `arrow.curved`;
+3. design a reusable multi-point body/frame if it benefits both flat-tail and tailed attack variants;
+4. preserve the existing curved-arrow golden contract;
+5. add only `arrow.attack` in this slice.
 
-Do not implement attack, double, pincer, route or corridor arrows in parallel.
+Do not implement `arrow.attack.tailed`, double, pincer, route or corridor arrows in parallel.
