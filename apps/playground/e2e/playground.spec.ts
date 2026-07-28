@@ -26,6 +26,18 @@ test("loads from the GitHub Pages project path", async ({ page }) => {
   await expect(page.getByTestId("plot-count")).toHaveText("0 个标绘");
 });
 
+test("starts immediately when the optional basemap is disabled", async ({ page }) => {
+  await page.goto("/PlotLibre/?basemap=none");
+  await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+  await expect(page.getByTestId("plot-count")).toHaveText("3 个标绘");
+  await expect(page.getByTestId("status-text")).not.toContainText("正在初始化");
+
+  const isReady = await page.evaluate(
+    () => window.__plotlibrePlayground !== undefined,
+  );
+  expect(isReady).toBe(true);
+});
+
 test("draws a straight arrow and supports undo and redo", async ({ page }) => {
   await openPlayground(page);
   await drawArrow(page);
