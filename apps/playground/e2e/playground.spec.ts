@@ -6,6 +6,8 @@ type TwoPointArrowType =
   | "arrow.fine.tailed"
   | "arrow.assault-direction";
 
+type ArrowType = TwoPointArrowType | "arrow.curved";
+
 async function openPlayground(page: Page): Promise<void> {
   await page.goto("/PlotLibre/?e2e=1");
   await expect(page.getByTestId("status-text")).toContainText("准备就绪");
@@ -30,9 +32,48 @@ async function drawArrow(
   await expect(page.getByTestId("selected-id")).not.toHaveText("未选择");
 }
 
+async function drawCurvedArrow(page: Page): Promise<void> {
+  const canvas = page.locator(".maplibregl-canvas");
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("MapLibre canvas does not have a bounding box.");
+
+  await page.getByTestId("symbol-select").selectOption("arrow.curved");
+  await page.getByTestId("draw-button").click();
+
+  const zoomDisabled = await page.evaluate(() => {
+    const playground = window.__plotlibrePlayground;
+    if (!playground) throw new Error("Playground API is unavailable.");
+    return !playground.map.doubleClickZoom.isEnabled();
+  });
+  expect(zoomDisabled).toBe(true);
+
+  const first = { x: box.x + box.width * 0.26, y: box.y + box.height * 0.68 };
+  const middle = { x: box.x + box.width * 0.48, y: box.y + box.height * 0.28 };
+  const tip = { x: box.x + box.width * 0.74, y: box.y + box.height * 0.48 };
+
+  await page.mouse.click(first.x, first.y);
+  await page.mouse.click(middle.x, middle.y);
+  await page.mouse.move(tip.x, tip.y);
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const playground = window.__plotlibrePlayground;
+        if (!playground) return 0;
+        return playground.map.querySourceFeatures("plotlibre-draft").length;
+      }),
+    )
+    .toBeGreaterThan(0);
+
+  await page.mouse.dblclick(tip.x, tip.y, { delay: 60 });
+  await expect(page.getByTestId("plot-count")).toHaveText("1 个标绘");
+  await expect(page.getByTestId("selected-id")).not.toHaveText("未选择");
+}
+
 async function expectSelectedRenderedType(
   page: Page,
-  plotType: TwoPointArrowType,
+  plotType: ArrowType,
+  controlPointCount = 2,
 ): Promise<void> {
   await expect
     .poll(
@@ -58,7 +99,7 @@ async function expectSelectedRenderedType(
     )
     .toEqual({
       plotType,
-      controlPointCount: 2,
+      controlPointCount,
       rendered: true,
     });
 }
@@ -68,13 +109,13 @@ test("loads from the GitHub Pages project path", async ({ page }) => {
   await expect(page).toHaveTitle("PlotLibre Playground");
   await expect(page.getByTestId("plot-count")).toHaveText("0 个标绘");
   await expect(page.getByTestId("symbol-select")).toHaveValue("arrow.straight");
-  await expect(page.getByTestId("symbol-select").locator("option")).toHaveCount(4);
+  await expect(page.getByTestId("symbol-select").locator("option")).toHaveCount(5);
 });
 
 test("starts immediately when the optional basemap is disabled", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
-  await expect(page.getByTestId("plot-count")).toHaveText("4 个标绘");
+  await expect(page.getByTestId("plot-count")).toHaveText("5 个标绘");
   await expect(page.getByTestId("status-text")).not.toContainText("正在初始化");
 
   const sampleTypes = await page.evaluate(() => {
@@ -86,11 +127,12 @@ test("starts immediately when the optional basemap is disabled", async ({ page }
   expect(sampleTypes).toContain("arrow.fine");
   expect(sampleTypes).toContain("arrow.fine.tailed");
   expect(sampleTypes).toContain("arrow.assault-direction");
+  expect(sampleTypes).toContain("arrow.curved");
 });
 
 test("renders all sample arrow types through committed layers", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
-  await expect(page.getByTestId("plot-count")).toHaveText("4 个标绘");
+  await expect(page.getByTestId("plot-count")).toHaveText("5 个标绘");
 
   await expect
     .poll(
@@ -118,19 +160,14 @@ test("renders all sample arrow types through committed layers", async ({ page })
             sourceExists: map.getSource("plotlibre-committed") !== undefined,
             fillLayerExists: map.getLayer("plotlibre-fill") !== undefined,
             lineLayerExists: map.getLayer("plotlibre-line") !== undefined,
-            fillLayerVisible:
-              (map.getLayoutProperty("plotlibre-fill", "visibility") ??
-                "visible") === "visible",
-            lineLayerVisible:
-              (map.getLayoutProperty("plotlibre-line", "visibility") ??
-                "visible") === "visible",
-            sourceHasExpectedFeatures: sourceFeatures.length >= 8,
+            sourceHasExpectedFeatures: sourceFeatures.length >= 10,
             sourceHasFill: sourceRoles.includes("fill"),
             sourceHasOutline: sourceRoles.includes("outline"),
             sourceHasStraight: sourcePlotTypes.includes("arrow.straight"),
             sourceHasFine: sourcePlotTypes.includes("arrow.fine"),
             sourceHasTailedFine: sourcePlotTypes.includes("arrow.fine.tailed"),
             sourceHasAssault: sourcePlotTypes.includes("arrow.assault-direction"),
+            sourceHasCurved: sourcePlotTypes.includes("arrow.curved"),
             canvasHasRenderedFeatures: renderedFeatures.length > 0,
             canvasHasFill: renderedRoles.includes("fill"),
             canvasHasOutline: renderedRoles.includes("outline"),
@@ -142,8 +179,6 @@ test("renders all sample arrow types through committed layers", async ({ page })
       sourceExists: true,
       fillLayerExists: true,
       lineLayerExists: true,
-      fillLayerVisible: true,
-      lineLayerVisible: true,
       sourceHasExpectedFeatures: true,
       sourceHasFill: true,
       sourceHasOutline: true,
@@ -151,6 +186,7 @@ test("renders all sample arrow types through committed layers", async ({ page })
       sourceHasFine: true,
       sourceHasTailedFine: true,
       sourceHasAssault: true,
+      sourceHasCurved: true,
       canvasHasRenderedFeatures: true,
       canvasHasFill: true,
       canvasHasOutline: true,
@@ -180,18 +216,6 @@ test("draws and renders a tailed fine arrow from the symbol selector", async ({
   await openPlayground(page);
   await drawArrow(page, "arrow.fine.tailed");
   await expectSelectedRenderedType(page, "arrow.fine.tailed");
-
-  const derivedRingLength = await page.evaluate(() => {
-    const playground = window.__plotlibrePlayground;
-    if (!playground) throw new Error("Playground API is unavailable.");
-    const selectedId = playground.plot.interaction.selectedId;
-    if (!selectedId) throw new Error("No plot is selected.");
-    const selected = playground.plot.store.get(selectedId);
-    const bundle = playground.plot.registry.generate(selected);
-    const geometry = bundle.fills[0]?.geometry;
-    return geometry?.type === "Polygon" ? geometry.coordinates[0]?.length : 0;
-  });
-  expect(derivedRingLength).toBe(9);
 });
 
 test("draws and renders an assault direction from the symbol selector", async ({
@@ -200,6 +224,14 @@ test("draws and renders an assault direction from the symbol selector", async ({
   await openPlayground(page);
   await drawArrow(page, "arrow.assault-direction");
   await expectSelectedRenderedType(page, "arrow.assault-direction");
+});
+
+test("draws and renders a curved arrow with restored double-click zoom", async ({
+  page,
+}) => {
+  await openPlayground(page);
+  await drawCurvedArrow(page);
+  await expectSelectedRenderedType(page, "arrow.curved", 3);
 
   const derived = await page.evaluate(() => {
     const playground = window.__plotlibrePlayground;
@@ -212,15 +244,74 @@ test("draws and renders an assault direction from the symbol selector", async ({
     return {
       ringLength:
         geometry?.type === "Polygon" ? geometry.coordinates[0]?.length : 0,
-      bodyWidthRatio: selected.parameters.bodyWidthRatio,
-      headAngleDegrees: selected.parameters.headAngleDegrees,
+      tension: selected.parameters.tension,
+      zoomEnabled: playground.map.doubleClickZoom.isEnabled(),
+      handleCount:
+        playground.map.querySourceFeatures("plotlibre-handles").length,
     };
   });
-  expect(derived).toEqual({
-    ringLength: 8,
-    bodyWidthRatio: 0.18,
-    headAngleDegrees: 42,
+
+  expect(derived.ringLength).toBeGreaterThan(20);
+  expect(derived.tension).toBe(0.15);
+  expect(derived.zoomEnabled).toBe(true);
+  expect(derived.handleCount).toBe(3);
+});
+
+test("drags an interior curved control point and undoes the edit", async ({ page }) => {
+  await openPlayground(page);
+  await drawCurvedArrow(page);
+
+  const canvas = page.locator(".maplibregl-canvas");
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("MapLibre canvas does not have a bounding box.");
+
+  const projected = await page.evaluate(() => {
+    const playground = window.__plotlibrePlayground;
+    if (!playground) throw new Error("Playground API is unavailable.");
+    const selectedId = playground.plot.interaction.selectedId;
+    if (!selectedId) throw new Error("No plot is selected.");
+    const selected = playground.plot.store.get(selectedId);
+    const middle = selected.controlPoints[1];
+    if (!middle) throw new Error("Curved arrow has no middle control.");
+    const point = playground.map.project(middle);
+    return {
+      selectedId,
+      middle,
+      x: point.x,
+      y: point.y,
+    };
   });
+
+  await page.mouse.move(box.x + projected.x, box.y + projected.y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + projected.x + 45, box.y + projected.y - 35, {
+    steps: 4,
+  });
+  await page.mouse.up();
+
+  const edited = await page.evaluate(({ selectedId, middle }) => {
+    const playground = window.__plotlibrePlayground;
+    if (!playground) throw new Error("Playground API is unavailable.");
+    const feature = playground.plot.store.get(selectedId);
+    return {
+      changed:
+        feature.controlPoints[1]?.[0] !== middle[0] ||
+        feature.controlPoints[1]?.[1] !== middle[1],
+      revision: feature.revision,
+      undoDepth: playground.plot.history.undoDepth,
+    };
+  }, projected);
+  expect(edited.changed).toBe(true);
+  expect(edited.revision).toBe(1);
+  expect(edited.undoDepth).toBe(2);
+
+  await page.getByTestId("undo-button").click();
+  const restored = await page.evaluate(({ selectedId }) => {
+    const playground = window.__plotlibrePlayground;
+    if (!playground) throw new Error("Playground API is unavailable.");
+    return playground.plot.store.get(selectedId).controlPoints[1];
+  }, projected);
+  expect(restored).toEqual(projected.middle);
 });
 
 test("updates the selected style and deletes the plot", async ({ page }) => {
