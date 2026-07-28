@@ -1,5 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
+type TwoPointArrowType =
+  | "arrow.straight"
+  | "arrow.fine"
+  | "arrow.fine.tailed";
+
 async function openPlayground(page: Page): Promise<void> {
   await page.goto("/PlotLibre/?e2e=1");
   await expect(page.getByTestId("status-text")).toContainText("准备就绪");
@@ -8,7 +13,7 @@ async function openPlayground(page: Page): Promise<void> {
 
 async function drawArrow(
   page: Page,
-  plotType: "arrow.straight" | "arrow.fine" = "arrow.straight",
+  plotType: TwoPointArrowType = "arrow.straight",
 ): Promise<void> {
   const canvas = page.locator(".maplibregl-canvas");
   const box = await canvas.boundingBox();
@@ -24,11 +29,45 @@ async function drawArrow(
   await expect(page.getByTestId("selected-id")).not.toHaveText("未选择");
 }
 
+async function expectSelectedRenderedType(
+  page: Page,
+  plotType: TwoPointArrowType,
+): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        page.evaluate((expectedType) => {
+          const playground = window.__plotlibrePlayground;
+          if (!playground) throw new Error("Playground API is unavailable.");
+          const selectedId = playground.plot.interaction.selectedId;
+          if (!selectedId) return undefined;
+          const selected = playground.plot.store.get(selectedId);
+          const rendered = playground.map.queryRenderedFeatures(undefined, {
+            layers: ["plotlibre-fill", "plotlibre-line"],
+          });
+          return {
+            plotType: selected.plotType,
+            controlPointCount: selected.controlPoints.length,
+            rendered: rendered.some(
+              (feature) => feature.properties?.plotType === expectedType,
+            ),
+          };
+        }, plotType),
+      { timeout: 10_000 },
+    )
+    .toEqual({
+      plotType,
+      controlPointCount: 2,
+      rendered: true,
+    });
+}
+
 test("loads from the GitHub Pages project path", async ({ page }) => {
   await openPlayground(page);
   await expect(page).toHaveTitle("PlotLibre Playground");
   await expect(page.getByTestId("plot-count")).toHaveText("0 个标绘");
   await expect(page.getByTestId("symbol-select")).toHaveValue("arrow.straight");
+  await expect(page.getByTestId("symbol-select").locator("option")).toHaveCount(3);
 });
 
 test("starts immediately when the optional basemap is disabled", async ({ page }) => {
@@ -44,9 +83,10 @@ test("starts immediately when the optional basemap is disabled", async ({ page }
   });
   expect(sampleTypes).toContain("arrow.straight");
   expect(sampleTypes).toContain("arrow.fine");
+  expect(sampleTypes).toContain("arrow.fine.tailed");
 });
 
-test("renders sample GeoJSON through committed fill and line layers", async ({ page }) => {
+test("renders all sample arrow types through committed layers", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
   await expect(page.getByTestId("plot-count")).toHaveText("3 个标绘");
 
@@ -85,7 +125,9 @@ test("renders sample GeoJSON through committed fill and line layers", async ({ p
             sourceHasExpectedFeatures: sourceFeatures.length >= 6,
             sourceHasFill: sourceRoles.includes("fill"),
             sourceHasOutline: sourceRoles.includes("outline"),
-            sourceHasFineArrow: sourcePlotTypes.includes("arrow.fine"),
+            sourceHasStraight: sourcePlotTypes.includes("arrow.straight"),
+            sourceHasFine: sourcePlotTypes.includes("arrow.fine"),
+            sourceHasTailedFine: sourcePlotTypes.includes("arrow.fine.tailed"),
             canvasHasRenderedFeatures: renderedFeatures.length > 0,
             canvasHasFill: renderedRoles.includes("fill"),
             canvasHasOutline: renderedRoles.includes("outline"),
@@ -102,7 +144,9 @@ test("renders sample GeoJSON through committed fill and line layers", async ({ p
       sourceHasExpectedFeatures: true,
       sourceHasFill: true,
       sourceHasOutline: true,
-      sourceHasFineArrow: true,
+      sourceHasStraight: true,
+      sourceHasFine: true,
+      sourceHasTailedFine: true,
       canvasHasRenderedFeatures: true,
       canvasHasFill: true,
       canvasHasOutline: true,
@@ -123,34 +167,27 @@ test("draws a straight arrow and supports undo and redo", async ({ page }) => {
 test("draws and renders a fine arrow from the symbol selector", async ({ page }) => {
   await openPlayground(page);
   await drawArrow(page, "arrow.fine");
+  await expectSelectedRenderedType(page, "arrow.fine");
+});
 
-  await expect
-    .poll(
-      async () =>
-        page.evaluate(() => {
-          const playground = window.__plotlibrePlayground;
-          if (!playground) throw new Error("Playground API is unavailable.");
-          const selectedId = playground.plot.interaction.selectedId;
-          if (!selectedId) return undefined;
-          const selected = playground.plot.store.get(selectedId);
-          const rendered = playground.map.queryRenderedFeatures(undefined, {
-            layers: ["plotlibre-fill", "plotlibre-line"],
-          });
-          return {
-            plotType: selected.plotType,
-            controlPointCount: selected.controlPoints.length,
-            hasRenderedFineArrow: rendered.some(
-              (feature) => feature.properties?.plotType === "arrow.fine",
-            ),
-          };
-        }),
-      { timeout: 10_000 },
-    )
-    .toEqual({
-      plotType: "arrow.fine",
-      controlPointCount: 2,
-      hasRenderedFineArrow: true,
-    });
+test("draws and renders a tailed fine arrow from the symbol selector", async ({
+  page,
+}) => {
+  await openPlayground(page);
+  await drawArrow(page, "arrow.fine.tailed");
+  await expectSelectedRenderedType(page, "arrow.fine.tailed");
+
+  const derivedRingLength = await page.evaluate(() => {
+    const playground = window.__plotlibrePlayground;
+    if (!playground) throw new Error("Playground API is unavailable.");
+    const selectedId = playground.plot.interaction.selectedId;
+    if (!selectedId) throw new Error("No plot is selected.");
+    const selected = playground.plot.store.get(selectedId);
+    const bundle = playground.plot.registry.generate(selected);
+    const geometry = bundle.fills[0]?.geometry;
+    return geometry?.type === "Polygon" ? geometry.coordinates[0]?.length : 0;
+  });
+  expect(derivedRingLength).toBe(9);
 });
 
 test("updates the selected style and deletes the plot", async ({ page }) => {

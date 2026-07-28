@@ -47,6 +47,8 @@ Avoid circular package dependencies.
 - Shared Arrow primitives must remain pure and worker-ready.
 - New Arrow symbols must use the shared polyline, curve, offset, ring, geodesic, and arrow-component APIs before adding symbol-specific mathematics.
 - Related symbols must share internal components instead of copying complete generators.
+- Tail variants must use a shared body/frame or tail strategy; copying an entire base generator is prohibited.
+- Parameters that can cause topology failure must be validated dynamically and tested with self-intersection checks.
 
 ## 4. Clean-room and licensing rules
 
@@ -63,7 +65,7 @@ Never copy proprietary Mapbox code released after its open-source license change
 
 ## 5. API rules
 
-- Public identifiers use stable dotted names such as `arrow.straight` and `arrow.fine`.
+- Public identifiers use stable dotted names such as `arrow.straight`, `arrow.fine`, and `arrow.fine.tailed`.
 - Public data structures must be serializable unless explicitly documented otherwise.
 - Public APIs require TypeScript declarations and focused tests.
 - Breaking changes require a migration note and a PlotJSON migration strategy.
@@ -141,6 +143,8 @@ Do not implement many symbol types before the shared geometry primitives, regist
 
 Read `docs/handover/LATEST.md` before starting.
 
-Milestone 005A completes `arrow.fine`. The next priority is Milestone 005B: one complete `arrow.fine.tailed` vertical slice. It must reuse the fine-arrow body and shared arrow-head components, add only the tail-notch mathematics, and include definition, parameter contract, golden fixture, PlotJSON round trip, Playground selector entry, semantic editing, and real Chromium rendered-feature coverage.
+Milestone 005B completes `arrow.fine.tailed` through a shared internal fine-arrow frame, dynamic notch validation, golden and PlotJSON tests, Playground selection, semantic editing and real Chromium rendered-feature coverage.
 
-Do not implement `arrow.assault-direction`, `arrow.curved`, or attack arrows in parallel with `arrow.fine.tailed`.
+The next priority is Milestone 005C: `arrow.assault-direction`. Before implementation, its algorithm document must define a real visual and semantic distinction from `arrow.fine`; it must not be created merely by changing default width ratios. Implement only this single vertical slice next.
+
+Do not implement `arrow.curved`, `arrow.attack`, or other complex arrows in parallel with `arrow.assault-direction`.
