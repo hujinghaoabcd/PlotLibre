@@ -1,6 +1,11 @@
 import { PlotLibre } from "@plotlibre/maplibre";
 import { builtInSymbols } from "@plotlibre/symbols";
-import { Map, NavigationControl, type StyleSpecification } from "maplibre-gl";
+import {
+  Map,
+  NavigationControl,
+  setWorkerUrl,
+  type StyleSpecification,
+} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { PlaygroundApp } from "./playground-app.js";
 import "./styles.css";
@@ -32,6 +37,12 @@ const bootstrapStyle = {
     },
   ],
 } satisfies StyleSpecification;
+
+// MapLibre GL JS 6 ships its renderer worker as a sibling ESM file. Vite
+// bundles the main module but does not automatically emit that sibling file,
+// so the Playground copies it into public/assets during configuration and sets
+// the URL explicitly before the first Map is created.
+setWorkerUrl(`${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`);
 
 const map = new Map({
   container: "map",
