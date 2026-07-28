@@ -1,0 +1,31 @@
+.toolbar > label[for="symbol-select"] {
+  flex: 0 0 auto;
+  color: #9eb5cd;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#symbol-select {
+  min-height: 36px;
+  flex: 0 0 auto;
+  padding: 0 34px 0 11px;
+  border: 1px solid rgba(122, 160, 197, 0.34);
+  border-radius: 9px;
+  background: #172d43;
+  color: #e4f1fc;
+  cursor: pointer;
+}
+
+#symbol-select:hover:not(:disabled) {
+  border-color: rgba(114, 193, 255, 0.64);
+}
+
+#symbol-select:focus-visible {
+  outline: 3px solid rgba(79, 172, 254, 0.72);
+  outline-offset: 2px;
+}
+
+#symbol-select:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
