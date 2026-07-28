@@ -8,8 +8,9 @@
 
 - 源码；
 - 自动化测试；
-- 架构文档；
+- 架构或算法文档；
 - README/API 示例；
+- Playground 可视化入口；
 - `docs/handover/LATEST.md`；
 - 日期化不可变交接文件。
 
@@ -54,113 +55,185 @@
 
 ## Milestone 003：浏览器 Playground 与 GitHub Pages
 
-状态：**已合并到 `main`，Pages 公开地址仍需人工验证**。
+状态：**已完成并合并**。
 
 完成：
 
-1. 创建 `apps/playground` workspace；
-2. 使用 Vite 8 和 MapLibre GL JS 6 ESM；
-3. 生产页面使用公开 demonstration style；
-4. E2E 使用无网络空白 Style；
-5. 工具栏支持绘制、取消、撤销、重做、删除、清空；
-6. 内置南京三箭头示例；
-7. 属性面板支持填充颜色、透明度、边线颜色和宽度；
-8. PlotJSON 文件导入和下载导出；
-9. 响应式桌面/移动端界面；
-10. Vite `/PlotLibre/` project-site base 构建；
-11. Playwright Chromium E2E；
-12. 测试 Pages 子路径、绘制、撤销重做、样式、删除和 PlotJSON；
-13. CI 增加 Node 20.19/22 构建矩阵和 browser job；
-14. GitHub Pages 官方 artifact/deploy workflow；
-15. 新增 `docs/PLAYGROUND.md`；
-16. Node 20.19 validation 通过；
-17. Node 22 validation 通过；
-18. 4 项真实 Chromium E2E 通过；
-19. 解决 MapLibre 6 类型边界和 Vite Preview base 路径问题；
-20. PR #2 合并提交：`a68cdd659861c6ee3d5523baca637958e8730def`。
+- `apps/playground` Vite workspace；
+- MapLibre GL JS 6 ESM 与 WebGL2；
+- 本地 bootstrap style；
+- 可选在线 raster 底图；
+- `?basemap=none` 离线模式；
+- 绘制、取消、撤销、重做、删除和清空；
+- 南京示例；
+- 样式编辑；
+- PlotJSON 文件导入和下载导出；
+- 响应式桌面/移动端界面；
+- `/PlotLibre/` project-site base；
+- Playwright Chromium E2E；
+- Node 20.19/22 CI 矩阵；
+- GitHub Pages artifact/deploy workflow；
+- 在线底图不能阻塞标绘初始化；
+- MapLibre Worker entry/shared 模块显式打包；
+- Worker MIME、Source Feature 和实际 rendered-feature 测试。
 
-部署收尾：
+关键合并提交：
 
-- 仓库 `Settings → Pages → Build and deployment → Source` 选择 `GitHub Actions`；
-- 检查 Pages workflow 成功；
-- 验证 `https://hujinghaoabcd.github.io/PlotLibre/`；
-- 若 Pages 环境已有保护规则，批准首次部署。
+```text
+a68cdd659861c6ee3d5523baca637958e8730def
+c00f589078c8ae5ac2d01bc02441619004a413a6
+```
 
 ## Milestone 004：箭头公共几何基础
 
-状态：**实现与 PR #3 CI 已完成，等待合并**。
+状态：**已完成并通过 PR #6 集成到最新主线**。
 
-目标：建立后续 Arrow 系列共享的中心线、平滑曲线、偏移线、头部构造和退化输入策略。
+合并提交：
+
+```text
+06e392aaec42bd89ee4856244be49df7a9d934ba
+```
 
 完成：
 
-- 扩展有限 `Vec2` 运算、点积、叉积、距离和法向量；
-- `cleanPolyline()` 连续近重复点清洗；
-- segment length、cumulative length 和 total length；
-- 沿距离/比例采样点、切向量、segment index 和 segment ratio；
+- 有限 `Vec2` 运算、点积、叉积、距离和法向量；
+- `cleanPolyline()`；
+- segment/cumulative/total length；
+- 沿距离和比例采样；
 - 按数量重采样；
-- Cubic Bezier 插值；
-- 可调 tension 的 Catmull-Rom/Hermite 插值；
-- 统一和逐顶点半宽的 variable-width offset；
+- Cubic Bezier；
+- Catmull-Rom/Hermite；
+- variable-width offset；
 - miter join 与 `miterLimit`；
-- 左右边界生成；
-- ring 闭合、shoelace signed area 和 winding；
+- ring 闭合、signed area 和 winding；
 - winding normalization；
-- segment intersection、ring self-intersection 和 simple-ring 判断；
+- segment/ring self-intersection；
 - Haversine distance；
 - initial bearing；
 - destination point；
 - geodesic path；
 - longitude normalization；
-- antimeridian detection 和 longitude unwrapping；
+- antimeridian detection 与 unwrap；
 - local/geodesic coordinate-mode analysis；
-- 80°高纬度和 250 km 范围默认策略；
+- 高纬度和大范围默认策略；
 - 共享 `buildArrowHead()`；
-- `arrow.straight` 复用公共箭头头部组件；
-- 直箭头精确保留语义箭尖控制点；
-- 局部投影使用反经线最短经差；
-- `tests/fixtures/geometry-foundation.json` 黄金样例；
-- 退化输入和确定性测试；
-- 100 组固定种子随机性质测试；
+- `arrow.straight` 重构；
+- 精确保留语义箭尖；
+- 黄金样例、退化测试和 100 组固定种子性质测试；
 - `docs/GEOMETRY_FOUNDATION.md`；
-- Milestone 004 provenance 记录。
+- clean-room provenance。
 
-验收结果：
+验收：
 
-- 公共算法不依赖具体箭头类型和 MapLibre；
-- TypeScript 在 Node 20.19 和 22 均通过；
-- 27 项 Node 测试全部通过；
-- 随机输入测试未产生 NaN/Infinity；
-- Chromium Playground 回归通过；
-- 环方向、自交和退化策略已显式定义；
-- 已为 Milestone 005 提供中心线、曲线、偏移、头部和测地基础。
+- 27 项 Node 测试通过；
+- Node 20.19/22 通过；
+- Chromium Worker 与真实渲染回归通过；
+- 公共算法不依赖 MapLibre、DOM、Store 或 UI。
 
-## Milestone 005：第一组传统箭头
+## Milestone 005A：`arrow.fine` 完整纵向切片
+
+状态：**实现与首轮 CI 已完成，等待最终交接和合并**。
+
+目标：只完成一个新的传统箭头，从几何到 GitHub Pages 形成完整可复用模板。
+
+完成：
+
+- `FineArrowParameters` 与解析校验；
+- `buildFineArrowRing()`；
+- 尾中心与箭尖两点语义；
+- 细身渐缩轮廓；
+- 共享 `buildArrowHead()`；
+- 最短反经线经差；
+- 精确保留语义箭尖；
+- 独立 `arrow.fine` PlotDefinition；
+- built-in catalog 注册；
+- fill、outline 和 hit-area；
+- PlotJSON round trip；
+- 赤道方向黄金坐标；
+- 参数、退化、有限性和闭合测试；
+- 默认细箭头比默认直箭头更窄的契约测试；
+- 复用 `TwoPointDrawSession`；
+- 复用两个语义控制点 handles；
+- Playground 符号选择器；
+- 直箭头/细箭头混合南京示例；
+- Chromium 实际 `arrow.fine` rendered-feature 测试；
+- `docs/algorithms/arrow-fine.md`；
+- workspace `0.0.5`。
+
+首轮 CI：
+
+```text
+Run ID: 30387914395
+Node tests: 33 passed
+validate 20.19: success
+validate 22: success
+browser: success
+```
+
+## Milestone 005B：`arrow.fine.tailed`
 
 状态：**下一步**。
 
-建议采用新的纵向切片顺序：
+目标：在保持两点语义和细箭头主体契约的基础上增加参数化燕尾，不复制 `arrow.fine` 整个实现。
 
-1. `arrow.fine`：先完成完整 definition、几何、交互和 Playground；
-2. `arrow.fine.tailed`：在相同中心线和偏移框架上增加尾部；
-3. `arrow.assault-direction`；
-4. `arrow.curved`；
-5. `arrow.attack`；
-6. `arrow.attack.tailed`。
+任务：
 
-每种符号必须同时完成：
+1. 提取可复用的两点窄箭身构造结果；
+2. 定义 `tailNotchRatio` 或等价的燕尾深度参数；
+3. 实现 `buildTailedFineArrowRing()`；
+4. 保证尾缺口不会越过箭身或造成自交；
+5. 定义 `arrow.fine.tailed`；
+6. 参数和退化测试；
+7. 黄金 fixture；
+8. PlotJSON round trip；
+9. Playground selector 入口；
+10. 两点绘制和 handles 回归；
+11. Chromium 实际渲染测试；
+12. 算法来源与交接文件。
+
+## Milestone 005C：`arrow.assault-direction`
+
+- 明确与 `arrow.fine` 的视觉和语义差异；
+- 独立参数契约；
+- geometry、definition、fixture、PlotJSON、Playground 和 E2E。
+
+## Milestone 005D：`arrow.curved`
+
+- 多点控制语义；
+- centerline 清洗和曲线采样；
+- variable-width offset；
+- 多点 DrawSession；
+- 控制点插入/删除策略；
+- 自交和退化处理。
+
+## Milestone 005E：`arrow.attack`
+
+- 多点攻击方向中心线；
+- 参数化头部和箭身；
+- 曲线与偏移复用；
+- 多点完成规则；
+- Golden、property 和 browser tests。
+
+## Milestone 005F：`arrow.attack.tailed`
+
+- 在 `arrow.attack` 公共构造上增加尾部语义；
+- 不复制完整算法；
+- 明确燕尾与平尾迁移兼容。
+
+每种新符号必须同时完成：
 
 - definition；
 - 控制点语义；
 - 参数文档和单位；
 - 几何测试；
-- 视觉 fixture；
-- 多点 DrawSession；
-- 控制点 handles；
+- 黄金 fixture；
+- DrawSession；
+- handles；
 - Playground catalog 入口；
 - 交互 E2E；
 - PlotJSON round trip；
-- provenance 记录。
+- provenance；
+- 不可变交接文件。
 
 ## Milestone 006：双箭头和复杂箭头
 

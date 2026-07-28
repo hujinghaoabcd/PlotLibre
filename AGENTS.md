@@ -46,6 +46,7 @@ Avoid circular package dependencies.
 - Algorithm parameters must be explicit, validated, versioned, and serializable.
 - Shared Arrow primitives must remain pure and worker-ready.
 - New Arrow symbols must use the shared polyline, curve, offset, ring, geodesic, and arrow-component APIs before adding symbol-specific mathematics.
+- Related symbols must share internal components instead of copying complete generators.
 
 ## 4. Clean-room and licensing rules
 
@@ -62,7 +63,7 @@ Never copy proprietary Mapbox code released after its open-source license change
 
 ## 5. API rules
 
-- Public identifiers use stable dotted names such as `arrow.straight`.
+- Public identifiers use stable dotted names such as `arrow.straight` and `arrow.fine`.
 - Public data structures must be serializable unless explicitly documented otherwise.
 - Public APIs require TypeScript declarations and focused tests.
 - Breaking changes require a migration note and a PlotJSON migration strategy.
@@ -90,6 +91,8 @@ npm run playground:e2e
 
 A milestone is incomplete if required checks fail. Browser interaction changes require Playwright coverage. New geometry primitives require numerical, degenerate-input, property, and golden-fixture tests as appropriate.
 
+For MapLibre symbols, Store size is not a sufficient browser assertion. Tests must also verify committed Source data and at least one actual rendered feature from the relevant fill/line layers.
+
 ## 7. Playground and GitHub Pages rules
 
 - The project-site base path is `/PlotLibre/`.
@@ -97,11 +100,12 @@ A milestone is incomplete if required checks fail. Browser interaction changes r
 - E2E must remain independent of remote tile services.
 - The Pages workflow deploys only from `main`.
 - Do not claim the public site is live until the deployment workflow succeeds and the URL is verified.
-- New public symbols must eventually receive a Playground entry and browser test.
+- Every new public symbol must receive a Playground selector/catalog entry and browser test in the same slice.
+- MapLibre GL JS 6 Worker and shared modules must remain version-aligned with the installed package.
 
 ## 8. Documentation requirements
 
-Architecture, data format, public API, Playground workflow, and roadmap documents must match the code. Do not leave major architectural decisions only in source comments or chat messages.
+Architecture, data format, public API, Playground workflow, symbol algorithms, and roadmap documents must match the code. Do not leave major architectural decisions only in source comments or chat messages.
 
 ## 9. Mandatory handover after every completed task
 
@@ -135,4 +139,8 @@ Do not implement many symbol types before the shared geometry primitives, regist
 
 ## 11. Current priority
 
-Read `docs/handover/LATEST.md` before starting. After Milestone 004, the next priority is Milestone 005, beginning with one complete `arrow.fine` vertical slice: definition, multi-point geometry, DrawSession, semantic editing, PlotJSON, Playground entry, numerical tests, golden fixture and browser E2E. Do not implement the six-symbol catalog in parallel.
+Read `docs/handover/LATEST.md` before starting.
+
+Milestone 005A completes `arrow.fine`. The next priority is Milestone 005B: one complete `arrow.fine.tailed` vertical slice. It must reuse the fine-arrow body and shared arrow-head components, add only the tail-notch mathematics, and include definition, parameter contract, golden fixture, PlotJSON round trip, Playground selector entry, semantic editing, and real Chromium rendered-feature coverage.
+
+Do not implement `arrow.assault-direction`, `arrow.curved`, or attack arrows in parallel with `arrow.fine.tailed`.

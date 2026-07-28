@@ -1,5 +1,6 @@
 export * from "./arrow-components.js";
 export * from "./curves.js";
+export * from "./fine-arrow.js";
 export * from "./geodesic.js";
 export * from "./local-projection.js";
 export * from "./offset.js";
