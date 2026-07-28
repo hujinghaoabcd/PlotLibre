@@ -8,13 +8,13 @@
 
 **https://hujinghaoabcd.github.io/PlotLibre/**
 
-The playground supports a symbol selector, straight-arrow and fine-arrow drawing, live preview, semantic control-point editing, undo/redo, deletion, style editing, mixed sample data, and PlotJSON import/export.
+The playground supports a symbol selector, straight-arrow, fine-arrow and tailed-fine-arrow drawing, live preview, semantic control-point editing, undo/redo, deletion, style editing, mixed sample data, and PlotJSON import/export.
 
 The application starts from a local MapLibre style. The optional online basemap never blocks PlotLibre. MapLibre GL JS 6 Worker modules are packaged explicitly and verified by Chromium tests.
 
 ## Project status
 
-Workspace baseline `0.0.5` completes the first traditional-arrow vertical slice on top of the shared geometry foundation:
+Workspace baseline `0.0.6` contains three complete two-point Arrow slices on top of the shared geometry foundation:
 
 - engine-independent plot definitions, registry, Store and CommandHistory;
 - PlotJSON 1.0 semantic serialization;
@@ -29,11 +29,12 @@ Workspace baseline `0.0.5` completes the first traditional-arrow vertical slice 
 - Haversine distance, bearing, destination point and geodesic paths;
 - antimeridian normalization and local/geodesic policy analysis;
 - reusable arrow-head construction;
-- `arrow.straight` and independent `arrow.fine` definitions;
+- an internal reusable fine-arrow frame;
+- `arrow.straight`, `arrow.fine` and `arrow.fine.tailed` definitions;
 - deterministic golden fixtures, parameter tests and PlotJSON round trips;
 - Chromium tests that query actual committed fill/line features.
 
-The next symbol slice is `arrow.fine.tailed`. Other Arrow types will continue one at a time rather than being added as an untested batch.
+The next symbol slice is `arrow.assault-direction`. Arrow types continue one at a time rather than being added as an untested batch.
 
 ## Why PlotLibre
 
@@ -146,16 +147,34 @@ const ring = buildFineArrowRing(
 
 See [`docs/algorithms/arrow-fine.md`](docs/algorithms/arrow-fine.md).
 
+### Tailed fine arrow
+
+`arrow.fine.tailed` reuses the same fine-arrow frame and adds one centered inward swallowtail notch. It introduces only `tailNotchRatio`; it does not duplicate the complete fine-arrow generator.
+
+```ts
+import { buildTailedFineArrowRing } from "@plotlibre/geometry";
+
+const ring = buildTailedFineArrowRing(
+  [118.78, 32.04],
+  [118.86, 32.1],
+  {
+    tailNotchRatio: 0.9,
+  },
+);
+```
+
+See [`docs/algorithms/arrow-fine-tailed.md`](docs/algorithms/arrow-fine-tailed.md).
+
 ## Programmatic creation
 
-MapLibre GL JS 6 is ESM-only. The GitHub Pages application also sets an explicit Worker URL before creating the first map.
+MapLibre GL JS 6 is ESM-only. The GitHub Pages application sets an explicit Worker URL before creating the first map.
 
 ```ts
 import { Map } from "maplibre-gl";
 import { PlotLibre } from "@plotlibre/maplibre";
 import {
   builtInSymbols,
-  FINE_ARROW_TYPE,
+  TAILED_FINE_ARROW_TYPE,
 } from "@plotlibre/symbols";
 
 const map = new Map({
@@ -175,8 +194,8 @@ map.on("load", () => {
   });
 
   plot.create({
-    id: "fine-direction",
-    plotType: FINE_ARROW_TYPE,
+    id: "tailed-direction",
+    plotType: TAILED_FINE_ARROW_TYPE,
     controlPoints: [
       [118.78, 32.04],
       [118.86, 32.1],
@@ -190,7 +209,7 @@ map.on("load", () => {
 All exactly-two-point definitions currently reuse the engine-independent `TwoPointDrawSession` and two semantic edit handles.
 
 ```ts
-const id = plot.draw(FINE_ARROW_TYPE, {
+const id = plot.draw(TAILED_FINE_ARROW_TYPE, {
   style: {
     fillColor: "#d32f2f",
     fillOpacity: 0.5,
@@ -261,8 +280,8 @@ A PlotLibre feature stores semantic source data rather than only the generated p
 
 ```json
 {
-  "id": "fine-direction",
-  "plotType": "arrow.fine",
+  "id": "tailed-direction",
+  "plotType": "arrow.fine.tailed",
   "definitionVersion": "1.0.0",
   "controlPoints": [
     [118.78, 32.04],
@@ -272,7 +291,8 @@ A PlotLibre feature stores semantic source data rather than only the generated p
     "tailWidthRatio": 0.055,
     "headLengthRatio": 0.22,
     "headWidthRatio": 1.9,
-    "neckWidthRatio": 0.42
+    "neckWidthRatio": 0.42,
+    "tailNotchRatio": 0.9
   },
   "style": {
     "fillColor": "#d32f2f"
@@ -301,6 +321,7 @@ npm run handover:check
 - [Interaction model](docs/INTERACTION_MODEL.md)
 - [Shared geometry foundation](docs/GEOMETRY_FOUNDATION.md)
 - [Fine arrow algorithm](docs/algorithms/arrow-fine.md)
+- [Tailed fine arrow algorithm](docs/algorithms/arrow-fine-tailed.md)
 - [MapLibre Worker packaging](docs/MAPLIBRE_WORKER_PACKAGING.md)
 - [Playground and GitHub Pages](docs/PLAYGROUND.md)
 - [PlotJSON specification](docs/PLOTJSON_SPEC.md)
