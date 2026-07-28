@@ -1,4 +1,5 @@
 export * from "./arrow-components.js";
+export * from "./assault-direction.js";
 export * from "./curves.js";
 export * from "./fine-arrow.js";
 export * from "./geodesic.js";
