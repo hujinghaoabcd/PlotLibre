@@ -58,8 +58,8 @@ export interface MapLibreMapLike {
   off(type: string, listener: MapLibreEventListener): unknown;
   getCanvas(): MapCanvasLike;
   queryRenderedFeatures?(
-    point: unknown,
-    options?: { readonly layers?: readonly string[] },
+    point: MapLibrePointLike,
+    options?: { layers?: string[] | Set<string> },
   ): readonly MapLibreRenderedFeatureLike[];
   readonly dragPan?: MapDragPanLike;
 }
