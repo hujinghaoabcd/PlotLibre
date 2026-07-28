@@ -3,6 +3,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+apps/playground/public/assets/maplibre-gl-worker.mjs
 *.tsbuildinfo
 .DS_Store
 .vscode/
