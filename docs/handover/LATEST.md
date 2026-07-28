@@ -1,104 +1,142 @@
-# PlotLibre Development Handover — Milestone 003 Basemap Hotfix 001
+# PlotLibre Development Handover — MapLibre Worker Hotfix 002
 
 日期：2026-07-29  
 仓库：`hujinghaoabcd/PlotLibre`  
 目标分支：`main`  
-开发分支：`fix/playground-basemap-fallback`  
-基线提交：`a68cdd659861c6ee3d5523baca637958e8730def`
+开发分支：`fix/playground-render-visibility`  
+PR：`#5 Diagnose and fix invisible PlotLibre rendering`
 
 ## Current state
 
-GitHub Pages 页面可以加载 HTML 和 Playground 资源，但生产初始化曾将远程 MapLibre style URL 直接作为地图初始 style。用户反馈页面长期停留在“正在初始化地图/等待底图加载”。
+用户确认 GitHub Pages 页面可以启动，工具栏和对象计数正常，但加载示例和新绘制的箭头都不可见。
 
-根因是 PlotLibre 和 `PlaygroundApp` 的创建被绑定在 `map.once("load")` 中，而该 `load` 事件依赖远程 style 及其资源完成。网络较慢、服务不可访问或跨域资源失败时，整个标绘应用也无法启动。
+诊断证明 PlotLibre Store、Registry、示例加载和图层创建均已执行。真正失败的是 MapLibre GL JS 6 的渲染 Worker：页面请求 `/PlotLibre/assets/maplibre-gl-worker.mjs` 时，早期部署返回 SPA 的 `index.html`；首次修复只发布 Worker 入口后，又发现该入口继续导入缺失的 `maplibre-gl-shared.mjs`。
 
-本热修复将标绘应用与在线底图彻底解耦。
+最终修复已在 PR #5 完成。最新权威 CI 运行 `30382886536` 中 Node 20.19、Node 22 和 Chromium 均通过。
 
 ## Completed in this milestone
 
-### 启动流程修复
+### Worker 资源打包
 
-`apps/playground/src/main.ts` 现在始终使用内联本地 background style 创建 MapLibre：
+`apps/playground/vite.config.ts` 现在从已安装的 `maplibre-gl` 包复制：
 
 ```text
-local bootstrap style
-→ MapLibre load
-→ optional raster basemap
-→ PlotLibre
-→ PlaygroundApp
+maplibre-gl-worker.mjs
+maplibre-gl-shared.mjs
 ```
 
-在线底图不再是初始化前置条件。
+到：
 
-### 可选在线底图
+```text
+apps/playground/public/assets/
+```
 
-生产页面在本地 style 加载后增加 OpenStreetMap raster source/layer：
+两个文件由构建过程生成，不提交到 Git。
 
-- 在线瓦片在后台加载；
-- PlotLibre layer 在其后创建，因此保持在底图上方；
-- 保留 OpenStreetMap attribution；
-- 网络失败时继续显示本地深色背景；
-- 仅显示一次可理解的警告信息；
-- 绘制、编辑、撤销、导入导出和示例数据不受影响。
+### 显式 Worker URL
 
-### 禁用底图参数
+`apps/playground/src/main.ts` 在第一次创建 `Map` 前调用：
+
+```ts
+setWorkerUrl(`${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`);
+```
+
+GitHub Pages 中实际路径为：
+
+```text
+/PlotLibre/assets/maplibre-gl-worker.mjs
+```
+
+### 真实渲染回归测试
+
+Playwright 新增和强化了以下验证：
+
+- Worker 入口返回 JavaScript；
+- Shared 模块返回 JavaScript；
+- 两个 URL 不返回 `index.html`；
+- Worker 入口确实导入 Shared 模块；
+- `plotlibre-committed` Source 存在；
+- Source 至少包含三个示例生成的 6 个 fill/outline Feature；
+- `plotlibre-fill` 和 `plotlibre-line` 图层存在且可见；
+- `queryRenderedFeatures()` 在画布上返回 fill 和 outline；
+- 原有绘制、撤销重做、样式、删除与 PlotJSON 测试继续通过。
+
+### 文档和生成文件管理
 
 新增：
 
 ```text
-?basemap=none
+docs/MAPLIBRE_WORKER_PACKAGING.md
+docs/handover/2026-07-29-maplibre-worker-hotfix.md
 ```
 
-该模式保留生产 Playground 行为和南京示例，但完全不请求在线瓦片。
+更新：
 
-### 回归测试
-
-`apps/playground/e2e/playground.spec.ts` 新增测试：
-
-- 访问 `/PlotLibre/?basemap=none`；
-- MapLibre canvas 可见；
-- 自动加载 3 个南京示例；
-- 状态不再停留在“正在初始化”；
-- `window.__plotlibrePlayground` 已建立。
-
-### 文档
-
-`docs/PLAYGROUND.md` 已更新：
-
-- 记录本地 bootstrap style；
-- 记录 optional raster basemap；
-- 记录离线降级行为；
-- 记录 `?basemap=none`；
-- 将“在线底图不能阻塞 PlotLibre”列为强制设计约束。
+```text
+.gitignore
+docs/handover/LATEST.md
+```
 
 ## Validation
 
-合并前必须通过：
+权威 GitHub Actions：
 
-```bash
-npm run check
-npm run handover:check
-npm run playground:e2e
+```text
+Run ID: 30382886536
 ```
 
-预期浏览器测试数量从 4 增加到 5。
+结果：
 
-本热修复完成后将创建 PR，并以 GitHub Actions Node 20.19、Node 22 和 Chromium 结果作为权威验证。
+```text
+Node 20.19 validation: passed
+Node 22 validation: passed
+TypeScript and workspace build: passed
+Unit and adapter tests: passed
+GitHub Pages build: passed
+Handover contract: passed
+Chromium E2E: passed
+Worker entry module test: passed
+Worker shared module test: passed
+GeoJSON source feature test: passed
+Rendered fill/line feature test: passed
+```
+
+诊断过程中确认的失败链路：
+
+```text
+UI and Store ready
+→ committed Source created
+→ MapLibre Worker URL missing or incomplete
+→ GeoJSON Worker never starts
+→ source query returns no processed features
+→ fill/line layers render nothing
+```
+
+修复后的链路：
+
+```text
+Vite copies Worker + Shared modules
+→ setWorkerUrl uses BASE_URL
+→ Worker imports Shared successfully
+→ GeoJSON source processes features
+→ fill/line layers render examples and drawn arrows
+```
 
 ## Next tasks
 
-1. 创建并验证热修复 PR；
-2. CI 全绿后合并到 `main`；
-3. 确认 GitHub Pages workflow 完成重新部署；
-4. 用户刷新公开页面，确认标绘立即出现；
-5. 后续增加底图切换器、加载状态和手动重试；
-6. 将同一启动策略同步到后续 Milestone 004/005 分支，避免文档冲突。
+1. 将 PR #5 标记为 Ready 并合并到 `main`；
+2. 等待 GitHub Pages workflow 重新部署；
+3. 强制刷新公开页面；
+4. 验证示例箭头和新绘制箭头均可见；
+5. 后续 MapLibre 升级时检查 Worker 的全部相对依赖；
+6. 将“Source 数据 + rendered features”作为所有后续符号的浏览器验收标准；
+7. Pages 验证完成后继续 Milestone 004/005 主线开发。
 
 ## Risks and decisions
 
-- OpenStreetMap raster tiles 是可选增强，不是 PlotLibre 运行依赖；
-- 在线底图失败时页面缺少道路地理背景，但标绘功能完整可用；
-- 底图 source 在 PlotLibre 前添加，以保证标绘图层位于其上方；
-- 不再使用远程完整 style，因为 glyph、sprite、vector source 中任一资源都可能延迟初始化；
-- `map.error` 可能由多种地图资源触发，当前统一按在线底图降级提示处理；
-- 后续应将底图提供者抽象为可配置 catalog，并审查各提供者使用政策。
+- 不能仅用 Store 数量、状态文字或图层存在判断渲染成功；
+- MapLibre 6 Worker 是模块图，不能只发布入口文件；
+- Vite SPA fallback 会让缺失的 `.mjs` URL 返回 HTTP 200 的 HTML，因此只检查状态码不足；
+- Worker 文件必须来自当前安装的 MapLibre 版本，不手工复制进源码仓库；
+- MapLibre 升级可能改变 Worker 文件名或增加相对依赖，升级必须运行模块和真实渲染 E2E；
+- 在线底图与 Worker 是两个独立问题：底图可以降级，Worker 是 GeoJSON 渲染的必要运行组件。
