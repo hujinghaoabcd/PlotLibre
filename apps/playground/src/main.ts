@@ -9,6 +9,7 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import { PlaygroundApp } from "./playground-app.js";
 import "./styles.css";
+import "./symbol-controls.css";
 import { playgroundTemplate } from "./template.js";
 
 const BASEMAP_SOURCE_ID = "plotlibre-basemap-source";
