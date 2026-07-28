@@ -8,6 +8,7 @@ import {
   type FineArrowParameters,
   type ResolvedFineArrowParameters,
 } from "./fine-arrow.js";
+import { isSimpleRing } from "./ring.js";
 import { add, scale, subtract } from "./vector.js";
 
 export interface TailedFineArrowParameters extends FineArrowParameters {
@@ -95,6 +96,11 @@ export function buildTailedFineArrowRing(
     notchToNeck.x * frame.direction.x + notchToNeck.y * frame.direction.y <= 0
   ) {
     throw new RangeError("The swallowtail notch must remain behind the arrow neck.");
+  }
+  if (!isSimpleRing(ring)) {
+    throw new RangeError(
+      "The tailed fine arrow parameters create a self-intersecting polygon.",
+    );
   }
 
   return unprojectFineArrowRing(frame, ring, tipPosition, 3);
