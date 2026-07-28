@@ -241,13 +241,19 @@ test("draws and renders a curved arrow with restored double-click zoom", async (
     const selected = playground.plot.store.get(selectedId);
     const bundle = playground.plot.registry.generate(selected);
     const geometry = bundle.fills[0]?.geometry;
+    const handleIndices = new Set(
+      playground.map
+        .querySourceFeatures("plotlibre-handles")
+        .filter((feature) => feature.properties?.plotId === selectedId)
+        .map((feature) => feature.properties?.handleIndex)
+        .filter((value): value is number => typeof value === "number"),
+    );
     return {
       ringLength:
         geometry?.type === "Polygon" ? geometry.coordinates[0]?.length : 0,
       tension: selected.parameters.tension,
       zoomEnabled: playground.map.doubleClickZoom.isEnabled(),
-      handleCount:
-        playground.map.querySourceFeatures("plotlibre-handles").length,
+      handleCount: handleIndices.size,
     };
   });
 
