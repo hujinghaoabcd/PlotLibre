@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,22 +13,65 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [20, 22]
+        node-version: ["20.19", "22"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build and test
-        run: npm test
+      - name: Typecheck, unit tests and playground build
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee check.log
+
+      - name: Upload validation log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-log-${{ matrix.node-version }}
+          path: check.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Verify handover contract
         run: npm run handover:check
+
+  browser:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run playground browser tests
+        run: npm run playground:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/playground/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7

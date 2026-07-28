@@ -1,22 +1,27 @@
 {
   "name": "plotlibre-workspace",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "A MapLibre-native framework for parametric situation plotting and tactical graphics.",
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
     "test": "npm run build && node scripts/link-workspaces.mjs && node --test tests/*.test.mjs",
-    "check": "npm run typecheck && npm test",
+    "check": "npm run typecheck && npm test && npm run playground:typecheck && npm run playground:build",
+    "playground:dev": "npm run build && npm run dev --workspace @plotlibre/playground",
+    "playground:typecheck": "npm run typecheck --workspace @plotlibre/playground",
+    "playground:build": "npm run build && npm run build --workspace @plotlibre/playground -- --base /PlotLibre/",
+    "playground:e2e": "npm run test:e2e --workspace @plotlibre/playground",
     "handover:check": "node scripts/check-handover.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19"
   },
   "devDependencies": {
     "typescript": "~5.8.3"

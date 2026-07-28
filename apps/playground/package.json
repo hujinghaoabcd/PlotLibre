@@ -1,0 +1,25 @@
+{
+  "name": "@plotlibre/playground",
+  "version": "0.0.3",
+  "private": true,
+  "description": "Interactive PlotLibre browser playground and GitHub Pages site.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@plotlibre/core": "0.0.2",
+    "@plotlibre/maplibre": "0.0.2",
+    "@plotlibre/symbols": "0.0.2",
+    "maplibre-gl": "6.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "26.1.1",
+    "vite": "8.1.5"
+  }
+}

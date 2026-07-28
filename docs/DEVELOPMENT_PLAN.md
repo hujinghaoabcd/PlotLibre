@@ -39,7 +39,7 @@
 1. 新增 `@plotlibre/interaction`；
 2. 定义 engine-independent `DrawSession`；
 3. 实现 `TwoPointDrawSession`；
-4. 增加 `plotlibre-draft` Source 和三种 draft layers；
+4. 增加 `plotlibre-draft` Source 和 draft layers；
 5. 增加 `plotlibre-handles` Source 和 handle layer；
 6. MapLibre click + pointermove 动态预览；
 7. 第二次点击或 Enter 完成；
@@ -52,58 +52,72 @@
 14. `style.load` 后恢复 Sources、Layers、数据、draft 和 handles；
 15. 测试扩展至 15 项全部通过。
 
-当前限制：尚未在真实浏览器 MapLibre 运行，只有结构化 fake map 集成测试。
-
 ## Milestone 003：浏览器 Playground 与 GitHub Pages
 
-状态：**下一步**。
+状态：**实现与 PR CI 已完成，等待 PR #2 合并和 Pages 部署验证**。
 
-目标：建立真实、可公开访问、可持续扩展的示例和验证环境。
+完成：
 
-任务：
+1. 创建 `apps/playground` workspace；
+2. 使用 Vite 8 和 MapLibre GL JS 6 ESM；
+3. 生产页面使用公开 demonstration style；
+4. E2E 使用无网络空白 Style；
+5. 工具栏支持绘制、取消、撤销、重做、删除、清空；
+6. 内置南京三箭头示例；
+7. 属性面板支持填充颜色、透明度、边线颜色和宽度；
+8. PlotJSON 文件导入和下载导出；
+9. 响应式桌面/移动端界面；
+10. Vite `/PlotLibre/` project-site base 构建；
+11. Playwright Chromium E2E；
+12. 测试 Pages 子路径、绘制、撤销重做、样式、删除和 PlotJSON；
+13. CI 增加 Node 20.19/22 构建矩阵和 browser job；
+14. GitHub Pages 官方 artifact/deploy workflow；
+15. 新增 `docs/PLAYGROUND.md`；
+16. Node 20.19 validation 通过；
+17. Node 22 validation 通过；
+18. 4 项真实 Chromium E2E 通过；
+19. 解决 MapLibre 6 类型边界和 Vite Preview base 路径问题。
 
-1. 创建 `apps/playground`；
-2. 使用 Vite 和 MapLibre GL JS 6 的 ESM 导入；
-3. 使用无需私有 Key 的公开演示样式；
-4. 工具栏：绘制、取消、选择、撤销、重做、删除、清空；
-5. 状态栏：当前模式、选中对象、控制点数和历史深度；
-6. 样式面板：颜色、透明度、线宽；
-7. PlotJSON 导出、复制、下载和导入；
-8. 展示程序化创建与交互创建；
-9. Playwright Chromium E2E；
-10. 验证绘制、取消、编辑、撤销、style reload；
-11. GitHub Pages workflow；
-12. Vite `base` 支持 `/PlotLibre/`；
-13. Pages 发布后在 README 加在线演示入口；
-14. 后续增加 symbol gallery 和文档站。
+合并后的首次发布要求：
 
-验收：
-
-- GitHub Pages 可直接访问；
-- 不依赖私有 token；
-- 刷新和深链接不报错；
-- 真实 MapLibre 6 绘制和编辑正常；
-- Chromium E2E 通过；
-- 示例只调用公开 API。
+- 仓库 `Settings → Pages → Build and deployment → Source` 选择 `GitHub Actions`；
+- 检查 Pages workflow 成功；
+- 验证 `https://hujinghaoabcd.github.io/PlotLibre/`；
+- 若 Pages 环境已有保护规则，批准首次部署。
 
 ## Milestone 004：箭头公共几何基础
 
-目标：建立后续 Arrow 系列共享的中心线、平滑曲线、偏移线和头尾构造。
+状态：**下一步**。
+
+目标：建立后续 Arrow 系列共享的中心线、平滑曲线、偏移线、头尾构造和退化输入策略。
 
 任务：
 
 - polyline length；
-- point along line；
+- cumulative distances；
+- point/tangent along line；
 - segment bearing；
 - Catmull-Rom/Bezier 插值；
 - variable-width offset；
+- left/right side generation；
+- ring winding normalization；
 - self-intersection 检测；
-- ring winding；
-- geodesic path；
+- duplicate/near-coincident point cleaning；
+- geodesic path abstraction；
 - antimeridian normalization；
+- high-latitude policy；
 - property-based tests；
 - geometry golden fixtures；
-- worker-ready pure functions。
+- worker-ready pure functions；
+- provenance records for every mathematical source。
+
+验收：
+
+- 公共算法不依赖具体箭头类型和 MapLibre；
+- 随机输入不产生 NaN/Infinity；
+- 所有 Polygon ring 闭合且方向一致；
+- 退化输入具有明确错误或降级策略；
+- 为 Milestone 005 的六类箭头提供足够构件。
 
 ## Milestone 005：第一组传统箭头
 
@@ -125,6 +139,7 @@
 - 视觉 fixture；
 - 多点 DrawSession；
 - 控制点 handles；
+- Playground catalog 入口；
 - 交互 E2E；
 - PlotJSON round trip；
 - provenance 记录。
