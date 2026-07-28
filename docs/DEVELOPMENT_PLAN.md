@@ -54,7 +54,7 @@
 
 ## Milestone 003：浏览器 Playground 与 GitHub Pages
 
-状态：**代码完成，等待 PR CI 和合并部署**。
+状态：**实现与 PR CI 已完成，等待 PR #2 合并和 Pages 部署验证**。
 
 完成：
 
@@ -72,7 +72,11 @@
 12. 测试 Pages 子路径、绘制、撤销重做、样式、删除和 PlotJSON；
 13. CI 增加 Node 20.19/22 构建矩阵和 browser job；
 14. GitHub Pages 官方 artifact/deploy workflow；
-15. 新增 `docs/PLAYGROUND.md`。
+15. 新增 `docs/PLAYGROUND.md`；
+16. Node 20.19 validation 通过；
+17. Node 22 validation 通过；
+18. 4 项真实 Chromium E2E 通过；
+19. 解决 MapLibre 6 类型边界和 Vite Preview base 路径问题。
 
 合并后的首次发布要求：
 
