@@ -54,7 +54,7 @@
 
 ## Milestone 003：浏览器 Playground 与 GitHub Pages
 
-状态：**实现与 PR CI 已完成，等待 PR #2 合并和 Pages 部署验证**。
+状态：**已合并到 `main`，Pages 公开地址仍需人工验证**。
 
 完成：
 
@@ -76,9 +76,10 @@
 16. Node 20.19 validation 通过；
 17. Node 22 validation 通过；
 18. 4 项真实 Chromium E2E 通过；
-19. 解决 MapLibre 6 类型边界和 Vite Preview base 路径问题。
+19. 解决 MapLibre 6 类型边界和 Vite Preview base 路径问题；
+20. PR #2 合并提交：`a68cdd659861c6ee3d5523baca637958e8730def`。
 
-合并后的首次发布要求：
+部署收尾：
 
 - 仓库 `Settings → Pages → Build and deployment → Source` 选择 `GitHub Actions`；
 - 检查 Pages workflow 成功；
@@ -87,48 +88,65 @@
 
 ## Milestone 004：箭头公共几何基础
 
-状态：**下一步**。
+状态：**实现与 PR #3 CI 已完成，等待合并**。
 
-目标：建立后续 Arrow 系列共享的中心线、平滑曲线、偏移线、头尾构造和退化输入策略。
+目标：建立后续 Arrow 系列共享的中心线、平滑曲线、偏移线、头部构造和退化输入策略。
 
-任务：
+完成：
 
-- polyline length；
-- cumulative distances；
-- point/tangent along line；
-- segment bearing；
-- Catmull-Rom/Bezier 插值；
-- variable-width offset；
-- left/right side generation；
-- ring winding normalization；
-- self-intersection 检测；
-- duplicate/near-coincident point cleaning；
-- geodesic path abstraction；
-- antimeridian normalization；
-- high-latitude policy；
-- property-based tests；
-- geometry golden fixtures；
-- worker-ready pure functions；
-- provenance records for every mathematical source。
+- 扩展有限 `Vec2` 运算、点积、叉积、距离和法向量；
+- `cleanPolyline()` 连续近重复点清洗；
+- segment length、cumulative length 和 total length；
+- 沿距离/比例采样点、切向量、segment index 和 segment ratio；
+- 按数量重采样；
+- Cubic Bezier 插值；
+- 可调 tension 的 Catmull-Rom/Hermite 插值；
+- 统一和逐顶点半宽的 variable-width offset；
+- miter join 与 `miterLimit`；
+- 左右边界生成；
+- ring 闭合、shoelace signed area 和 winding；
+- winding normalization；
+- segment intersection、ring self-intersection 和 simple-ring 判断；
+- Haversine distance；
+- initial bearing；
+- destination point；
+- geodesic path；
+- longitude normalization；
+- antimeridian detection 和 longitude unwrapping；
+- local/geodesic coordinate-mode analysis；
+- 80°高纬度和 250 km 范围默认策略；
+- 共享 `buildArrowHead()`；
+- `arrow.straight` 复用公共箭头头部组件；
+- 直箭头精确保留语义箭尖控制点；
+- 局部投影使用反经线最短经差；
+- `tests/fixtures/geometry-foundation.json` 黄金样例；
+- 退化输入和确定性测试；
+- 100 组固定种子随机性质测试；
+- `docs/GEOMETRY_FOUNDATION.md`；
+- Milestone 004 provenance 记录。
 
-验收：
+验收结果：
 
 - 公共算法不依赖具体箭头类型和 MapLibre；
-- 随机输入不产生 NaN/Infinity；
-- 所有 Polygon ring 闭合且方向一致；
-- 退化输入具有明确错误或降级策略；
-- 为 Milestone 005 的六类箭头提供足够构件。
+- TypeScript 在 Node 20.19 和 22 均通过；
+- 27 项 Node 测试全部通过；
+- 随机输入测试未产生 NaN/Infinity；
+- Chromium Playground 回归通过；
+- 环方向、自交和退化策略已显式定义；
+- 已为 Milestone 005 提供中心线、曲线、偏移、头部和测地基础。
 
 ## Milestone 005：第一组传统箭头
 
-符号：
+状态：**下一步**。
 
-- `arrow.fine`；
-- `arrow.fine.tailed`；
-- `arrow.assault-direction`；
-- `arrow.curved`；
-- `arrow.attack`；
-- `arrow.attack.tailed`。
+建议采用新的纵向切片顺序：
+
+1. `arrow.fine`：先完成完整 definition、几何、交互和 Playground；
+2. `arrow.fine.tailed`：在相同中心线和偏移框架上增加尾部；
+3. `arrow.assault-direction`；
+4. `arrow.curved`；
+5. `arrow.attack`；
+6. `arrow.attack.tailed`。
 
 每种符号必须同时完成：
 
