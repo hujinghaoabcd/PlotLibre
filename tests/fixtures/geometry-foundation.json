@@ -1,0 +1,14 @@
+{
+  "polyline": [[0, 0], [3, 0], [3, 4]],
+  "cumulativeLengths": [0, 3, 7],
+  "sampleAtDistance5": {
+    "point": [3, 2],
+    "tangent": [0, 1],
+    "segmentIndex": 1,
+    "segmentRatio": 0.5
+  },
+  "offsetHalfWidth1": {
+    "left": [[0, 1], [2, 1], [2, 4]],
+    "right": [[0, -1], [4, -1], [4, 4]]
+  }
+}

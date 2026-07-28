@@ -45,6 +45,7 @@ Avoid circular package dependencies.
 - Generated polygon rings must be closed and finite.
 - Algorithm parameters must be explicit, validated, versioned, and serializable.
 - Shared Arrow primitives must remain pure and worker-ready.
+- New Arrow symbols must use the shared polyline, curve, offset, ring, geodesic, and arrow-component APIs before adding symbol-specific mathematics.
 
 ## 4. Clean-room and licensing rules
 
@@ -134,4 +135,4 @@ Do not implement many symbol types before the shared geometry primitives, regist
 
 ## 11. Current priority
 
-Read `docs/handover/LATEST.md` before starting. After Milestone 003, the next priority is Milestone 004: shared Arrow geometry primitives, degenerate-input policy, property tests, golden fixtures, and provenance records. Do not jump directly to copying multiple tactical arrow implementations.
+Read `docs/handover/LATEST.md` before starting. After Milestone 004, the next priority is Milestone 005, beginning with one complete `arrow.fine` vertical slice: definition, multi-point geometry, DrawSession, semantic editing, PlotJSON, Playground entry, numerical tests, golden fixture and browser E2E. Do not implement the six-symbol catalog in parallel.

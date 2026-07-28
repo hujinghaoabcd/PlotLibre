@@ -1,4 +1,5 @@
 import type { Position } from "@plotlibre/core";
+import { buildArrowHead } from "./arrow-components.js";
 import { createLocalProjection } from "./local-projection.js";
 import {
   add,
@@ -99,29 +100,30 @@ export function buildStraightArrowRing(
     arrowLength * resolved.headLengthRatio,
     arrowLength * 0.8,
   );
-  const neckCenter = subtract(tip, scale(direction, headLength));
-  const neckHalfWidth = tailHalfWidth * resolved.neckWidthRatio;
-  const headHalfWidth = tailHalfWidth * resolved.headWidthRatio;
+  const head = buildArrowHead(tip, direction, {
+    length: headLength,
+    headHalfWidth: tailHalfWidth * resolved.headWidthRatio,
+    neckHalfWidth: tailHalfWidth * resolved.neckWidthRatio,
+  });
 
   const tailLeft = add(tailCenter, scale(normal, tailHalfWidth));
-  const neckLeft = add(neckCenter, scale(normal, neckHalfWidth));
-  const headLeft = add(neckCenter, scale(normal, headHalfWidth));
-  const headRight = add(neckCenter, scale(normal, -headHalfWidth));
-  const neckRight = add(neckCenter, scale(normal, -neckHalfWidth));
   const tailRight = add(tailCenter, scale(normal, -tailHalfWidth));
-
   const ring = [
     tailLeft,
-    neckLeft,
-    headLeft,
-    tip,
-    headRight,
-    neckRight,
+    head.neckLeft,
+    head.headLeft,
+    head.tip,
+    head.headRight,
+    head.neckRight,
     tailRight,
     tailLeft,
   ];
+  const geographicRing = ring.map((point) => projection.unproject(point));
 
-  return ring.map((point) => projection.unproject(point));
+  // Preserve the exact semantic tip control point instead of returning a
+  // projection round-trip approximation with sub-nanodegree floating error.
+  geographicRing[3] = [end[0], end[1]];
+  return geographicRing;
 }
 
 function assertRatio(

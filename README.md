@@ -6,33 +6,32 @@
 
 ## Live playground
 
-After the GitHub Pages workflow is enabled and this milestone is merged, the interactive example is published at:
+The GitHub Pages workflow targets:
 
 **https://hujinghaoabcd.github.io/PlotLibre/**
 
-The playground supports straight-arrow drawing, live preview, semantic control-point editing, undo/redo, deletion, style editing, sample data, and PlotJSON import/export.
+The playground supports straight-arrow drawing, live preview, semantic control-point editing, undo/redo, deletion, style editing, sample data, and PlotJSON import/export. The deployment URL should be treated as verified only after the Pages workflow succeeds and the page is opened successfully.
 
 ## Project status
 
-Version `0.0.3` provides the first real browser playground on top of the interactive library foundation:
+Workspace baseline `0.0.4` adds the shared Arrow geometry foundation required before implementing multi-point tactical symbols:
 
-- engine-independent plot definitions and registry;
-- semantic plot features based on control points and parameters;
-- reversible Store and CommandHistory;
-- PlotJSON 1.0 serialization;
-- projection-aware straight-arrow geometry;
-- built-in `arrow.straight` symbol;
-- engine-independent two-point draw session;
-- MapLibre click drawing and pointer-move preview;
-- Escape/Backspace/Enter keyboard behavior;
-- semantic control-point handles and drag editing;
-- committed, draft, and handles GeoJSON sources;
-- automatic restoration after `style.load`;
-- Vite 8 browser application using MapLibre GL JS 6;
+- engine-independent plot definitions, registry, Store and CommandHistory;
+- PlotJSON 1.0 semantic serialization;
+- interactive MapLibre drawing and semantic control-point editing;
+- Vite 8 / MapLibre GL JS 6 browser playground;
 - Playwright Chromium end-to-end tests;
-- GitHub Pages build and deployment workflow.
+- reusable finite `Vec2` operations;
+- polyline cleaning, cumulative lengths and along-line sampling;
+- cubic Bezier and Catmull-Rom interpolation;
+- constant and per-vertex variable-width offsets;
+- ring closure, winding normalization and self-intersection detection;
+- Haversine distance, bearing, destination point and geodesic paths;
+- antimeridian normalization and local/geodesic policy analysis;
+- reusable arrow-head construction;
+- deterministic golden fixtures and fixed-seed property-style tests.
 
-The next development stage will expand the shared Arrow geometry primitives and add the first multi-point tactical symbols.
+The next development stage is Milestone 005: the first traditional multi-point Arrow family, beginning with a narrow vertical slice rather than adding all six symbol types at once.
 
 ## Why PlotLibre
 
@@ -51,13 +50,70 @@ PlotLibre preserves that semantic model. Rendered GeoJSON is derived and may be 
 | Package | Responsibility |
 |---|---|
 | `@plotlibre/core` | Domain types, registry, feature store, commands, history and PlotJSON |
-| `@plotlibre/geometry` | Projection-aware mathematical and geometric algorithms |
+| `@plotlibre/geometry` | Projection-aware planar and geodesic geometry algorithms |
 | `@plotlibre/symbols` | Built-in parametric plot definitions |
 | `@plotlibre/interaction` | Engine-independent draw-session state machines |
 | `@plotlibre/maplibre` | MapLibre sources, layers, event adapter, selection and editing |
 | `@plotlibre/playground` | Real MapLibre application, E2E tests and GitHub Pages site |
 
 Planned packages include `@plotlibre/ui`, `@plotlibre/io`, `@plotlibre/milstd`, `@plotlibre/react`, `@plotlibre/vue`, and `@plotlibre/collab`.
+
+## Shared geometry foundation
+
+The geometry package operates in two explicit coordinate layers:
+
+- planar algorithms consume local metre-based `Vec2` values;
+- geographic algorithms consume WGS84 `Position` values.
+
+Example: measure and sample a projected centerline.
+
+```ts
+import {
+  measurePolyline,
+  sampleMeasuredPolyline,
+  type Vec2,
+} from "@plotlibre/geometry";
+
+const centerline: readonly Vec2[] = [
+  { x: 0, y: 0 },
+  { x: 80, y: 20 },
+  { x: 150, y: 90 },
+];
+
+const measured = measurePolyline(centerline);
+const midpoint = sampleMeasuredPolyline(
+  measured,
+  measured.totalLength * 0.5,
+);
+```
+
+Example: construct variable-width boundaries.
+
+```ts
+import { offsetPolyline } from "@plotlibre/geometry";
+
+const boundaries = offsetPolyline(centerline, [4, 8, 12], {
+  miterLimit: 4,
+});
+
+console.log(boundaries.left, boundaries.right);
+```
+
+Example: choose local or geodesic processing explicitly.
+
+```ts
+import { analyzeCoordinateMode } from "@plotlibre/geometry";
+
+const analysis = analyzeCoordinateMode([
+  [179.9, 10],
+  [-179.9, 10],
+]);
+
+// "geodesic" because the path crosses the antimeridian.
+console.log(analysis.mode);
+```
+
+See [`docs/GEOMETRY_FOUNDATION.md`](docs/GEOMETRY_FOUNDATION.md).
 
 ## Programmatic creation
 
@@ -206,6 +262,7 @@ npm run handover:check
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Interaction model](docs/INTERACTION_MODEL.md)
+- [Shared geometry foundation](docs/GEOMETRY_FOUNDATION.md)
 - [Playground and GitHub Pages](docs/PLAYGROUND.md)
 - [PlotJSON specification](docs/PLOTJSON_SPEC.md)
 - [Reference library matrix](docs/REFERENCE_LIBRARY_MATRIX.md)
