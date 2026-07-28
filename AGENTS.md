@@ -22,6 +22,7 @@ The dependency direction is mandatory:
 core <- geometry <- symbols
 core <- interaction
 core + interaction <- maplibre
+public packages <- playground / framework wrappers
 ```
 
 Future packages may depend on these public layers, but:
@@ -31,7 +32,7 @@ Future packages may depend on these public layers, but:
 - `symbols` must define behavior through `PlotDefinition` registration;
 - `interaction` must remain engine-independent and must not import MapLibre or DOM APIs;
 - `maplibre` must translate semantic render bundles and interaction snapshots into MapLibre sources, layers and events;
-- UI packages must call public controller APIs and must not mutate stores directly.
+- the Playground and UI packages must call public APIs and must not mutate stores or MapLibre sources directly.
 
 Avoid circular package dependencies.
 
@@ -43,6 +44,7 @@ Avoid circular package dependencies.
 - Every symbol must have numerical tests and, when the visual test system exists, golden image tests.
 - Generated polygon rings must be closed and finite.
 - Algorithm parameters must be explicit, validated, versioned, and serializable.
+- Shared Arrow primitives must remain pure and worker-ready.
 
 ## 4. Clean-room and licensing rules
 
@@ -50,7 +52,7 @@ Reference libraries may be studied for public behavior, terminology, architectur
 
 1. identify the exact source file and repository revision;
 2. verify its license;
-3. record provenance in `docs/ALGORITHM_POLICY.md`;
+3. record provenance in `docs/ALGORITHM_POLICY.md` or a symbol-specific algorithm record;
 4. preserve required notices;
 5. avoid code from incompatible or unclear licenses;
 6. prefer independent implementation from published mathematical descriptions and behavior tests.
@@ -65,6 +67,7 @@ Never copy proprietary Mapbox code released after its open-source license change
 - Breaking changes require a migration note and a PlotJSON migration strategy.
 - MapLibre remains a peer dependency.
 - Framework wrappers must remain optional packages.
+- Playground code is a consumer example, not a privileged internal client.
 
 ## 6. Testing requirements
 
@@ -73,16 +76,33 @@ Before publishing a development milestone, run:
 ```bash
 npm run typecheck
 npm test
+npm run playground:typecheck
+npm run playground:build
 npm run handover:check
 ```
 
-A milestone is incomplete if any check fails. When browser interaction begins, Playwright tests and a MapLibre version matrix become mandatory.
+When browser-facing behavior changes, also run:
 
-## 7. Documentation requirements
+```bash
+npm run playground:e2e
+```
 
-Architecture, data format, public API, and roadmap documents must match the code. Do not leave major architectural decisions only in source comments or chat messages.
+A milestone is incomplete if required checks fail. Browser interaction changes require Playwright coverage. New geometry primitives require numerical, degenerate-input, property, and golden-fixture tests as appropriate.
 
-## 8. Mandatory handover after every completed task
+## 7. Playground and GitHub Pages rules
+
+- The project-site base path is `/PlotLibre/`.
+- Production examples must not require private API keys.
+- E2E must remain independent of remote tile services.
+- The Pages workflow deploys only from `main`.
+- Do not claim the public site is live until the deployment workflow succeeds and the URL is verified.
+- New public symbols must eventually receive a Playground entry and browser test.
+
+## 8. Documentation requirements
+
+Architecture, data format, public API, Playground workflow, and roadmap documents must match the code. Do not leave major architectural decisions only in source comments or chat messages.
+
+## 9. Mandatory handover after every completed task
 
 Every completed development task must update:
 
@@ -98,7 +118,7 @@ docs/handover/YYYY-MM-DD-milestone-NNN.md
 
 Each handover must contain:
 
-- current repository and branch state;
+- current repository, branch, PR, and deployment state;
 - exact completed files and capabilities;
 - validation commands and results;
 - architectural decisions made;
@@ -108,10 +128,10 @@ Each handover must contain:
 
 Never delete prior milestone handovers. `LATEST.md` is replaced each time; dated milestone files are append-only.
 
-## 9. Scope control
+## 10. Scope control
 
 Do not implement many symbol types before the shared geometry primitives, registry, validation, editing model, and tests are stable. A vertical slice with one high-quality symbol is preferred over many untested copied algorithms.
 
-## 10. Current priority
+## 11. Current priority
 
-Read `docs/handover/LATEST.md` before starting. The current next milestone is the authoritative task list. After Milestone 002, prioritize the real MapLibre browser playground and GitHub Pages deployment before expanding the symbol catalog.
+Read `docs/handover/LATEST.md` before starting. After Milestone 003, the next priority is Milestone 004: shared Arrow geometry primitives, degenerate-input policy, property tests, golden fixtures, and provenance records. Do not jump directly to copying multiple tactical arrow implementations.
