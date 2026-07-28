@@ -10,7 +10,7 @@ export const playgroundTemplate = `
       </a>
       <div class="header-links">
         <a href="https://github.com/hujinghaoabcd/PlotLibre" target="_blank" rel="noreferrer">GitHub</a>
-        <span class="version-badge">v0.0.9 demo</span>
+        <span class="version-badge">v0.0.10 demo</span>
       </div>
     </header>
 
@@ -22,6 +22,7 @@ export const playgroundTemplate = `
         <option value="arrow.fine.tailed">燕尾细箭头</option>
         <option value="arrow.assault-direction">突击方向</option>
         <option value="arrow.curved">曲线箭头</option>
+        <option value="arrow.attack">攻击箭头</option>
       </select>
       <button id="draw-button" data-testid="draw-button" class="primary" type="button">开始绘制</button>
       <button id="cancel-button" data-testid="cancel-button" type="button">取消绘制</button>
@@ -92,12 +93,12 @@ export const playgroundTemplate = `
           <span class="eyebrow">Workflow</span>
           <h2>交互说明</h2>
           <ol class="instruction-list">
-            <li>选择直线类箭头时，点击箭尾后再点击箭尖完成。</li>
-            <li>选择曲线箭头时，连续点击路径控制点。</li>
-            <li>第三个候选点开始显示曲线箭头预览。</li>
-            <li>双击最后一点或按 Enter 完成曲线箭头。</li>
-            <li>Backspace/Delete 可逐点回退；Escape 取消。</li>
-            <li>完成后拖动任一圆形语义控制点重新编辑。</li>
+            <li>两点箭头：点击箭尾，再点击箭尖完成。</li>
+            <li>曲线箭头：第一个点为尾部中心，后续点定义路径。</li>
+            <li>攻击箭头：前两个点定义左右尾缘，后续点定义进攻骨架和目标。</li>
+            <li>多点箭头从第三个候选点开始显示合法预览。</li>
+            <li>双击最后一点或按 Enter 完成；Backspace/Delete 逐点回退。</li>
+            <li>完成后可拖动任一圆形语义控制点重新编辑。</li>
           </ol>
         </section>
 
