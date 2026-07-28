@@ -6,15 +6,6 @@ async function openPlayground(page: Page): Promise<void> {
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
 }
 
-async function waitForMapIdle(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const playground = window.__plotlibrePlayground;
-    if (!playground) throw new Error("Playground API is unavailable.");
-    if (playground.map.loaded()) return;
-    await new Promise<void>((resolve) => playground.map.once("idle", () => resolve()));
-  });
-}
-
 async function drawArrow(page: Page): Promise<void> {
   const canvas = page.locator(".maplibregl-canvas");
   const box = await canvas.boundingBox();
@@ -50,50 +41,59 @@ test("starts immediately when the optional basemap is disabled", async ({ page }
 test("renders sample GeoJSON through committed fill and line layers", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
   await expect(page.getByTestId("plot-count")).toHaveText("3 个标绘");
-  await waitForMapIdle(page);
 
-  const diagnostics = await page.evaluate(() => {
-    const playground = window.__plotlibrePlayground;
-    if (!playground) throw new Error("Playground API is unavailable.");
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const playground = window.__plotlibrePlayground;
+          if (!playground) throw new Error("Playground API is unavailable.");
 
-    const map = playground.map;
-    const styleLayers = map.getStyle().layers.map((layer) => layer.id);
-    const sourceFeatures = map.querySourceFeatures("plotlibre-committed");
-    const renderedFeatures = map.queryRenderedFeatures(undefined, {
-      layers: ["plotlibre-fill", "plotlibre-line"],
+          const map = playground.map;
+          const sourceFeatures = map.querySourceFeatures("plotlibre-committed");
+          const renderedFeatures = map.queryRenderedFeatures(undefined, {
+            layers: ["plotlibre-fill", "plotlibre-line"],
+          });
+          const sourceRoles = sourceFeatures.map(
+            (feature) => feature.properties?.role,
+          );
+          const renderedRoles = renderedFeatures.map(
+            (feature) => feature.properties?.role,
+          );
+
+          return {
+            sourceExists: map.getSource("plotlibre-committed") !== undefined,
+            fillLayerExists: map.getLayer("plotlibre-fill") !== undefined,
+            lineLayerExists: map.getLayer("plotlibre-line") !== undefined,
+            fillLayerVisible:
+              (map.getLayoutProperty("plotlibre-fill", "visibility") ??
+                "visible") === "visible",
+            lineLayerVisible:
+              (map.getLayoutProperty("plotlibre-line", "visibility") ??
+                "visible") === "visible",
+            sourceHasExpectedFeatures: sourceFeatures.length >= 6,
+            sourceHasFill: sourceRoles.includes("fill"),
+            sourceHasOutline: sourceRoles.includes("outline"),
+            canvasHasRenderedFeatures: renderedFeatures.length > 0,
+            canvasHasFill: renderedRoles.includes("fill"),
+            canvasHasOutline: renderedRoles.includes("outline"),
+          };
+        }),
+      { timeout: 10_000 },
+    )
+    .toEqual({
+      sourceExists: true,
+      fillLayerExists: true,
+      lineLayerExists: true,
+      fillLayerVisible: true,
+      lineLayerVisible: true,
+      sourceHasExpectedFeatures: true,
+      sourceHasFill: true,
+      sourceHasOutline: true,
+      canvasHasRenderedFeatures: true,
+      canvasHasFill: true,
+      canvasHasOutline: true,
     });
-
-    return {
-      hasSource: map.getSource("plotlibre-committed") !== undefined,
-      hasFillLayer: map.getLayer("plotlibre-fill") !== undefined,
-      hasLineLayer: map.getLayer("plotlibre-line") !== undefined,
-      sourceFeatureCount: sourceFeatures.length,
-      sourceRoles: sourceFeatures.map((feature) => feature.properties?.role),
-      renderedFeatureCount: renderedFeatures.length,
-      renderedRoles: renderedFeatures.map((feature) => feature.properties?.role),
-      styleLayers,
-      fillVisibility: map.getLayoutProperty("plotlibre-fill", "visibility") ?? "visible",
-      lineVisibility: map.getLayoutProperty("plotlibre-line", "visibility") ?? "visible",
-      fillOpacity: map.getPaintProperty("plotlibre-fill", "fill-opacity"),
-      lineOpacity: map.getPaintProperty("plotlibre-line", "line-opacity"),
-    };
-  });
-
-  expect(diagnostics.hasSource).toBe(true);
-  expect(diagnostics.hasFillLayer).toBe(true);
-  expect(diagnostics.hasLineLayer).toBe(true);
-  expect(diagnostics.styleLayers).toContain("plotlibre-fill");
-  expect(diagnostics.styleLayers).toContain("plotlibre-line");
-  expect(diagnostics.fillVisibility).toBe("visible");
-  expect(diagnostics.lineVisibility).toBe("visible");
-  expect(diagnostics.sourceFeatureCount).toBeGreaterThanOrEqual(6);
-  expect(diagnostics.sourceRoles).toEqual(
-    expect.arrayContaining(["fill", "outline"]),
-  );
-  expect(diagnostics.renderedFeatureCount).toBeGreaterThan(0);
-  expect(diagnostics.renderedRoles).toEqual(
-    expect.arrayContaining(["fill", "outline"]),
-  );
 });
 
 test("draws a straight arrow and supports undo and redo", async ({ page }) => {
