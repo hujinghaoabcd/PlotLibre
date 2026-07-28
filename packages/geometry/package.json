@@ -1,0 +1,20 @@
+{
+  "name": "@plotlibre/geometry",
+  "version": "0.0.1",
+  "description": "Projection-aware geometry algorithms for PlotLibre.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "dependencies": {
+    "@plotlibre/core": "0.0.1"
+  },
+  "license": "UNLICENSED"
+}

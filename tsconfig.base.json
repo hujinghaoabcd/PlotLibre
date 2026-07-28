@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true,
+    "verbatimModuleSyntax": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@plotlibre/core": ["packages/core/src/index.ts"],
+      "@plotlibre/geometry": ["packages/geometry/src/index.ts"],
+      "@plotlibre/symbols": ["packages/symbols/src/index.ts"],
+      "@plotlibre/maplibre": ["packages/maplibre/src/index.ts"]
+    }
+  }
+}
