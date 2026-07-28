@@ -58,8 +58,8 @@ test("curved arrow matches the deterministic golden fixture", () => {
 test("curved arrow produces a finite closed counterclockwise simple ring", () => {
   const controls = [
     [118.75, 32.03],
-    [118.79, 32.09],
-    [118.84, 32.07],
+    [118.79, 32.06],
+    [118.84, 32.085],
     [118.88, 32.12],
   ];
   const ring = buildCurvedArrowRing(controls);
@@ -119,6 +119,19 @@ test("curved arrow cleans consecutive duplicate controls", () => {
   for (const [index, coordinate] of duplicated.entries()) {
     assertPositionClose(coordinate, clean[index]);
   }
+});
+
+test("curved arrow rejects an excessively tight self-intersecting path", () => {
+  assert.throws(
+    () =>
+      buildCurvedArrowRing([
+        [118.75, 32.03],
+        [118.79, 32.09],
+        [118.84, 32.07],
+        [118.88, 32.12],
+      ]),
+    /self-intersecting ring/,
+  );
 });
 
 test("curved arrow rejects invalid semantic controls and parameters", () => {
@@ -181,9 +194,9 @@ test("PlotJSON round-trips the full curved-arrow semantic path", () => {
     definitionVersion: curvedArrowDefinition.version,
     controlPoints: [
       [118.75, 32.03],
-      [118.78, 32.09],
-      [118.82, 32.06],
-      [118.87, 32.12],
+      [118.79, 32.06],
+      [118.84, 32.085],
+      [118.88, 32.12],
     ],
     parameters: curvedArrowDefinition.defaultParameters,
     metadata: { purpose: "curved-arrow-round-trip" },
