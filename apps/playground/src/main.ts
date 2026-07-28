@@ -6,6 +6,9 @@ import { PlaygroundApp } from "./playground-app.js";
 import "./styles.css";
 import { playgroundTemplate } from "./template.js";
 
+const BASEMAP_SOURCE_ID = "plotlibre-basemap-source";
+const BASEMAP_LAYER_ID = "plotlibre-basemap-layer";
+
 const root = document.getElementById("app");
 if (!root) {
   throw new Error("PlotLibre playground root element was not found.");
@@ -14,8 +17,9 @@ root.innerHTML = playgroundTemplate;
 
 const query = new URLSearchParams(window.location.search);
 const e2e = query.get("e2e") === "1";
+const basemapDisabled = e2e || query.get("basemap") === "none";
 
-const offlineStyle = {
+const bootstrapStyle = {
   version: 8,
   sources: {},
   layers: [
@@ -31,7 +35,9 @@ const offlineStyle = {
 
 const map = new Map({
   container: "map",
-  style: e2e ? offlineStyle : "https://demotiles.maplibre.org/style.json",
+  // Always bootstrap from a local style. Remote basemap resources are optional
+  // enhancements and must never block PlotLibre initialization.
+  style: bootstrapStyle,
   center: [118.7969, 32.0603],
   zoom: 11.2,
   canvasContextAttributes: {
@@ -51,6 +57,13 @@ if (!e2e) {
 }
 
 map.once("load", () => {
+  // Add the optional basemap synchronously before PlotLibre creates its layers,
+  // so all plotting layers remain above it. Tile requests continue in the
+  // background and do not delay the application.
+  if (!basemapDisabled) {
+    installOptionalBasemap(map);
+  }
+
   const plot = new PlotLibre(map, {
     definitions: builtInSymbols,
     historySize: 300,
@@ -61,15 +74,41 @@ map.once("load", () => {
   window.__plotlibrePlayground = { map, plot, app };
 });
 
+let basemapWarningShown = false;
 map.on("error", (event) => {
   console.error("MapLibre error", event.error);
+  if (e2e || basemapWarningShown) return;
+
+  basemapWarningShown = true;
   const status = document.getElementById("status-text");
-  if (status && !e2e) {
+  if (status) {
     status.textContent =
-      "底图资源加载出现问题，但 PlotLibre 标绘功能仍可在当前地图上使用。";
+      "在线底图暂时不可用，已切换为本地背景；PlotLibre 标绘功能不受影响。";
     status.dataset.state = "warning";
   }
 });
+
+function installOptionalBasemap(targetMap: Map): void {
+  if (targetMap.getSource(BASEMAP_SOURCE_ID)) return;
+
+  targetMap.addSource(BASEMAP_SOURCE_ID, {
+    type: "raster",
+    tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+    tileSize: 256,
+    minzoom: 0,
+    maxzoom: 19,
+    attribution: "© OpenStreetMap contributors",
+  });
+  targetMap.addLayer({
+    id: BASEMAP_LAYER_ID,
+    type: "raster",
+    source: BASEMAP_SOURCE_ID,
+    paint: {
+      "raster-opacity": 0.92,
+      "raster-fade-duration": 150,
+    },
+  });
+}
 
 declare global {
   interface Window {
