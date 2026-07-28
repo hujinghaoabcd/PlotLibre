@@ -3,7 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 type TwoPointArrowType =
   | "arrow.straight"
   | "arrow.fine"
-  | "arrow.fine.tailed";
+  | "arrow.fine.tailed"
+  | "arrow.assault-direction";
 
 async function openPlayground(page: Page): Promise<void> {
   await page.goto("/PlotLibre/?e2e=1");
@@ -67,13 +68,13 @@ test("loads from the GitHub Pages project path", async ({ page }) => {
   await expect(page).toHaveTitle("PlotLibre Playground");
   await expect(page.getByTestId("plot-count")).toHaveText("0 个标绘");
   await expect(page.getByTestId("symbol-select")).toHaveValue("arrow.straight");
-  await expect(page.getByTestId("symbol-select").locator("option")).toHaveCount(3);
+  await expect(page.getByTestId("symbol-select").locator("option")).toHaveCount(4);
 });
 
 test("starts immediately when the optional basemap is disabled", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
-  await expect(page.getByTestId("plot-count")).toHaveText("3 个标绘");
+  await expect(page.getByTestId("plot-count")).toHaveText("4 个标绘");
   await expect(page.getByTestId("status-text")).not.toContainText("正在初始化");
 
   const sampleTypes = await page.evaluate(() => {
@@ -84,11 +85,12 @@ test("starts immediately when the optional basemap is disabled", async ({ page }
   expect(sampleTypes).toContain("arrow.straight");
   expect(sampleTypes).toContain("arrow.fine");
   expect(sampleTypes).toContain("arrow.fine.tailed");
+  expect(sampleTypes).toContain("arrow.assault-direction");
 });
 
 test("renders all sample arrow types through committed layers", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
-  await expect(page.getByTestId("plot-count")).toHaveText("3 个标绘");
+  await expect(page.getByTestId("plot-count")).toHaveText("4 个标绘");
 
   await expect
     .poll(
@@ -122,12 +124,13 @@ test("renders all sample arrow types through committed layers", async ({ page })
             lineLayerVisible:
               (map.getLayoutProperty("plotlibre-line", "visibility") ??
                 "visible") === "visible",
-            sourceHasExpectedFeatures: sourceFeatures.length >= 6,
+            sourceHasExpectedFeatures: sourceFeatures.length >= 8,
             sourceHasFill: sourceRoles.includes("fill"),
             sourceHasOutline: sourceRoles.includes("outline"),
             sourceHasStraight: sourcePlotTypes.includes("arrow.straight"),
             sourceHasFine: sourcePlotTypes.includes("arrow.fine"),
             sourceHasTailedFine: sourcePlotTypes.includes("arrow.fine.tailed"),
+            sourceHasAssault: sourcePlotTypes.includes("arrow.assault-direction"),
             canvasHasRenderedFeatures: renderedFeatures.length > 0,
             canvasHasFill: renderedRoles.includes("fill"),
             canvasHasOutline: renderedRoles.includes("outline"),
@@ -147,6 +150,7 @@ test("renders all sample arrow types through committed layers", async ({ page })
       sourceHasStraight: true,
       sourceHasFine: true,
       sourceHasTailedFine: true,
+      sourceHasAssault: true,
       canvasHasRenderedFeatures: true,
       canvasHasFill: true,
       canvasHasOutline: true,
@@ -188,6 +192,35 @@ test("draws and renders a tailed fine arrow from the symbol selector", async ({
     return geometry?.type === "Polygon" ? geometry.coordinates[0]?.length : 0;
   });
   expect(derivedRingLength).toBe(9);
+});
+
+test("draws and renders an assault direction from the symbol selector", async ({
+  page,
+}) => {
+  await openPlayground(page);
+  await drawArrow(page, "arrow.assault-direction");
+  await expectSelectedRenderedType(page, "arrow.assault-direction");
+
+  const derived = await page.evaluate(() => {
+    const playground = window.__plotlibrePlayground;
+    if (!playground) throw new Error("Playground API is unavailable.");
+    const selectedId = playground.plot.interaction.selectedId;
+    if (!selectedId) throw new Error("No plot is selected.");
+    const selected = playground.plot.store.get(selectedId);
+    const bundle = playground.plot.registry.generate(selected);
+    const geometry = bundle.fills[0]?.geometry;
+    return {
+      ringLength:
+        geometry?.type === "Polygon" ? geometry.coordinates[0]?.length : 0,
+      bodyWidthRatio: selected.parameters.bodyWidthRatio,
+      headAngleDegrees: selected.parameters.headAngleDegrees,
+    };
+  });
+  expect(derived).toEqual({
+    ringLength: 8,
+    bodyWidthRatio: 0.18,
+    headAngleDegrees: 42,
+  });
 });
 
 test("updates the selected style and deletes the plot", async ({ page }) => {

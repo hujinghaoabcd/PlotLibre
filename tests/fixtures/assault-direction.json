@@ -1,0 +1,21 @@
+{
+  "controlPoints": [[0, 0], [0.01, 0]],
+  "parameters": {
+    "bodyWidthRatio": 0.18,
+    "headLengthRatio": 0.3,
+    "headAngleDegrees": 42,
+    "neckWidthRatio": 0.72,
+    "minimumWidthMeters": 2,
+    "maximumWidthMeters": 100000
+  },
+  "expectedRing": [
+    [0, 0.0009],
+    [0.007, 0.000648],
+    [0.007, 0.00270121213289352],
+    [0.01, 0],
+    [0.007, -0.00270121213289352],
+    [0.007, -0.000648],
+    [0, -0.0009],
+    [0, 0.0009]
+  ]
+}

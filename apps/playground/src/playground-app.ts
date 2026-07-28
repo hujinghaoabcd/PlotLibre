@@ -1,6 +1,7 @@
 import type { PlotFeature, PlotStyle } from "@plotlibre/core";
 import type { PlotLibre } from "@plotlibre/maplibre";
 import {
+  ASSAULT_DIRECTION_TYPE,
   FINE_ARROW_TYPE,
   STRAIGHT_ARROW_TYPE,
   TAILED_FINE_ARROW_TYPE,
@@ -148,6 +149,20 @@ export class PlaygroundApp {
           lineWidth: 2,
         },
       },
+      {
+        id: "sample-assault-direction",
+        plotType: ASSAULT_DIRECTION_TYPE,
+        controlPoints: [
+          [118.805, 32.025],
+          [118.885, 32.055],
+        ] as const,
+        style: {
+          fillColor: "#9b51e0",
+          fillOpacity: 0.5,
+          lineColor: "#5f2b91",
+          lineWidth: 2,
+        },
+      },
     ];
 
     for (const sample of samples) {
@@ -165,12 +180,12 @@ export class PlaygroundApp {
     this.#map.fitBounds(
       [
         [118.7, 31.99],
-        [118.9, 32.16],
+        [118.92, 32.16],
       ],
       { padding: 72, duration: 500 },
     );
     this.setStatus(
-      "已加载南京直箭头、细箭头和燕尾细箭头示例。可拖动控制点或修改右侧样式。",
+      "已加载南京四类箭头示例。可拖动控制点或修改右侧样式。",
       "ready",
     );
     this.refresh();
