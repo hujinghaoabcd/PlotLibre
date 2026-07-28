@@ -273,7 +273,7 @@ test("drags an interior curved control point and undoes the edit", async ({ page
     const selected = playground.plot.store.get(selectedId);
     const middle = selected.controlPoints[1];
     if (!middle) throw new Error("Curved arrow has no middle control.");
-    const point = playground.map.project(middle);
+    const point = playground.map.project([middle[0], middle[1]]);
     return {
       selectedId,
       middle,
