@@ -64,8 +64,10 @@ npm run playground:dev
 默认地址：
 
 ```text
-http://127.0.0.1:5173/
+http://127.0.0.1:5173/PlotLibre/
 ```
+
+Vite 开发、Preview、Playwright 和 GitHub Pages 均使用同一个 `/PlotLibre/` base，避免只在部署后才发现资源路径错误。
 
 ## 5. 构建 GitHub Pages 版本
 
@@ -135,16 +137,21 @@ npm run playground:e2e
 - Node.js 20.19；
 - Node.js 22；
 - package TypeScript 构建；
-- 单元测试；
+- 15 项单元与适配器测试；
 - Playground TypeScript；
 - GitHub Pages base 构建；
-- handover 检查。
+- handover 检查；
+- 两个 Node 版本独立运行；
+- 失败时上传完整 validation log。
 
 ### Browser
 
 - 安装 Chromium；
 - 运行 Playwright；
-- 失败时上传报告。
+- 真实加载 MapLibre GL JS 6；
+- 失败时上传 HTML report、trace、截图和视频。
+
+Milestone 003 的 PR 验证中，Node 20.19、Node 22 和 Chromium 三个作业均已通过。
 
 ## 9. GitHub Pages 部署
 
@@ -183,7 +190,20 @@ Settings → Pages → Build and deployment → Source
 GitHub Actions
 ```
 
-## 10. 设计约束
+只有 workflow 部署成功并实际访问公开 URL 后，才可宣布站点上线。
+
+## 10. 已解决的真实集成问题
+
+真实 CI 帮助发现并修复：
+
+1. Playwright 在 `exactOptionalPropertyTypes` 下不能显式传递 `workers: undefined`；
+2. MapLibre GL JS 6 的 `attributionControl` 类型不接受 `true`；
+3. MapLibre Point 类与轻量测试点对象需要不透明 adapter 边界；
+4. MapLibre Feature `id` 在类型上允许 `undefined`；
+5. 仅在 build CLI 传入 `--base` 会导致 Vite Preview 的 `/PlotLibre/assets/*` 404；
+6. `base` 必须固定在 `vite.config.ts`，使 dev、preview、E2E 和 Pages 保持一致。
+
+## 11. 设计约束
 
 - Playground 只能使用公开 API；
 - 不直接编辑 `plotlibre-committed` Source；
@@ -193,7 +213,7 @@ GitHub Actions
 - GitHub Pages 路径必须始终通过 `/PlotLibre/` 构建进行验证；
 - 后续每种新符号都应在 Playground 中增加可视化入口。
 
-## 11. 后续扩展
+## 12. 后续扩展
 
 - Symbol catalog；
 - 攻击箭头、燕尾箭头和双箭头示例；
