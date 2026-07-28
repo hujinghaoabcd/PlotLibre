@@ -1,0 +1,24 @@
+{
+  "name": "@plotlibre/maplibre",
+  "version": "0.0.2",
+  "description": "MapLibre GL JS adapter, renderer and interactions for PlotLibre.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "dependencies": {
+    "@plotlibre/core": "0.0.2",
+    "@plotlibre/interaction": "0.0.2"
+  },
+  "peerDependencies": {
+    "maplibre-gl": ">=5.0.0 <7.0.0"
+  },
+  "license": "UNLICENSED"
+}

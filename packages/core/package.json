@@ -1,0 +1,19 @@
+{
+  "name": "@plotlibre/core",
+  "version": "0.0.2",
+  "description": "Engine-independent PlotLibre domain model, registry, store, history and PlotJSON support.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@plotlibre/symbols",
+  "version": "0.0.2",
+  "description": "Built-in parametric symbol definitions for PlotLibre.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@plotlibre/core": "0.0.2",
+    "@plotlibre/geometry": "0.0.2"
+  },
+  "license": "UNLICENSED"
+}
