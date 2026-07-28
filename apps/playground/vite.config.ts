@@ -4,22 +4,29 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 const configDirectory = dirname(fileURLToPath(import.meta.url));
+const MAPLIBRE_WORKER_MODULES = [
+  "maplibre-gl-worker.mjs",
+  "maplibre-gl-shared.mjs",
+] as const;
 
-async function prepareMapLibreWorker(): Promise<void> {
+async function prepareMapLibreWorkerModules(): Promise<void> {
   const mapLibreEntry = fileURLToPath(import.meta.resolve("maplibre-gl"));
-  const workerSource = resolve(
-    dirname(mapLibreEntry),
-    "maplibre-gl-worker.mjs",
-  );
-  const workerDirectory = resolve(configDirectory, "public", "assets");
-  const workerTarget = resolve(workerDirectory, "maplibre-gl-worker.mjs");
+  const mapLibreDirectory = dirname(mapLibreEntry);
+  const targetDirectory = resolve(configDirectory, "public", "assets");
 
-  await mkdir(workerDirectory, { recursive: true });
-  await copyFile(workerSource, workerTarget);
+  await mkdir(targetDirectory, { recursive: true });
+  await Promise.all(
+    MAPLIBRE_WORKER_MODULES.map((fileName) =>
+      copyFile(
+        resolve(mapLibreDirectory, fileName),
+        resolve(targetDirectory, fileName),
+      ),
+    ),
+  );
 }
 
 export default defineConfig(async () => {
-  await prepareMapLibreWorker();
+  await prepareMapLibreWorkerModules();
 
   return {
     base: "/PlotLibre/",
