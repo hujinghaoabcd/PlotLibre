@@ -1,0 +1,23 @@
+{
+  "controlPoints": [[0, 0], [0.01, 0]],
+  "parameters": {
+    "tailWidthRatio": 0.055,
+    "headLengthRatio": 0.22,
+    "headWidthRatio": 1.9,
+    "neckWidthRatio": 0.42,
+    "minimumWidthMeters": 1,
+    "maximumWidthMeters": 100000,
+    "tailNotchRatio": 0.9
+  },
+  "expectedRing": [
+    [0, 0.000275],
+    [0.0078, 0.0001155],
+    [0.0078, 0.0005225],
+    [0.01, 0],
+    [0.0078, -0.0005225],
+    [0.0078, -0.0001155],
+    [0, -0.000275],
+    [0.000495, 0],
+    [0, 0.000275]
+  ]
+}
