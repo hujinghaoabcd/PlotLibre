@@ -1,220 +1,180 @@
-# PlotLibre Development Handover — Milestone 002
+# PlotLibre Development Handover — Milestone 003
 
 日期：2026-07-28  
 仓库：`hujinghaoabcd/PlotLibre`  
 目标分支：`main`  
-开发分支：`agent/bootstrap-foundation`  
-草稿 PR：`#1 Bootstrap PlotLibre foundation`
+开发分支：`agent/github-pages-playground`  
+基线提交：`6032321b5d4edfe3b8911071451e0bef14a1759b`  
+上一阶段 PR：`#1`，已合并
 
 ## Current state
 
-PlotLibre 当前版本提升为开发基线 `0.0.2`。在 Milestone 001 的语义对象、几何生成、Store、History 和 MapLibre committed renderer 之上，本里程碑完成了第一个完整交互纵向切片。
+PlotLibre 当前开发版本为 `0.0.3`。Milestone 001 和 002 已通过 PR #1 合并到 `main`，本阶段在新的独立分支上完成真实 MapLibre GL JS 6 浏览器应用、Playwright 测试和 GitHub Pages 部署结构。
 
-当前用户已经可以：
+当前预期公开地址：
 
-1. 调用 `plot.draw("arrow.straight")` 开始绘制；
-2. 第一次点击确定箭尾；
-3. 移动鼠标动态预览；
-4. 第二次点击或 Enter 完成；
-5. Escape 取消；
-6. 点击图形选择；
-7. 拖动两个语义控制点；
-8. 一次拖动通过一次 `undo()` 整体撤销；
-9. MapLibre `style.load` 后自动恢复图层和状态。
+```text
+https://hujinghaoabcd.github.io/PlotLibre/
+```
 
-尚未创建真实浏览器 Playground。下一里程碑专门完成 Vite、真实 MapLibre 6、Playwright 和 GitHub Pages。
+该地址只有在本阶段 PR 合并、Pages Source 选择 GitHub Actions 且部署工作流成功后才可视为正式可用。
 
 ## Completed in this milestone
 
-### 新增 `@plotlibre/interaction`
+### 1. 新增真实浏览器 Playground
 
-新增文件：
+新增 workspace：
 
 ```text
-packages/interaction/package.json
-packages/interaction/tsconfig.json
-packages/interaction/src/index.ts
-packages/interaction/src/types.ts
-packages/interaction/src/two-point-draw-session.ts
+apps/playground/
+├── package.json
+├── tsconfig.json
+├── index.html
+├── vite.config.ts
+├── playwright.config.ts
+├── src/
+│   ├── main.ts
+│   ├── playground-app.ts
+│   ├── template.ts
+│   └── styles.css
+└── e2e/
+    └── playground.spec.ts
 ```
 
-实现：
+技术基线：
 
-- `DrawSession` 接口；
-- `DrawSessionStatus`；
-- `DrawSessionSnapshot`；
-- `TwoPointDrawSessionOptions`；
-- `TwoPointDrawSession`；
-- ready/drawing/completed/cancelled 状态；
-- click、pointerMove、keyDown 和 cancel；
-- Enter 完成；
+- MapLibre GL JS `6.0.0`；
+- Vite `8.1.5`；
+- Playwright `1.61.1`；
+- Node.js `20.19+`；
+- GitHub Pages project base `/PlotLibre/`。
+
+### 2. Playground 功能
+
+用户界面已经支持：
+
+- 绘制直箭头；
+- 第一次点击确定箭尾；
+- pointer move 动态预览；
+- 第二次点击完成；
 - Escape 取消；
-- Backspace/Delete 清空起点并返回 ready；
-- distinct-point 检查；
-- 语义 `PlotFeatureInput` 输出；
-- 不依赖 MapLibre、DOM 或浏览器全局变量。
+- Enter 使用当前预览位置完成；
+- 点击对象选择；
+- 拖动两个语义控制点；
+- 撤销和重做；
+- 删除选中对象；
+- 清空文档；
+- 加载三个南京示例箭头；
+- 填充颜色；
+- 填充透明度；
+- 边线颜色；
+- 边线宽度；
+- PlotJSON 下载导出；
+- PlotJSON 文件导入；
+- 当前对象数量、选中 ID 和操作状态显示；
+- 桌面和移动端响应式布局。
 
-### MapLibre renderer 扩展
+Playground 只调用正式公开 API，不直接操作 Store 内部 Map、不直接修改 MapLibre Source，也不复制箭头算法。
 
-`MapLibrePlotRenderer` 从单一 Source 扩展为：
+### 3. 生产与测试地图模式
 
-```text
-plotlibre-committed
-plotlibre-draft
-plotlibre-handles
-```
-
-新增图层：
-
-```text
-plotlibre-fill
-plotlibre-line
-plotlibre-point
-plotlibre-draft-fill
-plotlibre-draft-line
-plotlibre-draft-point
-plotlibre-handle
-```
-
-新增：
-
-- `renderDraft()`；
-- `renderHandles()`；
-- `clearDraft()`；
-- `clearHandles()`；
-- `sourceIds` getter；
-- draft 透明和虚线视觉区分；
-- 控制点白色填充、蓝色描边；
-- 幂等 Source/Layer 初始化；
-- 全部 Source/Layer 的逆序销毁。
-
-### MapLibre interaction adapter
-
-新增：
+生产模式使用：
 
 ```text
-packages/maplibre/src/interaction.ts
+https://demotiles.maplibre.org/style.json
 ```
 
-实现 `MapLibrePlotInteraction`：
+无需私有 token。
 
-- MapLibre click 到 DrawSession 的转换；
-- mousemove 动态草图；
-- canvas keyboard 事件；
-- committed fill/line 点击选择；
-- handles hit testing；
-- mousedown 开始控制点拖动；
-- 拖动期间关闭 `dragPan`；
-- mousemove 生成语义 preview；
-- Registry 验证 preview；
-- mouseup 提交一次 ReplacePlotCommand；
-- Escape 取消拖动并恢复原对象；
-- Store 更新后同步选择 handles；
-- style.load 后恢复 renderer、数据、draft 和 handles；
-- cursor：crosshair/grab/grabbing/idle；
-- map canvas 自动变为 keyboard focusable；
-- 可注入 `idFactory` 便于测试和业务 ID 策略。
-
-### `PlotLibre` 高层 API
-
-新增：
-
-```ts
-plot.draw(plotType, options)
-plot.cancelDrawing()
-plot.select(id)
-plot.replace(feature)
-plot.interaction
-```
-
-行为：
-
-- `draw()` 当前只接受控制点要求恰好为 2 的 definition；
-- `replace()` 自动把 revision 提升 1；
-- `clear()` 和 `importDocument()` 会取消 drawing 和 selection；
-- `destroy()` 先解绑交互，再销毁 renderer；
-- 创建和编辑都通过 CommandHistory。
-
-### Core 类型更新
-
-`PlotRenderRole` 新增：
+Playwright 使用：
 
 ```text
-handle
+?e2e=1
 ```
 
-`PlotRenderProperties` 新增可选字段：
+并加载本地空白 Style。该设计使浏览器测试不依赖远程底图、字体或瓦片服务，只验证 MapLibre WebGL2 与 PlotLibre 本身。
 
-```text
-handleKind
-handleIndex
-plotRenderId
+### 4. Playwright 浏览器测试
+
+E2E 覆盖：
+
+1. `/PlotLibre/` GitHub Pages project path；
+2. MapLibre canvas 初始化；
+3. 两点绘制直箭头；
+4. 自动选择新对象；
+5. undo；
+6. redo；
+7. 样式更新；
+8. 删除；
+9. PlotJSON 下载；
+10. PlotJSON 文件导入。
+
+Chromium 使用 WebGL 相关启动参数，便于 GitHub Actions runner 通过软件渲染运行 MapLibre 6。
+
+### 5. Workspace 和命令
+
+根 workspace 新增 `apps/*`。
+
+新增命令：
+
+```bash
+npm run playground:dev
+npm run playground:typecheck
+npm run playground:build
+npm run playground:e2e
 ```
 
-### 工程配置
+`npm run check` 现在包括：
 
-更新：
+- packages TypeScript；
+- packages 单元测试；
+- Playground TypeScript；
+- GitHub Pages base 构建。
 
-- workspace 版本到 `0.0.2`；
-- internal package dependency 版本到 `0.0.2`；
-- TypeScript paths；
-- project references；
-- clean script；
-- workspace link script；
-- MapLibre package dependency graph。
+### 6. CI
 
-新的依赖方向：
+`.github/workflows/ci.yml` 已扩展：
 
-```text
-core <- geometry <- symbols
-core <- interaction
-core + interaction <- maplibre
-```
+- Node.js 20.19；
+- Node.js 22；
+- `npm run check`；
+- handover contract；
+- 独立 Chromium browser job；
+- 失败时上传 Playwright report；
+- `workflow_dispatch` 手动触发入口。
 
-### 测试
+### 7. GitHub Pages
 
 新增：
 
 ```text
-tests/interaction.test.mjs
+.github/workflows/pages.yml
 ```
 
-重写和扩展：
+工作流：
 
-```text
-tests/maplibre.test.mjs
+1. 从 `main` checkout；
+2. Node.js 22；
+3. `npm install`；
+4. `npm run playground:build`；
+5. `actions/configure-pages`；
+6. 上传 `apps/playground/dist`；
+7. 部署到 `github-pages` environment。
+
+权限：
+
+```yaml
+contents: read
+pages: write
+id-token: write
 ```
 
-FakeMap 现在模拟：
-
-- Source；
-- Layer；
-- Evented on/off/fire；
-- Canvas keyboard；
-- cursor；
-- queryRenderedFeatures；
-- dragPan；
-- style reset。
-
-新增测试覆盖：
-
-- TwoPointDrawSession preview 和 complete；
-- keyboard reset/complete/cancel；
-- interactive click drawing；
-- draft source；
-- automatic selection；
-- Escape cancel；
-- semantic handle drag；
-- revision increment；
-- single-command undo；
-- style.load restoration。
-
-### 文档
+### 8. 文档
 
 新增：
 
 ```text
-docs/INTERACTION_MODEL.md
+docs/PLAYGROUND.md
 ```
 
 更新：
@@ -222,142 +182,117 @@ docs/INTERACTION_MODEL.md
 ```text
 README.md
 AGENTS.md
-CONTRIBUTING.md
-docs/ARCHITECTURE.md
 docs/DEVELOPMENT_PLAN.md
 docs/handover/LATEST.md
 ```
 
-README 已改用符合 MapLibre 6 ESM 的 named import 示例，并增加 interactive API、键盘行为和 Source 架构说明。
-
 ## Validation
 
-环境：
+### 已完成的静态设计检查
 
-```text
-Node.js v22.16.0
-npm 10.9.2
-TypeScript 5.8.3
-```
+- Playground 使用公开 PlotLibre API；
+- Vite base 固定验证 `/PlotLibre/`；
+- E2E 不依赖远程地图资源；
+- Pages workflow 只从 `main` 部署；
+- Pages workflow 使用 artifact deployment；
+- CI 与 Pages 均可 `workflow_dispatch`；
+- handover 文件结构符合项目约定。
 
-运行：
+### 自动化验证状态
 
-```bash
-tsc -b --pretty false
-```
-
-结果：通过，0 TypeScript errors。
-
-运行：
+本阶段 PR 创建后，以 GitHub Actions 为权威执行：
 
 ```bash
-npm test
-```
-
-结果：
-
-```text
-15 tests
-15 passed
-0 failed
-```
-
-运行：
-
-```bash
+npm install
+npm run check
 npm run handover:check
+npx playwright install --with-deps chromium
+npm run playground:e2e
 ```
 
-结果：通过。
-
-注意：当前环境不能从容器直接访问 GitHub/npm 网络，因此尚未安装和启动真实 MapLibre 6。当前浏览器交互通过结构化 MapLibre 接口和 FakeMap 验证。真实浏览器验证明确列入下一里程碑。
+当前执行环境无法解析 `github.com`，因此不能在容器中重新克隆仓库或安装 npm 依赖。PR CI 结果和必要修复将在本文件后续更新中记录；在 CI 通过前，本里程碑状态为“代码完成、等待验证”。
 
 ## Architectural decisions
 
-1. **Interaction 独立成包。** 两点会话只依赖 Core，不依赖地图引擎。
-2. **MapLibre 只做适配。** 它处理事件、命中测试、cursor、dragPan 和 Source/Layer 生命周期。
-3. **三 Source 分离。** committed、draft、handles 不共享高频更新路径。
-4. **Preview 不进入 Store。** pointermove 不产生历史命令。
-5. **控制点是编辑对象。** 不暴露派生 Polygon 顶点。
-6. **一次拖动是一个事务。** pointerup 才提交 ReplacePlotCommand。
-7. **选择是运行时状态。** 不写入 PlotJSON。
-8. **Style reload 采用幂等恢复。** 监听 `style.load` 而不是依赖一次性初始化。
-9. **结构化 MapLibre 类型。** 当前库编译时不直接依赖 maplibre-gl 包，真实版本由 peer dependency 和 E2E 验证。
-10. **示例部署单独里程碑。** 不在未真实运行前声称 GitHub Pages 可用。
+1. Playground 是正式公开 API 的普通消费者，不拥有内部特权。
+2. 生产底图与 E2E 底图分离，但运行相同 PlotLibre 源码。
+3. GitHub Pages 使用 project-site base `/PlotLibre/`，所有 E2E 也使用同一路径。
+4. MapLibre 6 为 Playground 固定验证版本；库本身仍声明 MapLibre 5/6 peer 范围。
+5. Vite 和 Playwright 只属于私有 Playground workspace，不进入发布包依赖。
+6. PlotJSON 导入导出使用现有 Core API，不在 UI 层定义第二套格式。
+7. 样式修改通过 `PlotLibre.replace()` 进入 History，不直接改派生 Feature。
+8. GitHub Pages 只从 `main` 部署，PR 分支只运行 CI。
+9. 没有 `package-lock.json` 前，Actions 不启用 npm cache，以免 setup-node 因缺失锁文件失败。
+10. Vite 8 要求 Node 20.19+，根 engines 已同步提升。
 
 ## Known limitations
 
-- 只支持控制点数量恰好为 2 的交互 definition；
-- 没有多点 DrawSession 和双击完成；
-- 没有 snapping、guides 或角度约束；
-- 没有 width/head-length/curve 等参数控制柄；
-- 没有触摸专项交互；
-- 没有多选、框选和套索；
-- hit testing 目前使用 fill/line 图层，没有独立 expanded hit-area layer；
-- 拖动 preview 仍同步执行几何生成，尚未 requestAnimationFrame 合并；
-- 未真实验证 MapLibre 5/6；
-- 未创建 Vite Playground；
-- 未创建 Playwright E2E；
-- 未创建 GitHub Pages workflow；
-- 未生成 package-lock；
-- 项目仍为 `UNLICENSED`。
+- 当前只有 `arrow.straight`；
+- 符号目录尚未建立；
+- 属性面板仅覆盖四个基础样式字段；
+- 尚无参数控制柄；
+- 没有多选、框选、吸附和图层树；
+- 没有文本方式编辑 PlotJSON；
+- 生产底图依赖 MapLibre 官方 demo tile service；
+- 当前 E2E 只覆盖 Chromium；
+- 未验证 Firefox 和 WebKit；
+- 尚未验证真实触摸设备；
+- GitHub Pages 首次部署可能需要管理员在 Settings 中选择 GitHub Actions；
+- 仓库仍未选择开源许可证；
+- 尚未生成锁文件，依赖安装不是完全可重复构建；
+- 本阶段 CI 结果在 PR 创建后确认。
 
 ## Next tasks
 
-下一里程碑：**Milestone 003 — Browser Playground and GitHub Pages**。
+Milestone 004：箭头公共几何基础。
 
 优先顺序：
 
-1. 创建 `apps/playground`；
-2. 引入真实 MapLibre GL JS 6；
-3. 使用 ESM named import；
-4. 选择无需私有 Key 的公开样式；
-5. 绘制、取消、选择、撤销、重做、删除、清空工具栏；
-6. 样式编辑面板；
-7. PlotJSON 导入导出；
-8. 状态栏和操作提示；
-9. Playwright Chromium；
-10. 测试 click draw、Escape、handle drag、undo、style reload；
-11. 建立 GitHub Pages workflow；
-12. Vite base 设置为 `/PlotLibre/`；
-13. README 增加在线 Demo；
-14. 再评估 MapLibre 5 compatibility job；
-15. 完成 Milestone 003 交接文件。
-
-完成 Pages 示例后，再进入公共 Arrow 几何基础，不应提前批量添加攻击箭头。
+1. 为每个参考算法建立 provenance 记录；
+2. polyline 清洗和累计长度；
+3. point/tangent along line；
+4. 局部与测地计算接口；
+5. Catmull-Rom/Bezier 平滑；
+6. variable-width left/right offset；
+7. 箭头头部与颈部公共构造；
+8. ring winding normalization；
+9. self-intersection 检测；
+10. 重合点、极短线、共线点退化策略；
+11. antimeridian 和高纬度策略；
+12. property-based tests；
+13. geometry golden fixtures；
+14. Playground 增加 geometry debugging 页面；
+15. 更新交接文件。
 
 ## Risks and decisions
 
-### MapLibre 6
+### Vite 8 和 Node 版本
 
-MapLibre GL JS 6 已转为 ESM-only，并要求 WebGL2。Playground 必须使用现代 bundler 和 named/namespace import，不能继续依赖旧 UMD `<script>` 示例。
+Vite 8 要求现代 Node.js。项目最低 Node 已从 20 提升至 20.19。后续若发布 npm 包，应明确库包本身与 Playground 工具链的 Node 要求可能不同。
 
-### MapLibre type compatibility
+### GitHub Pages 首次配置
 
-当前结构化接口只覆盖实际使用的方法。真实 MapLibre 6 接入时可能发现事件类型、queryRenderedFeatures 参数或 style lifecycle 的细节差异，应优先调整 adapter，不要让 interaction 包依赖 MapLibre。
+Workflow 文件本身不能保证仓库 Pages Source 已设置为 GitHub Actions。首次合并后需要检查仓库 Settings；不能在部署成功前宣称公开站点已上线。
 
-### Pointer performance
+### MapLibre demo service
 
-当前 FakeMap 测试无法衡量 pointermove FPS。真实示例完成后应增加 requestAnimationFrame batching，再建立性能基准。
+生产示例采用公开 demo style 以免要求 token，但它不是 SLA 底图服务。PlotLibre 功能与底图错误隔离，E2E 也完全不依赖该服务。
 
-### GitHub Pages 路径
+### 浏览器软件渲染
 
-Pages 项目站点路径为 `/PlotLibre/`，Vite 静态资源 base、导入 URL 和刷新行为必须显式验证。
-
-### 许可证
-
-公开 Demo 和未来 npm 发布前，应尽快决定许可证；在此之前不得复制许可证不明的态势标绘算法。
+GitHub-hosted runner 的 WebGL 能力可能受 Chromium/ANGLE 参数影响。若 E2E 失败，应优先查看浏览器日志和截图，不应把测试改成绕开真实 MapLibre。
 
 ## Continuation instructions
 
-新的开发者或新对话应按顺序：
+新的开发者应按以下顺序继续：
 
 1. 阅读 `AGENTS.md`；
 2. 阅读 `docs/ARCHITECTURE.md`；
 3. 阅读 `docs/INTERACTION_MODEL.md`；
-4. 阅读 `docs/DEVELOPMENT_PLAN.md` 的 Milestone 003；
-5. 运行 `npm test`，确认 15/15；
-6. 不要修改 control-points-as-source-of-truth 原则；
-7. Playground 只能调用公开 `PlotLibre` API；
-8. 优先真实 MapLibre 6 和 Pages，不先增加攻击箭头；
-9. 完成后更新 `LATEST.md` 并添加 Milestone 003 文件。
+4. 阅读 `docs/PLAYGROUND.md`；
+5. 查看本阶段 PR 的 CI；
+6. 修复所有 TypeScript、Vite、MapLibre 或 Playwright 问题；
+7. CI 通过后更新本交接文件 Validation；
+8. 合并后验证 Pages workflow 和公开 URL；
+9. 然后从最新 `main` 新建 Milestone 004 分支；
+10. 不直接批量复制攻击箭头代码，先完成共享几何基础和来源记录。
