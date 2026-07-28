@@ -169,8 +169,8 @@ export class PlaygroundApp {
         plotType: CURVED_ARROW_TYPE,
         controlPoints: [
           [118.72, 32.02],
-          [118.765, 32.045],
-          [118.745, 32.105],
+          [118.75, 32.05],
+          [118.78, 32.1],
           [118.82, 32.14],
         ] as const,
         style: {
