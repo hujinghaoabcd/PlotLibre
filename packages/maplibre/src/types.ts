@@ -57,9 +57,14 @@ export interface MapLibreMapLike {
   on(type: string, listener: MapLibreEventListener): unknown;
   off(type: string, listener: MapLibreEventListener): unknown;
   getCanvas(): MapCanvasLike;
+  /**
+   * The concrete MapLibre engine uses its own Point class while tests may use a
+   * lightweight point object. Keep these arguments opaque at the adapter boundary
+   * so the public packages do not depend on MapLibre implementation types.
+   */
   queryRenderedFeatures?(
-    point: MapLibrePointLike,
-    options?: { layers?: string[] | Set<string> },
+    point: any,
+    options?: any,
   ): readonly MapLibreRenderedFeatureLike[];
   readonly dragPan?: MapDragPanLike;
 }
