@@ -13,6 +13,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         node-version: ["20.19", "22"]
     steps:
@@ -28,7 +29,19 @@ jobs:
         run: npm install
 
       - name: Typecheck, unit tests and playground build
-        run: npm run check
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee check.log
+
+      - name: Upload validation log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-log-${{ matrix.node-version }}
+          path: check.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Verify handover contract
         run: npm run handover:check
