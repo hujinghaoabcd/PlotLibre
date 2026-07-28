@@ -71,7 +71,7 @@ export class MultiPointDrawSession implements DrawSession {
       return this.snapshot();
     }
 
-    this.#points.push(point);
+    this.#points = [...this.#points, point];
     this.#cursor = undefined;
     this.#status = "drawing";
 
@@ -80,7 +80,7 @@ export class MultiPointDrawSession implements DrawSession {
       this.#maximumPoints !== undefined &&
       this.#points.length === this.#maximumPoints
     ) {
-      return this.#complete(this.#points);
+      return this.#complete([...this.#points]);
     }
 
     return this.snapshot();
@@ -93,17 +93,20 @@ export class MultiPointDrawSession implements DrawSession {
 
     const point = clonePosition(position);
     const last = this.#points.at(-1);
-    if (!last || !samePosition(last, point)) {
-      if (!this.#isAtMaximum()) {
-        this.#points.push(point);
-      }
-    }
-    this.#cursor = undefined;
-    this.#status = this.#points.length > 0 ? "drawing" : "ready";
+    const candidate =
+      last && samePosition(last, point)
+        ? [...this.#points]
+        : this.#isAtMaximum()
+          ? [...this.#points]
+          : [...this.#points, point];
 
-    if (this.#points.length >= this.#minimumPoints) {
-      return this.#complete(this.#points);
+    this.#cursor = undefined;
+    if (candidate.length >= this.#minimumPoints) {
+      return this.#complete(candidate);
     }
+
+    this.#points = candidate.map(clonePosition);
+    this.#status = this.#points.length > 0 ? "drawing" : "ready";
     return this.snapshot();
   }
 
@@ -131,7 +134,7 @@ export class MultiPointDrawSession implements DrawSession {
     }
 
     if (key === "Backspace" || key === "Delete") {
-      this.#points.pop();
+      this.#points = this.#points.slice(0, -1);
       this.#cursor = undefined;
       this.#status = this.#points.length === 0 ? "ready" : "drawing";
       return this.snapshot();
@@ -140,7 +143,7 @@ export class MultiPointDrawSession implements DrawSession {
     if (key === "Enter") {
       const candidate = this.#candidatePoints();
       if (candidate.length >= this.#minimumPoints) {
-        return this.#complete(candidate);
+        return this.#complete([...candidate]);
       }
     }
 
@@ -179,7 +182,7 @@ export class MultiPointDrawSession implements DrawSession {
   #complete(points: readonly Position[]): DrawSessionSnapshot {
     const limited =
       this.#maximumPoints === undefined
-        ? points
+        ? [...points]
         : points.slice(0, this.#maximumPoints);
     if (limited.length < this.#minimumPoints) {
       return this.snapshot();
