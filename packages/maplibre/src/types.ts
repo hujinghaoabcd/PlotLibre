@@ -41,11 +41,14 @@ export interface KeyboardEventLike {
   preventDefault?(): void;
 }
 
-export interface MapDragPanLike {
+export interface MapInteractionHandlerLike {
   disable(): void;
   enable(): void;
   isEnabled?(): boolean;
 }
+
+export type MapDragPanLike = MapInteractionHandlerLike;
+export type MapDoubleClickZoomLike = MapInteractionHandlerLike;
 
 export interface MapLibreMapLike {
   getSource(id: string): unknown;
@@ -67,6 +70,7 @@ export interface MapLibreMapLike {
     options?: any,
   ): readonly MapLibreRenderedFeatureLike[];
   readonly dragPan?: MapDragPanLike;
+  readonly doubleClickZoom?: MapDoubleClickZoomLike;
 }
 
 export interface PlotLibreSourceIds {

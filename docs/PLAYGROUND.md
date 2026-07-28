@@ -11,7 +11,7 @@ https://hujinghaoabcd.github.io/PlotLibre/
 ## 2. 技术基线
 
 ```text
-PlotLibre demo:       0.0.7
+PlotLibre demo:       0.0.9
 MapLibre GL JS:       6.0.0
 Vite:                 8.1.5
 Playwright:           1.61.1
@@ -28,26 +28,50 @@ arrow.straight           直箭头
 arrow.fine               细箭头
 arrow.fine.tailed        燕尾细箭头
 arrow.assault-direction  突击方向
+arrow.curved             曲线箭头
 ```
 
-四种类型当前都使用两点语义：
+### 3.1 两点符号
+
+前四种类型使用：
 
 ```text
 第一次点击 = tail center / origin
 第二次点击 = tip / objective
 ```
 
-交互：
+支持：
 
-- pointer move 动态预览；
+- pointer move 预览；
 - 第二次点击或 Enter 完成；
 - Escape 取消；
-- Backspace/Delete 重置已收集起点；
-- 点击选择；
-- 拖动两个语义 handles；
-- undo/redo；
-- 样式编辑；
-- PlotJSON 导入导出。
+- Backspace/Delete 重置起点；
+- 两个语义 handles；
+- drag + one ReplacePlotCommand；
+- undo/redo。
+
+### 3.2 曲线箭头
+
+`arrow.curved` 使用三至 64 个语义控制点：
+
+```text
+第一个点   = tail center
+中间点     = curve path controls
+最后一个点 = exact tip
+```
+
+操作：
+
+1. 点击 tail；
+2. 点击一个或多个 path controls；
+3. 第三个候选点开始显示合法 Polygon draft；
+4. 双击最后一点或按 Enter 完成；
+5. Backspace/Delete 每次移除一个未提交点；
+6. Escape 取消；
+7. 完成后拖动任一语义 handle 改变曲线；
+8. 一次拖动只生成一次历史命令。
+
+绘制期间 MapLibre double-click zoom 会暂时关闭，完成或取消后恢复。
 
 ## 4. 南京示例
 
@@ -58,9 +82,10 @@ arrow.assault-direction  突击方向
 1 × arrow.fine
 1 × arrow.fine.tailed
 1 × arrow.assault-direction
+1 × arrow.curved
 ```
 
-突击方向使用独立紫色样式，便于与细箭头系列比较宽体箭身、肩部和角度定义箭头。
+曲线箭头示例使用四个语义控制点和独立青绿色样式。示例采用平滑单向弯曲路径，避免人为生成过紧自交曲线。
 
 ## 5. 底图与启动
 
@@ -69,9 +94,9 @@ arrow.assault-direction  突击方向
 ```text
 local background style
 → MapLibre load
-→ optional raster basemap
 → PlotLibre renderer
 → PlaygroundApp
+→ optional raster basemap
 ```
 
 禁用在线底图：
@@ -134,27 +159,65 @@ Playwright 验证：
 - `/PlotLibre/` project path；
 - Worker entry/shared 为 JavaScript；
 - 无在线底图时立即启动；
-- selector 有四个 option；
-- 四类南京示例；
-- committed Source 包含四种 `plotType`；
+- selector 有五个 option；
+- 五类南京示例；
+- committed Source 包含五种 `plotType`；
 - fill/line Layers 可见；
 - `queryRenderedFeatures()` 返回真实图形；
-- 绘制四种两点箭头；
-- 突击方向默认 `bodyWidthRatio = 0.18`；
-- 突击方向默认 `headAngleDegrees = 42`；
-- undo/redo、style、delete 和 PlotJSON 无回归。
+- 四种两点箭头绘制；
+- 曲线箭头三点 draft；
+- 曲线箭头 double-click completion；
+- double-click zoom disable/restore；
+- 曲线箭头参数和 derived ring；
+- handles 按语义 `handleIndex` 去重验证；
+- 中间控制点 drag；
+- one ReplacePlotCommand；
+- undo 恢复中间控制点；
+- style、delete 和 PlotJSON 无回归。
 
-Milestone 005C 首轮：
+当前 Node 测试：
 
 ```text
-Run ID: 30391839421
-Node tests: 47 passed
+65 passed
+0 failed
+```
+
+曲线箭头完整绿色运行：
+
+```text
+Run ID: 30398030416
 validate 20.19: success
 validate 22: success
 browser: success
 ```
 
-## 9. Pages 部署
+## 9. `querySourceFeatures()` 注意事项
+
+MapLibre 可以按瓦片返回同一 GeoJSON Feature 的多个副本。因此浏览器测试不能把原始返回数量直接解释为语义对象或 handles 数量。
+
+正确验证方法：
+
+```text
+filter by plotId
+→ map handleIndex
+→ Set(handleIndex)
+→ assert semantic count
+```
+
+Store 中的 `controlPoints.length` 仍是语义控制点数量的权威值。
+
+## 10. Self-intersection policy
+
+曲线箭头不会静默输出自交 Polygon。过紧 S 形、过宽箭身或过度折返的路径会被 `isSimpleRing()` 拒绝。
+
+Playground 当前：
+
+- 不提交无效 draft；
+- 无效 handle preview 不进入 Store；
+- 用户可减少弯曲、简化控制点或缩小宽度；
+- 后续 UI 将增加可见 validation feedback。
+
+## 11. Pages 部署
 
 `.github/workflows/pages.yml` 仅从 `main` 部署。
 
@@ -164,7 +227,7 @@ browser: success
 Settings → Pages → Build and deployment → GitHub Actions
 ```
 
-## 10. 强制约束
+## 12. 强制约束
 
 - Playground 不直接编辑 MapLibre Source；
 - Polygon 不是原始数据；
@@ -172,8 +235,9 @@ Settings → Pages → Build and deployment → GitHub Actions
 - 底图不能阻塞 PlotLibre；
 - dev、preview、E2E、Pages 统一 `/PlotLibre/`；
 - 每个新符号同阶段加入 selector、示例和浏览器测试；
-- 浏览器测试必须验证 actual rendered feature，而不是只检查 Store 数量。
+- 浏览器测试必须验证 actual rendered feature，而不是只检查 Store 数量；
+- 多点测试必须覆盖 double-click、缩放恢复和中间 semantic handle。
 
-## 11. 下一步
+## 13. 下一步
 
-`arrow.curved` 将是第一个多点符号，需要先增加通用 `MultiPointDrawSession`，再接入曲线中心线、variable-width offset、控制点编辑和实际 Chromium 渲染测试。
+下一单一纵向切片是 `arrow.attack`。它将复用通用多点交互和共享曲线/offset 基础，但必须建立独立攻击箭头 body/head/tail 语义，不能只是 `arrow.curved` 的参数别名。

@@ -2,27 +2,28 @@
 
 **PlotLibre** is a MapLibre-native, engine-independent framework for drawing, editing, rendering, and exchanging semantic parametric situation plots and tactical graphics.
 
-> PlotLibre 是面向 MapLibre GL JS 的参数化态势标绘框架。原始数据是“符号类型 + 控制点 + 参数 + 样式 + 元数据”，地图上的 GeoJSON Polygon 只是可重新生成的派生结果。
+> PlotLibre 是面向 MapLibre GL JS 的参数化态势标绘框架。原始数据是“符号类型 + 控制点 + 参数 + 样式 + 元数据”，地图中的 GeoJSON Polygon 只是可重新生成的派生结果。
 
 ## Live playground
 
 **https://hujinghaoabcd.github.io/PlotLibre/**
 
-The Playground supports four two-point Arrow definitions:
+Current built-in Arrow definitions:
 
 ```text
 arrow.straight
 arrow.fine
 arrow.fine.tailed
 arrow.assault-direction
+arrow.curved
 ```
 
-It also includes semantic control-point editing, live preview, undo/redo, style editing, mixed Nanjing samples, and PlotJSON import/export.
+The Playground supports two-point and multi-point drawing, live preview, double-click/Enter completion, semantic control-point editing, undo/redo, style editing, mixed Nanjing samples, and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.7
+workspace version: 0.0.9
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
 ```
@@ -31,15 +32,17 @@ Implemented foundations:
 
 - engine-independent `PlotDefinition`, Registry, Store and CommandHistory;
 - PlotJSON 1.0 semantic serialization;
-- engine-independent two-point DrawSession;
-- MapLibre committed, draft and handles Sources/Layers;
+- `TwoPointDrawSession` and reusable `MultiPointDrawSession`;
+- MapLibre committed, draft and semantic-handle Sources/Layers;
+- click, pointer preview, double-click, Enter, Escape and point-removal interaction;
+- automatic double-click zoom suppression/restoration during active multi-point drawing;
 - explicit MapLibre 6 Worker and shared-module packaging;
-- local bootstrap style and optional raster basemap;
+- local bootstrap style and optional non-blocking raster basemap;
 - vector, polyline, curve, offset, ring and geodesic primitives;
 - antimeridian and coordinate-mode policies;
-- golden fixtures, degenerate-input tests and Chromium rendered-feature tests.
+- deterministic golden fixtures, degenerate-input tests and Chromium actual-rendered-feature tests.
 
-The next slice is the first multi-point symbol: `arrow.curved`.
+The next single-symbol vertical slice is `arrow.attack`.
 
 ## Why semantic plotting
 
@@ -99,7 +102,7 @@ See [`docs/algorithms/arrow-fine.md`](docs/algorithms/arrow-fine.md).
 
 ### `arrow.fine.tailed`
 
-Fine arrow with a centered inward swallowtail notch. It reuses an internal fine-arrow frame rather than copying the base generator.
+Fine arrow with a centered inward swallowtail notch. It reuses an internal fine-arrow frame instead of copying the base generator.
 
 ```ts
 import { buildTailedFineArrowRing } from "@plotlibre/geometry";
@@ -130,7 +133,39 @@ const ring = buildAssaultDirectionRing(
 );
 ```
 
-This is a separate geometry model, not a fine-arrow alias with different defaults. See [`docs/algorithms/arrow-assault-direction.md`](docs/algorithms/arrow-assault-direction.md).
+This is a separate geometry model, not a fine-arrow alias. See [`docs/algorithms/arrow-assault-direction.md`](docs/algorithms/arrow-assault-direction.md).
+
+### `arrow.curved`
+
+First multi-point Arrow definition. Semantic path controls are interpolated through a Catmull–Rom/Hermite centreline; the shaft tapers by cumulative arc length and the head follows the terminal tangent.
+
+```ts
+import { buildCurvedArrowRing } from "@plotlibre/geometry";
+
+const ring = buildCurvedArrowRing(
+  [
+    [118.72, 32.02],
+    [118.75, 32.05],
+    [118.78, 32.10],
+    [118.82, 32.14],
+  ],
+  {
+    tension: 0.15,
+    tailWidthRatio: 0.065,
+  },
+);
+```
+
+Properties:
+
+- minimum three and maximum 64 semantic controls;
+- every semantic control remains editable;
+- double-click or Enter completes drawing;
+- Backspace/Delete removes one uncommitted point;
+- exact final control point is preserved as the tip;
+- self-intersecting derived rings are rejected explicitly.
+
+See [`docs/algorithms/arrow-curved.md`](docs/algorithms/arrow-curved.md).
 
 ## MapLibre usage
 
@@ -138,8 +173,8 @@ This is a separate geometry model, not a fine-arrow alias with different default
 import { Map, setWorkerUrl } from "maplibre-gl";
 import { PlotLibre } from "@plotlibre/maplibre";
 import {
-  ASSAULT_DIRECTION_TYPE,
   builtInSymbols,
+  CURVED_ARROW_TYPE,
 } from "@plotlibre/symbols";
 
 setWorkerUrl("/PlotLibre/assets/maplibre-gl-worker.mjs");
@@ -153,30 +188,41 @@ const map = new Map({
 
 map.on("load", () => {
   const plot = new PlotLibre(map, { definitions: builtInSymbols });
-
-  plot.draw(ASSAULT_DIRECTION_TYPE);
+  plot.draw(CURVED_ARROW_TYPE);
 });
 ```
 
-All current Arrow types use two semantic control points and reuse the same `TwoPointDrawSession` and two edit handles.
+For a curved arrow:
+
+1. click the tail;
+2. click one or more path controls;
+3. move the pointer to preview a valid candidate;
+4. double-click the final tip or press Enter;
+5. drag any semantic handle to reshape it;
+6. call `plot.undo()` to undo the complete handle drag in one step.
 
 ## PlotJSON example
 
 ```json
 {
-  "id": "assault-direction-1",
-  "plotType": "arrow.assault-direction",
+  "id": "curved-direction-1",
+  "plotType": "arrow.curved",
   "definitionVersion": "1.0.0",
   "controlPoints": [
-    [118.78, 32.04],
-    [118.86, 32.10]
+    [118.72, 32.02],
+    [118.75, 32.05],
+    [118.78, 32.10],
+    [118.82, 32.14]
   ],
   "parameters": {
-    "bodyWidthRatio": 0.18,
-    "headLengthRatio": 0.3,
-    "headAngleDegrees": 42,
-    "neckWidthRatio": 0.72,
-    "minimumWidthMeters": 2,
+    "tailWidthRatio": 0.065,
+    "headLengthRatio": 0.22,
+    "headWidthRatio": 2.3,
+    "neckWidthRatio": 0.55,
+    "tension": 0.15,
+    "segmentsPerSpan": 16,
+    "miterLimit": 3,
+    "minimumWidthMeters": 1,
     "maximumWidthMeters": 100000
   },
   "style": {},
@@ -208,7 +254,7 @@ npm run playground:e2e
 - [Architecture](docs/ARCHITECTURE.md)
 - [Interaction model](docs/INTERACTION_MODEL.md)
 - [Geometry foundation](docs/GEOMETRY_FOUNDATION.md)
-- [Assault direction algorithm](docs/algorithms/arrow-assault-direction.md)
+- [Curved arrow algorithm](docs/algorithms/arrow-curved.md)
 - [MapLibre Worker packaging](docs/MAPLIBRE_WORKER_PACKAGING.md)
 - [Playground](docs/PLAYGROUND.md)
 - [PlotJSON](docs/PLOTJSON_SPEC.md)

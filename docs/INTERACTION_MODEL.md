@@ -4,14 +4,14 @@
 
 PlotLibre separates semantic interaction state from the map engine. Drawing and editing rules are implemented as pure, engine-independent sessions that can be tested without DOM, WebGL or MapLibre.
 
-The interaction package currently provides:
+The interaction package provides:
 
 ```text
 TwoPointDrawSession
 MultiPointDrawSession
 ```
 
-Both return semantic `PlotFeatureInput` snapshots. Neither writes to the Store nor renders a layer.
+Both return semantic `PlotFeatureInput` snapshots. Neither writes to Store nor renders a layer.
 
 ## 2. Package boundary
 
@@ -28,9 +28,9 @@ MapLibre GL JS
 Rules:
 
 - `@plotlibre/interaction` depends only on `@plotlibre/core`;
-- it must not import MapLibre, DOM types or browser globals;
+- it does not import MapLibre, DOM types or browser globals;
 - sessions receive geographic `Position` values rather than screen pixels;
-- the MapLibre adapter owns event translation, hit testing and rendering;
+- the MapLibre adapter owns event translation, hit testing, cursor state and rendering;
 - only completed semantic features may enter Store and CommandHistory.
 
 ## 3. DrawSession contract
@@ -53,26 +53,24 @@ A snapshot may contain:
 - `completed`: the final semantic feature input;
 - only `status` when no valid preview exists.
 
-All control points and serializable property records are copied before they are returned.
+All control points and serializable property records are copied before return.
 
-## 4. Shared session guarantees
+## 4. Shared guarantees
 
-All sessions obey these rules:
+All sessions obey:
 
-1. `ready` and `drawing` are non-terminal states;
-2. `completed` and `cancelled` are terminal states;
-3. terminal sessions ignore subsequent input;
+1. `ready` and `drawing` are non-terminal;
+2. `completed` and `cancelled` are terminal;
+3. terminal sessions ignore later input;
 4. invalid or duplicate points do not create invalid features;
-5. drafts are emitted only when they satisfy the symbol's minimum semantic point count;
-6. pointer previews never modify committed control points;
-7. session completion produces one semantic feature, not rendered polygon vertices;
+5. draft output requires the definition's minimum semantic point count;
+6. pointer preview never mutates committed session points;
+7. completion returns semantic controls, not polygon vertices;
 8. sessions do not create Store history entries;
 9. parameters, style and metadata remain serializable;
 10. Escape cancels a non-completed session.
 
 ## 5. TwoPointDrawSession
-
-State transitions:
 
 ```text
 ready
@@ -87,14 +85,6 @@ drawing
   └─ Escape           → cancelled
 ```
 
-Rules:
-
-- the first point is not rendered as an invalid arrow;
-- a preview exists only after a distinct second position is available;
-- clicking the first location again does not complete;
-- double-click follows the shared contract by delegating to normal two-point completion;
-- the completed feature always contains exactly two semantic control points.
-
 Current users:
 
 ```text
@@ -104,11 +94,11 @@ arrow.fine.tailed
 arrow.assault-direction
 ```
 
+The completed feature always contains exactly two semantic controls.
+
 ## 6. MultiPointDrawSession
 
-`MultiPointDrawSession` supports symbols requiring three or more semantic control points.
-
-Configuration:
+`MultiPointDrawSession` serves definitions requiring three or more semantic points.
 
 ```ts
 interface MultiPointDrawSessionOptions {
@@ -142,41 +132,23 @@ drawing
 
 ### 6.2 Draft validity
 
-Let:
-
 ```text
 candidate = committed points + distinct pointer preview
 ```
 
-A draft is returned only when:
+A draft exists only when:
 
 ```text
 candidate.length >= minimumPoints
 ```
 
-This prevents the registry and renderer from receiving a semantically invalid curved arrow during the first one or two clicks.
+For `arrow.curved`, the first and second clicks therefore do not send an invalid Polygon candidate to Registry or renderer. The third candidate point creates the first valid draft.
 
-### 6.3 Click behavior
+### 6.3 Enter and double-click
 
-- clicks append copied semantic positions;
-- a click identical to the last committed point is ignored;
-- the pointer preview is cleared after a committed click;
-- if `maximumPoints` is reached and `completeAtMaximum` is true, completion is automatic;
-- fixed-point symbols can therefore use the same session without a separate state machine.
+Enter completes from the current candidate.
 
-### 6.4 Enter completion
-
-Enter uses the current candidate:
-
-```text
-committed points + distinct pointer preview
-```
-
-Completion occurs only when the candidate reaches `minimumPoints`.
-
-### 6.5 Double-click completion
-
-Double-click builds an immutable candidate array:
+Double-click uses an immutable candidate copy:
 
 ```text
 candidate = copy(committed points)
@@ -185,65 +157,73 @@ if final point is distinct and capacity remains:
 complete(candidate)
 ```
 
-This design prevents two common errors:
+This avoids duplicate final points and mutation coupling with browser click/double-click event order.
 
-- duplicating the last point because a browser double-click is preceded by click events;
-- mutating the internal committed-point array while the completion transaction is reading it.
+### 6.4 Point removal
 
-A regression test fixes the required behavior:
+Backspace/Delete removes one uncommitted semantic point at a time. This is local drawing-state undo and does not touch `CommandHistory`.
 
-```text
-click A
-click B
-doubleClick C
-→ completed [A, B, C]
-```
-
-### 6.6 Point removal
-
-Backspace and Delete remove exactly one committed point at a time:
-
-```text
-3 points → 2 points → 1 point → ready with 0 points
-```
-
-The pointer preview is cleared after each removal. This is local drawing-state undo and does not touch `CommandHistory` because the feature has not yet been committed.
-
-### 6.7 Maximum point count
+### 6.5 Maximum point count
 
 When `maximumPoints` is defined:
 
-- no additional point or preview is accepted after capacity is reached;
-- completion slices defensively to the configured maximum;
-- default `completeAtMaximum = true` automatically completes fixed-count multi-point symbols;
-- setting it to false allows explicit Enter or double-click completion at the maximum.
+- additional points and previews beyond capacity are ignored;
+- completion defensively slices to the maximum;
+- `completeAtMaximum = true` supports fixed-count multi-point symbols;
+- explicit Enter/double-click completion remains available when automatic completion is disabled.
 
-## 7. MapLibre event adapter
+Current user:
 
-The current adapter translates:
+```text
+arrow.curved
+```
+
+## 7. Definition-driven session selection
+
+`MapLibrePlotInteraction.startDraw()` reads:
+
+```text
+PlotDefinition.controlSchema.minPoints
+PlotDefinition.controlSchema.maxPoints
+PlotDefinition.controlSchema.completeOnDoubleClick
+```
+
+Selection rule:
+
+```text
+minPoints = 2 and maxPoints = 2
+→ TwoPointDrawSession
+
+otherwise
+→ MultiPointDrawSession
+```
+
+The adapter does not hard-code symbol identifiers. Future attack, route and corridor definitions reuse the same boundary.
+
+## 8. MapLibre event adapter
+
+The adapter translates:
 
 ```text
 click      → DrawSession.click / plot selection
 mousemove  → DrawSession.pointerMove / handle preview
+dblclick   → DrawSession.doubleClick
 mousedown  → start semantic handle drag
 mouseup    → commit one ReplacePlotCommand
-style.load → restore PlotLibre sources, layers and visual state
+style.load → restore sources, layers and visual state
 keydown    → session or selection keyboard action
 ```
 
-The next integration step will add:
+During active drawing:
 
-```text
-dblclick → DrawSession.doubleClick
-```
+- mouse events are converted to WGS84 `Position` values;
+- double-click default behavior is prevented and propagation stopped;
+- MapLibre double-click zoom is disabled and its previous enabled state is remembered;
+- zoom is restored on completion, cancellation or destroy.
 
-while preventing MapLibre's default double-click zoom during active multi-point drawing.
+The adapter uses structural interfaces rather than importing MapLibre runtime classes.
 
-The adapter uses structural interfaces rather than importing MapLibre runtime classes. This keeps package tests lightweight and avoids forcing implementation types into the semantic layer.
-
-## 8. Source separation
-
-The renderer maintains:
+## 9. Source separation
 
 ### `plotlibre-committed`
 
@@ -251,15 +231,15 @@ Persistent plots derived from Store features.
 
 ### `plotlibre-draft`
 
-The active drawing preview or control-handle drag preview. It is never exported as persistent data.
+The active drawing preview or handle-drag preview. It is never exported.
 
 ### `plotlibre-handles`
 
-Semantic control points for the selected object. Generated polygon vertices are never exposed as editable handles.
+Semantic control points for the selected object. Generated curve samples and polygon vertices are not editable handles.
 
-This separation prevents high-frequency pointer events from rebuilding the persistent Store or generating history entries.
+High-frequency pointer movement therefore does not rebuild persistent Store state or generate history entries.
 
-## 9. Completion transaction
+## 10. Completion transaction
 
 ```text
 session completed
@@ -273,17 +253,17 @@ session completed
 → render semantic handles
 ```
 
-Only a completed feature enters history. Pointer previews and point-by-point drawing-state removal do not.
+Only completion enters history.
 
-## 10. Control-point drag transaction
+## 11. Handle-drag transaction
 
 ```text
-mousedown handle
+mousedown semantic handle
 → capture original PlotFeature
-→ disable map dragPan
-→ pointerMove creates semantic preview
+→ disable dragPan
+→ pointerMove builds semantic preview
 → registry validation
-→ draft + handle rendering
+→ draft + handles rendering
 → mouseup
 → one ReplacePlotCommand
 → clear draft
@@ -292,60 +272,75 @@ mousedown handle
 
 Guarantees:
 
-- committed Store state does not change during pointer movement;
-- invalid previews are ignored;
+- Store does not change during pointer movement;
+- invalid geometry previews are ignored;
 - one drag produces one undo step;
 - Escape restores the original feature without a command;
-- handles follow Store undo/redo changes.
+- every `arrow.curved` path control is editable;
+- moving an interior control changes the path while preserving tail and tip controls.
 
-## 11. Selection and keyboard behavior
+## 12. Browser event and Source caveats
+
+### 12.1 Native double-click order
+
+Browsers usually emit click events before `dblclick`. Session-level final-point de-duplication remains mandatory even when the adapter prevents default zoom.
+
+### 12.2 Source Feature duplication
+
+`map.querySourceFeatures()` may return duplicate tile copies. Semantic handle tests must use unique:
+
+```text
+plotId + handleIndex
+```
+
+rather than raw Feature count. Store `controlPoints.length` is authoritative.
+
+## 13. Selection, cursor and keyboard
 
 When not drawing, clicking committed fill or line layers selects the corresponding semantic object. Clicking empty space clears selection.
 
-Cursor states:
-
 ```text
 crosshair  active draw session
-grab       pointer over selected handle / selected object
+grab       selected object or handle hover
 grabbing   active handle drag
 empty      idle
 ```
 
 The map canvas is keyboard-focusable.
 
-## 12. Style lifecycle
+## 14. Style lifecycle
 
-Calling `map.setStyle()` removes application-added sources and layers. PlotLibre listens to `style.load` and restores:
+Calling `map.setStyle()` removes application-added sources and layers. PlotLibre restores:
 
 1. committed, draft and handles sources;
 2. rendering layers;
 3. committed Store features;
-4. the active draft;
+4. active draft;
 5. selected semantic handles.
 
 All renderer initialization methods are idempotent.
 
-## 13. Current limitations
+## 15. Current limitations
 
-- the MapLibre adapter does not yet instantiate `MultiPointDrawSession` from a definition;
-- `dblclick` is not yet wired to the active session;
-- no curved-arrow definition exists yet;
-- no dynamic centerline guide is rendered before the minimum point count is reached;
+- no visible guide before a multi-point candidate reaches minimum semantic validity;
 - no snapping or angle constraints;
-- no touch-specific multi-point completion gesture;
+- no touch-specific double-tap/finish gesture;
+- no control-point insertion/removal after a feature is committed;
 - no box or lasso selection;
-- no parameter handles;
+- no parameter handles for width, head length or tension;
+- invalid previews are ignored but the Playground does not yet surface detailed validation messages;
 - hit testing currently uses fill and line layers rather than a separate expanded hit-area layer.
 
-## 14. Next extension: `arrow.curved`
+## 16. Next extension: `arrow.attack`
 
-The next vertical slice will:
+The next multi-point slice will reuse the interaction contract but define a structurally distinct attack-arrow geometry:
 
-1. add a clean-room curved-arrow geometry definition;
-2. require at least three semantic control points;
-3. create `MultiPointDrawSession` from `PlotDefinition.minPoints/maxPoints`;
-4. wire MapLibre `dblclick` and suppress double-click zoom during drawing;
-5. support Enter, Escape and point removal through the existing session contract;
-6. expose every semantic control point as an editable handle;
-7. add Playground instructions and a selector entry;
-8. add Node geometry/PlotJSON tests and Chromium rendering tests.
+1. clean-room semantic and provenance record;
+2. attack-specific body/head/tail model;
+3. shared multi-point frame only where it preserves independent symbol contracts;
+4. PlotJSON full-path persistence;
+5. double-click/Enter completion;
+6. all semantic handles editable;
+7. golden, degenerate and self-intersection tests;
+8. Playground selector/sample;
+9. Chromium actual rendering and interior-handle edit tests.

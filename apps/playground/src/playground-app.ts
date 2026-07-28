@@ -2,6 +2,7 @@ import type { PlotFeature, PlotStyle } from "@plotlibre/core";
 import type { PlotLibre } from "@plotlibre/maplibre";
 import {
   ASSAULT_DIRECTION_TYPE,
+  CURVED_ARROW_TYPE,
   FINE_ARROW_TYPE,
   STRAIGHT_ARROW_TYPE,
   TAILED_FINE_ARROW_TYPE,
@@ -163,6 +164,22 @@ export class PlaygroundApp {
           lineWidth: 2,
         },
       },
+      {
+        id: "sample-curved-direction",
+        plotType: CURVED_ARROW_TYPE,
+        controlPoints: [
+          [118.72, 32.02],
+          [118.75, 32.05],
+          [118.78, 32.1],
+          [118.82, 32.14],
+        ] as const,
+        style: {
+          fillColor: "#26a69a",
+          fillOpacity: 0.52,
+          lineColor: "#116a63",
+          lineWidth: 2,
+        },
+      },
     ];
 
     for (const sample of samples) {
@@ -179,13 +196,13 @@ export class PlaygroundApp {
     this.#plot.select(samples[0]?.id);
     this.#map.fitBounds(
       [
-        [118.7, 31.99],
-        [118.92, 32.16],
+        [118.69, 31.99],
+        [118.92, 32.17],
       ],
       { padding: 72, duration: 500 },
     );
     this.setStatus(
-      "已加载南京四类箭头示例。可拖动控制点或修改右侧样式。",
+      "已加载南京五类箭头示例。曲线箭头包含四个可拖动语义控制点。",
       "ready",
     );
     this.refresh();
@@ -193,20 +210,14 @@ export class PlaygroundApp {
 
   #bindToolbar(): void {
     this.#elements.symbolSelect.addEventListener("change", () => {
-      this.setStatus(
-        `已选择${this.#selectedSymbolLabel()}。点击“开始绘制”后在地图上确定箭尾和箭尖。`,
-        "ready",
-      );
+      this.setStatus(this.#selectionInstruction(), "ready");
     });
 
     this.#elements.drawButton.addEventListener("click", () => {
       try {
         const plotType = this.#elements.symbolSelect.value;
         this.#plot.draw(plotType, { style: this.#currentInputStyle() });
-        this.setStatus(
-          `正在绘制${this.#selectedSymbolLabel()}：请点击箭尾，再移动鼠标并点击箭尖。`,
-          "drawing",
-        );
+        this.setStatus(this.#drawingInstruction(), "drawing");
         this.refresh();
       } catch (error) {
         this.#reportError("无法开始绘制", error);
@@ -287,7 +298,7 @@ export class PlaygroundApp {
     const deferredRefresh = (): void => {
       queueMicrotask(() => {
         if (this.#plot.interaction.isDrawing) {
-          this.setStatus("绘制中：再次点击地图完成；Escape 取消。", "drawing");
+          this.setStatus(this.#drawingProgressInstruction(), "drawing");
         } else if (this.#plot.interaction.selectedId) {
           this.setStatus("对象已选择。拖动圆形控制点可重新编辑。", "selected");
         }
@@ -296,6 +307,7 @@ export class PlaygroundApp {
     };
 
     this.#map.on("click", deferredRefresh);
+    this.#map.on("dblclick", deferredRefresh);
     this.#map.on("mouseup", deferredRefresh);
     this.#map.on("style.load", deferredRefresh);
     this.#map.getCanvas().addEventListener("keydown", deferredRefresh);
@@ -324,6 +336,28 @@ export class PlaygroundApp {
   #selectedSymbolLabel(): string {
     return this.#elements.symbolSelect.selectedOptions[0]?.textContent?.trim() ??
       this.#elements.symbolSelect.value;
+  }
+
+  #isCurvedSelected(): boolean {
+    return this.#elements.symbolSelect.value === CURVED_ARROW_TYPE;
+  }
+
+  #selectionInstruction(): string {
+    return this.#isCurvedSelected()
+      ? "已选择曲线箭头。开始后连续点击路径点，双击最后一点或按 Enter 完成。"
+      : `已选择${this.#selectedSymbolLabel()}。点击“开始绘制”后确定箭尾和箭尖。`;
+  }
+
+  #drawingInstruction(): string {
+    return this.#isCurvedSelected()
+      ? "正在绘制曲线箭头：连续点击路径点；第三个候选点开始预览，双击或 Enter 完成。"
+      : `正在绘制${this.#selectedSymbolLabel()}：请点击箭尾，再移动鼠标并点击箭尖。`;
+  }
+
+  #drawingProgressInstruction(): string {
+    return this.#isCurvedSelected()
+      ? "曲线箭头绘制中：继续点击路径点，双击最后一点或按 Enter 完成；Backspace 退点。"
+      : "绘制中：再次点击地图完成；Escape 取消。";
   }
 
   #syncStyleInputs(feature: PlotFeature): void {
