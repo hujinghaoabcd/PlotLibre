@@ -17,8 +17,6 @@ import {
   add,
   cross,
   distance,
-  lerp,
-  magnitude,
   normalize,
   scale,
   subtract,
