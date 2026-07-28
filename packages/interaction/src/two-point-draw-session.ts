@@ -59,6 +59,10 @@ export class TwoPointDrawSession implements DrawSession {
     return this.snapshot();
   }
 
+  public doubleClick(position: Position): DrawSessionSnapshot {
+    return this.click(position);
+  }
+
   public pointerMove(position: Position): DrawSessionSnapshot {
     if (this.#isTerminal() || !this.#start) {
       return this.snapshot();
