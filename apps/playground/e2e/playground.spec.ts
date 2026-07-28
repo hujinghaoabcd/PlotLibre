@@ -47,9 +47,9 @@ async function drawCurvedArrow(page: Page): Promise<void> {
   });
   expect(zoomDisabled).toBe(true);
 
-  const first = { x: box.x + box.width * 0.26, y: box.y + box.height * 0.68 };
-  const middle = { x: box.x + box.width * 0.48, y: box.y + box.height * 0.28 };
-  const tip = { x: box.x + box.width * 0.74, y: box.y + box.height * 0.48 };
+  const first = { x: box.x + box.width * 0.28, y: box.y + box.height * 0.68 };
+  const middle = { x: box.x + box.width * 0.48, y: box.y + box.height * 0.52 };
+  const tip = { x: box.x + box.width * 0.75, y: box.y + box.height * 0.35 };
 
   await page.mouse.click(first.x, first.y);
   await page.mouse.click(middle.x, middle.y);
@@ -284,7 +284,7 @@ test("drags an interior curved control point and undoes the edit", async ({ page
 
   await page.mouse.move(box.x + projected.x, box.y + projected.y);
   await page.mouse.down();
-  await page.mouse.move(box.x + projected.x + 45, box.y + projected.y - 35, {
+  await page.mouse.move(box.x + projected.x + 25, box.y + projected.y - 15, {
     steps: 4,
   });
   await page.mouse.up();
