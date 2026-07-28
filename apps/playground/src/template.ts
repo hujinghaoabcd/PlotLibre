@@ -10,7 +10,7 @@ export const playgroundTemplate = `
       </a>
       <div class="header-links">
         <a href="https://github.com/hujinghaoabcd/PlotLibre" target="_blank" rel="noreferrer">GitHub</a>
-        <span class="version-badge">v0.0.7 demo</span>
+        <span class="version-badge">v0.0.9 demo</span>
       </div>
     </header>
 
@@ -21,6 +21,7 @@ export const playgroundTemplate = `
         <option value="arrow.fine">细箭头</option>
         <option value="arrow.fine.tailed">燕尾细箭头</option>
         <option value="arrow.assault-direction">突击方向</option>
+        <option value="arrow.curved">曲线箭头</option>
       </select>
       <button id="draw-button" data-testid="draw-button" class="primary" type="button">开始绘制</button>
       <button id="cancel-button" data-testid="cancel-button" type="button">取消绘制</button>
@@ -91,12 +92,12 @@ export const playgroundTemplate = `
           <span class="eyebrow">Workflow</span>
           <h2>交互说明</h2>
           <ol class="instruction-list">
-            <li>在工具栏选择一种箭头符号。</li>
-            <li>点击“开始绘制”。</li>
-            <li>第一次点击地图确定箭尾中心。</li>
-            <li>移动鼠标预览，第二次点击确定箭尖。</li>
-            <li>拖动两个圆形控制点重新编辑。</li>
-            <li>Escape 取消；Enter 使用当前预览点完成。</li>
+            <li>选择直线类箭头时，点击箭尾后再点击箭尖完成。</li>
+            <li>选择曲线箭头时，连续点击路径控制点。</li>
+            <li>第三个候选点开始显示曲线箭头预览。</li>
+            <li>双击最后一点或按 Enter 完成曲线箭头。</li>
+            <li>Backspace/Delete 可逐点回退；Escape 取消。</li>
+            <li>完成后拖动任一圆形语义控制点重新编辑。</li>
           </ol>
         </section>
 
