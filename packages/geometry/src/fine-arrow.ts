@@ -1,16 +1,9 @@
 import type { Position } from "@plotlibre/core";
-import { buildArrowHead } from "./arrow-components.js";
-import { createLocalProjection } from "./local-projection.js";
 import {
-  add,
-  clamp,
-  leftNormal,
-  magnitude,
-  normalize,
-  scale,
-  subtract,
-  type Vec2,
-} from "./vector.js";
+  buildFineArrowFrame,
+  unprojectFineArrowRing,
+} from "./fine-arrow-frame.js";
+import { add, scale } from "./vector.js";
 
 /**
  * Parameters for the two-point fine arrow.
@@ -88,52 +81,28 @@ export function buildFineArrowRing(
   tipPosition: Position,
   parameters: FineArrowParameters = {},
 ): readonly Position[] {
-  const projection = createLocalProjection(tail);
-  const tailCenter: Vec2 = { x: 0, y: 0 };
-  const tip = projection.project(tipPosition);
-  const directionVector = subtract(tip, tailCenter);
-  const arrowLength = magnitude(directionVector);
-
-  if (arrowLength < 1e-6) {
-    throw new RangeError("A fine arrow requires two distinct control points.");
-  }
-
   const resolved = resolveFineArrowParameters(parameters);
-  const direction = normalize(directionVector);
-  const normal = leftNormal(direction);
-  const tailHalfWidth =
-    clamp(
-      arrowLength * resolved.tailWidthRatio,
-      resolved.minimumWidthMeters,
-      resolved.maximumWidthMeters,
-    ) / 2;
-  const headLength = Math.min(
-    arrowLength * resolved.headLengthRatio,
-    arrowLength * 0.75,
+  const frame = buildFineArrowFrame(tail, tipPosition, resolved);
+  const tailLeft = add(
+    frame.tailCenter,
+    scale(frame.normal, frame.tailHalfWidth),
   );
-  const head = buildArrowHead(tip, direction, {
-    length: headLength,
-    headHalfWidth: tailHalfWidth * resolved.headWidthRatio,
-    neckHalfWidth: tailHalfWidth * resolved.neckWidthRatio,
-  });
-
-  const tailLeft = add(tailCenter, scale(normal, tailHalfWidth));
-  const tailRight = add(tailCenter, scale(normal, -tailHalfWidth));
+  const tailRight = add(
+    frame.tailCenter,
+    scale(frame.normal, -frame.tailHalfWidth),
+  );
   const ring = [
     tailLeft,
-    head.neckLeft,
-    head.headLeft,
-    head.tip,
-    head.headRight,
-    head.neckRight,
+    frame.head.neckLeft,
+    frame.head.headLeft,
+    frame.head.tip,
+    frame.head.headRight,
+    frame.head.neckRight,
     tailRight,
     tailLeft,
   ];
-  const geographicRing = ring.map((point) => projection.unproject(point));
 
-  // Preserve the exact semantic tip rather than a projection round-trip value.
-  geographicRing[3] = [tipPosition[0], tipPosition[1]];
-  return geographicRing;
+  return unprojectFineArrowRing(frame, ring, tipPosition, 3);
 }
 
 function assertRatio(
