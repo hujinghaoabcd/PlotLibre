@@ -9,23 +9,18 @@ PR：`#3 Add shared arrow geometry foundation`
 
 ## Current state
 
-PR #2 已成功合并到 `main`，合并提交：
+PR #2 已合并到 `main`，合并提交：
 
 ```text
 a68cdd659861c6ee3d5523baca637958e8730def
 ```
 
-Milestone 004 已完成共享 Arrow 几何基础。workspace 开发基线提升为 `0.0.4`。当前代码在 PR #3 中，等待最终文档提交的 CI 和合并。
+Milestone 004 已完成共享 Arrow 几何基础，workspace 开发基线提升为 `0.0.4`。当前代码位于 PR #3，等待最终 CI 和合并。
 
-Milestone 004 的代码验证运行：
+代码验证运行：
 
 ```text
 GitHub Actions run: 30378763887
-```
-
-结果：
-
-```text
 validate (20.19): success
 validate (22): success
 browser: success
@@ -33,45 +28,17 @@ browser: success
 4 Playwright tests: passed
 ```
 
-GitHub Pages 预期地址仍为：
+GitHub Pages 预期地址：
 
 ```text
 https://hujinghaoabcd.github.io/PlotLibre/
 ```
 
-Pages workflow 已随 PR #2 合并进入 `main`，但当前执行环境无法解析外部域名，因此尚未完成公开 URL 的实际访问验证。不能在验证前宣称站点已上线。
+Pages workflow 已进入 `main`，但当前执行环境无法解析外部域名，尚未完成公开 URL 实际访问验证。验证前不能宣称站点已上线。
 
-## Product and architecture decisions
+## Completed in this milestone
 
-PlotLibre 继续坚持：
-
-```text
-plot definition + control points + parameters + style + metadata
-```
-
-是语义源数据。Milestone 004 的几何算法只负责从语义控制点派生平面或地理几何，不改变 Store、PlotJSON 或交互模型。
-
-依赖方向保持：
-
-```text
-core <- geometry <- symbols
-core <- interaction
-core + interaction <- maplibre
-```
-
-新增几何模块：
-
-- 不依赖 MapLibre；
-- 不依赖 DOM；
-- 不依赖 UI framework；
-- 不读取或写入 Store；
-- 使用纯函数；
-- 可在未来迁移到 Worker；
-- 不复制参考标绘项目源码。
-
-## Completed files
-
-### Geometry source
+### Source files
 
 ```text
 packages/geometry/src/vector.ts
@@ -94,7 +61,7 @@ tests/fixtures/geometry-foundation.json
 tests/geometry.test.mjs
 ```
 
-### Documentation
+### Documentation and project state
 
 ```text
 docs/GEOMETRY_FOUNDATION.md
@@ -104,50 +71,37 @@ docs/handover/2026-07-28-milestone-004.md
 docs/handover/LATEST.md
 README.md
 AGENTS.md
-```
-
-### Workspace
-
-```text
 package.json
 ```
 
-根 workspace 版本：
-
-```text
-0.0.4
-```
-
-## Completed capabilities
-
-### 1. Vector primitives
+### Vector primitives
 
 `vector.ts` 现在提供：
 
 - finite-value validation；
-- add/subtract/scale；
-- dot product；
-- 2D cross product；
-- magnitude 和 squared magnitude；
-- point distance；
+- add、subtract、scale；
+- dot product 和 2D cross product；
+- magnitude、squared magnitude 和 distance；
 - normalize 和 fallback normalize；
 - left/right normal；
 - linear interpolation；
 - tolerance comparison；
 - validated clamp。
 
-所有输入在需要时进行有限数值检查。零向量不能 normalize。
+零向量不能 normalize，非有限输入会抛出 `RangeError`。
 
-### 2. Polyline metrics
+### Polyline metrics and sampling
 
-`polyline.ts` 提供：
+`polyline.ts` 新增：
 
-- `cleanPolyline()`；
-- `measurePolyline()`；
-- `sampleMeasuredPolyline()`；
-- `samplePolylineAtDistance()`；
-- `samplePolylineAtRatio()`；
-- `resamplePolylineByCount()`。
+```text
+cleanPolyline
+measurePolyline
+sampleMeasuredPolyline
+samplePolylineAtDistance
+samplePolylineAtRatio
+resamplePolylineByCount
+```
 
 `MeasuredPolyline` 包含：
 
@@ -168,62 +122,65 @@ segmentRatio
 distance
 ```
 
-路径外距离被夹紧到首尾点。连续重复或近重复点可被清洗；不足两个不同点时抛出 `RangeError`。
+连续重复或近重复点可清洗；不足两个不同点时抛出错误；路径外距离夹紧到首尾点。
 
-### 3. Curves
+### Curves
 
-`curves.ts` 提供：
+`curves.ts` 新增：
 
 - standard cubic Bezier sampling；
 - tension-controlled Catmull-Rom sampling；
-- Hermite form implementation；
+- cubic Hermite expression；
 - exact endpoint preservation；
 - configurable segments per span。
 
-当前 Catmull-Rom 为统一参数化基础版本。后续若增加 centripetal 参数化，必须保持 API 兼容或提供迁移说明。
+当前 Catmull-Rom 为统一参数化基础版本。后续增加 centripetal 参数化时必须保持兼容或提供迁移说明。
 
-### 4. Variable-width offsets
+### Variable-width offsets
 
-`offset.ts` 提供：
+`offset.ts` 新增：
 
 - constant half-width profile；
 - per-vertex half-width profile；
-- left boundary；
-- right boundary；
+- left/right boundary generation；
 - adjacent-normal miter join；
 - configurable `miterLimit`；
-- invalid profile validation；
-- duplicate point rejection。
+- width-profile validation；
+- duplicate-point rejection。
 
-180°回折使用下一段法向量作为明确退化策略。偏移结果可能发生自交，调用者必须使用 ring 工具检查最终 Polygon。
+180°回折使用下一段法向量作为明确退化策略。偏移器只生成边界，不自动掩盖或修复自交。
 
-### 5. Ring operations
+### Ring operations
 
-`ring.ts` 提供：
+`ring.ts` 新增：
 
-- `closeRing()`；
-- `signedRingArea()`；
-- `ringWinding()`；
-- `ensureRingWinding()`；
-- `segmentsIntersect()`；
-- `findRingSelfIntersections()`；
-- `isSimpleRing()`。
+```text
+closeRing
+signedRingArea
+ringWinding
+ensureRingWinding
+segmentsIntersect
+findRingSelfIntersections
+isSimpleRing
+```
 
-零面积 ring 不能被强制调整方向。相邻边不作为自交报告；非相邻交叉会返回 segment index 对。
+零面积 ring 不能强制调整方向。相邻边不报告为自交，非相邻交叉返回 segment index 对。
 
-### 6. Geodesic and antimeridian utilities
+### Geodesic and antimeridian utilities
 
-`geodesic.ts` 提供：
+`geodesic.ts` 新增：
 
-- `normalizeLongitude()`；
-- `shortestLongitudeDelta()`；
-- `crossesAntimeridian()`；
-- `unwrapLongitudes()`；
-- `haversineDistance()`；
-- `initialBearingDegrees()`；
-- `destinationPoint()`；
-- `geodesicPath()`；
-- `analyzeCoordinateMode()`。
+```text
+normalizeLongitude
+shortestLongitudeDelta
+crossesAntimeridian
+unwrapLongitudes
+haversineDistance
+initialBearingDegrees
+destinationPoint
+geodesicPath
+analyzeCoordinateMode
+```
 
 当前球形地球半径：
 
@@ -231,22 +188,22 @@ distance
 6378137 m
 ```
 
-默认建议使用 `geodesic` 的条件：
+默认建议切换到 `geodesic` 的条件：
 
-- 反经线跨越；
-- 最大绝对纬度大于 80°；
-- 相对起点范围大于 250 km。
+- 路径跨越反经线；
+- 最大绝对纬度超过 80°；
+- 相对起点范围超过 250 km。
 
 阈值可显式配置。
 
-### 7. Local projection corrections
+### Local projection corrections
 
 `local-projection.ts` 已改为：
 
-- 使用 `shortestLongitudeDelta()`；
+- 使用最短经差；
 - unproject 时归一化经度；
 - 拒绝非有限输入；
-- 在地理极点明确要求 geodesic mode。
+- 在极点明确要求 geodesic mode。
 
 因此：
 
@@ -256,9 +213,9 @@ distance
 
 被解释为约 222.6 m，而不是接近地球周长。
 
-### 8. Shared arrow components
+### Shared arrow components
 
-`arrow-components.ts` 新增 `buildArrowHead()`，通过：
+`arrow-components.ts` 新增 `buildArrowHead()`，输入：
 
 ```text
 tip
@@ -268,7 +225,7 @@ head half-width
 neck half-width
 ```
 
-生成：
+输出：
 
 ```text
 neckCenter
@@ -280,104 +237,24 @@ neckRight
 outline
 ```
 
-`buildStraightArrowRing()` 已重构为使用该公共组件。
+`buildStraightArrowRing()` 已重构为使用该组件。
 
-### 9. Semantic endpoint preservation
+### Semantic endpoint preservation
 
-首轮 CI 中唯一失败为：
-
-```text
-expected longitude: 118.84
-round-trip longitude: 118.83999999999992
-```
-
-原因是箭尖经过 local projection round trip。修复后，输出 ring 的箭尖直接使用原始 `end` 语义控制点，而不是反投影近似值。
-
-这不是放宽测试容差，而是落实语义控制点优先原则。
-
-## Validation
-
-### CI commands
-
-```bash
-npm install
-npm run typecheck
-npm test
-npm run playground:typecheck
-npm run playground:build
-npm run handover:check
-npx playwright install --with-deps chromium
-npm run playground:e2e
-```
-
-### Node validation
-
-CI run：
+首轮 CI 唯一失败为：
 
 ```text
-30378763887
+expected: 118.84
+actual:   118.83999999999992
 ```
 
-结果：
+原因是箭尖经过投影和反投影产生极小浮点误差。修复后，输出 ring 的箭尖直接保留原始 `end` 语义控制点，而不是放宽测试容差。
 
-```text
-Node 20.19: success
-Node 22: success
-TypeScript: success
-Workspace build: success
-Playground typecheck: success
-GitHub Pages base build: success
-Handover check: success
-```
+### Provenance
 
-### Test totals
+`docs/ALGORITHM_POLICY.md` 已记录 Milestone 004 来源。
 
-```text
-27 Node tests
-27 passed
-0 failed
-
-4 Playwright tests
-4 passed
-0 failed
-```
-
-原有 15 项测试继续通过；Milestone 004 新增 12 项几何基础测试。
-
-### Golden fixture
-
-```text
-tests/fixtures/geometry-foundation.json
-```
-
-固定验证：
-
-- 路径 `[0,0] -> [3,0] -> [3,4]`；
-- cumulative lengths `[0,3,7]`；
-- distance 5 sample `[3,2]`；
-- tangent `[0,1]`；
-- 统一 half-width 1 的 90° miter offset。
-
-### Property-style tests
-
-固定种子生成 100 组随机折线，验证：
-
-- total length 为正；
-- cumulative lengths 严格递增；
-- sample point 全部有限；
-- tangent 长度约为 1；
-- variable-width offset 全部有限；
-- 结果可重复。
-
-### Browser regression
-
-Milestone 004 没有改变 Playground UI，但真实 Chromium 回归仍运行并通过，确认几何重构没有破坏现有直箭头绘制、编辑、撤销、样式和 PlotJSON 行为。
-
-## Provenance and clean-room record
-
-`docs/ALGORITHM_POLICY.md` 已新增 Milestone 004 记录。
-
-使用的数学类别：
+使用公共领域基础数学：
 
 - Euclidean vector operations；
 - linear interpolation；
@@ -397,39 +274,76 @@ Milestone 004 没有改变 Playground UI，但真实 Chromium 回归仍运行并
 none
 ```
 
-没有翻译或复制 Leaflet、OpenLayers、Maptalks、Cesium、Mapbox 或其他战术标绘库实现。
+没有翻译或复制 Leaflet、OpenLayers、Maptalks、Cesium、Mapbox 或其他战术标绘插件源代码。
 
-## Architectural decisions
+## Validation
 
-1. 平面算法只接受 `Vec2`，不能直接把经纬度当 x/y。
-2. 地理算法接受 WGS84 `Position`。
-3. local/geodesic 决策必须显式，不在符号算法中隐藏。
-4. 共享中心线、曲线、偏移、ring 和 head 算法优先于 symbol-specific code。
-5. 偏移器只负责边界，不自动掩盖自交。
-6. ring 自交由独立检测阶段处理。
-7. 语义控制点在输出中的关键位置应精确保留。
-8. property-style tests 使用固定种子以保证 CI 可复现。
-9. 当前不增加第三方运行时几何依赖。
-10. 复杂符号必须继续建立独立 provenance 记录。
+执行命令：
 
-## Known limitations
+```bash
+npm install
+npm run typecheck
+npm test
+npm run playground:typecheck
+npm run playground:build
+npm run handover:check
+npx playwright install --with-deps chromium
+npm run playground:e2e
+```
 
-- Catmull-Rom 当前是统一参数化，不是 centripetal；
-- spherical geodesic 不是椭球 GeographicLib 精度；
-- `geodesicPath()` 使用固定初始方位角和 destination sampling，适合当前中短距离路径；
-- offset 使用 miter join，尚无 bevel/round join；
-- 偏移后自交只检测，不自动修复；
-- 180°回折是有限退化，不保证符合所有军事制图规范；
-- ring intersection 使用普通双精度 orientation，不是 adaptive robust predicates；
-- 尚无 geometry benchmark；
-- 尚无 geometry debug Playground 页面；
-- 尚无视觉 PNG/SVG golden image，只增加数值 JSON fixture；
-- 目前只有 `arrow.straight` 使用共享 head component；
-- Pages 公开 URL 尚未人工访问确认；
-- 仓库仍未选择开源许可证；
-- 尚未提交 lockfile。
+权威代码 CI：
 
-## Next milestone
+```text
+Run ID: 30378763887
+Node 20.19: success
+Node 22: success
+TypeScript: success
+Workspace build: success
+Playground typecheck: success
+Vite /PlotLibre/ build: success
+Chromium: success
+```
+
+测试总数：
+
+```text
+27 Node tests
+27 passed
+0 failed
+
+4 Playwright tests
+4 passed
+0 failed
+```
+
+原有 15 项测试继续通过；Milestone 004 新增 12 项几何基础测试。
+
+黄金样例：
+
+```text
+tests/fixtures/geometry-foundation.json
+```
+
+固定验证：
+
+- `[0,0] -> [3,0] -> [3,4]` 路径；
+- cumulative lengths `[0,3,7]`；
+- distance 5 sample `[3,2]`；
+- tangent `[0,1]`；
+- half-width 1 的 90° miter offset。
+
+性质测试使用固定种子生成 100 组随机折线，验证：
+
+- total length 为正；
+- cumulative lengths 严格递增；
+- sample point 全部有限；
+- tangent 长度约为 1；
+- variable-width offset 全部有限；
+- CI 结果可复现。
+
+Chromium 回归确认几何重构没有破坏现有直箭头绘制、编辑、撤销、样式和 PlotJSON 行为。
+
+## Next tasks
 
 Milestone 005：第一组传统箭头。
 
@@ -439,13 +353,11 @@ Milestone 005：第一组传统箭头。
 arrow.fine
 ```
 
-不要同时并行实现全部六种箭头。
+推荐顺序：
 
-### Recommended `arrow.fine` scope
-
-1. 建立 `docs/algorithms/arrow-fine.md` provenance；
-2. 定义 2 点或多点控制语义；
-3. 明确与现有 `arrow.straight` 的区别；
+1. 创建 `docs/algorithms/arrow-fine.md` provenance；
+2. 明确控制点语义以及与 `arrow.straight` 的差异；
+3. 定义参数、单位和默认值；
 4. 使用 `measurePolyline()`；
 5. 使用 shared curve primitives；
 6. 使用 `offsetPolyline()`；
@@ -454,15 +366,15 @@ arrow.fine
 9. 检查 self-intersection；
 10. 新建 `PlotDefinition`；
 11. 新建支持所需点数的 DrawSession；
-12. 实现控制点增删和编辑策略；
+12. 定义控制点插入、删除和编辑策略；
 13. PlotJSON round trip；
 14. geometry golden fixture；
 15. numerical and degenerate tests；
 16. Playground symbol selector；
 17. Chromium E2E；
-18. 更新 handover。
+18. 更新交接文件。
 
-完成 `arrow.fine` 全链路后，再决定是否继续：
+完成 `arrow.fine` 全链路后，再按顺序评估：
 
 ```text
 arrow.fine.tailed
@@ -472,19 +384,50 @@ arrow.attack
 arrow.attack.tailed
 ```
 
-## Continuation instructions
+## Risks and decisions
 
-新的开发者或对话必须按以下顺序：
+### Architectural decisions
+
+1. 平面算法只接受 `Vec2`，不能直接把经纬度当 x/y。
+2. 地理算法接受 WGS84 `Position`。
+3. local/geodesic 决策必须显式，不能藏在符号算法内部。
+4. 新箭头必须先复用共享 polyline、curve、offset、ring、geodesic 和 head API。
+5. 偏移器只负责边界，最终自交由独立检查阶段处理。
+6. 关键语义控制点在输出中应精确保留。
+7. property-style tests 使用固定种子保证可复现。
+8. 当前不增加第三方运行时几何依赖。
+9. 复杂符号必须继续建立独立 provenance 记录。
+10. Milestone 005 不并行实现六种符号，先完成一个完整纵向切片。
+
+### Known limitations
+
+- Catmull-Rom 当前是统一参数化，不是 centripetal；
+- spherical geodesic 不是椭球 GeographicLib 精度；
+- `geodesicPath()` 适合当前中短距离路径；
+- offset 只有 miter join，尚无 bevel/round join；
+- 偏移后自交只检测，不自动修复；
+- 180°回折策略不保证符合所有军事制图规范；
+- intersection 使用普通双精度 orientation，不是 adaptive robust predicates；
+- 尚无 geometry benchmark；
+- 尚无 geometry debug Playground 页面；
+- 尚无 PNG/SVG 视觉 golden image；
+- 目前只有 `arrow.straight` 使用共享 head component；
+- Pages 公开 URL 尚未人工访问确认；
+- 仓库仍未选择开源许可证；
+- 尚未提交 lockfile。
+
+### Continuation instructions
+
+新的开发者或对话必须：
 
 1. 阅读 `AGENTS.md`；
 2. 阅读 `docs/handover/LATEST.md`；
 3. 阅读 `docs/GEOMETRY_FOUNDATION.md`；
 4. 阅读 `docs/ALGORITHM_POLICY.md`；
 5. 查看 PR #3 和最新 CI；
-6. 确认最终文档提交的 CI 仍为绿色；
-7. 将 PR #3 标记为 Ready；
-8. 合并后从最新 `main` 创建 Milestone 005 分支；
-9. 先写 `arrow.fine` 算法记录，再写实现；
-10. 不批量复制传统标绘插件中的 Arrow 算法；
-11. 保持控制点和参数为语义源数据；
-12. 每个完成任务更新 `LATEST.md` 并增加不可变交接文件。
+6. CI 通过后将 PR #3 标记为 Ready；
+7. 合并后从最新 `main` 创建 Milestone 005 分支；
+8. 先写 `arrow.fine` 算法记录，再写实现；
+9. 不批量复制传统标绘插件的 Arrow 代码；
+10. 保持控制点和参数为语义源数据；
+11. 每个完成任务更新 `LATEST.md` 并添加不可变交接文件。
