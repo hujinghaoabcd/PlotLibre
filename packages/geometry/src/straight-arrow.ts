@@ -118,8 +118,12 @@ export function buildStraightArrowRing(
     tailRight,
     tailLeft,
   ];
+  const geographicRing = ring.map((point) => projection.unproject(point));
 
-  return ring.map((point) => projection.unproject(point));
+  // Preserve the exact semantic tip control point instead of returning a
+  // projection round-trip approximation with sub-nanodegree floating error.
+  geographicRing[3] = [end[0], end[1]];
+  return geographicRing;
 }
 
 function assertRatio(
