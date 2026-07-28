@@ -3,6 +3,7 @@ import type { PlotLibre } from "@plotlibre/maplibre";
 import {
   FINE_ARROW_TYPE,
   STRAIGHT_ARROW_TYPE,
+  TAILED_FINE_ARROW_TYPE,
 } from "@plotlibre/symbols";
 import type { Map } from "maplibre-gl";
 
@@ -134,15 +135,15 @@ export class PlaygroundApp {
         },
       },
       {
-        id: "sample-support-direction",
-        plotType: STRAIGHT_ARROW_TYPE,
+        id: "sample-tailed-fine-direction",
+        plotType: TAILED_FINE_ARROW_TYPE,
         controlPoints: [
           [118.735, 32.075],
           [118.795, 32.125],
         ] as const,
         style: {
           fillColor: "#2d9cdb",
-          fillOpacity: 0.4,
+          fillOpacity: 0.46,
           lineColor: "#14608b",
           lineWidth: 2,
         },
@@ -169,7 +170,7 @@ export class PlaygroundApp {
       { padding: 72, duration: 500 },
     );
     this.setStatus(
-      "已加载南京直箭头和细箭头示例。可拖动控制点或修改右侧样式。",
+      "已加载南京直箭头、细箭头和燕尾细箭头示例。可拖动控制点或修改右侧样式。",
       "ready",
     );
     this.refresh();
