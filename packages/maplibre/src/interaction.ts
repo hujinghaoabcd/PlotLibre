@@ -9,6 +9,7 @@ import {
   type Position,
 } from "@plotlibre/core";
 import {
+  MultiPointDrawSession,
   TwoPointDrawSession,
   type DrawSession,
   type DrawSessionSnapshot,
@@ -57,6 +58,7 @@ export class MapLibrePlotInteraction {
   #draftFeature: PlotFeature | undefined;
   #selectedId: string | undefined;
   #drag: ControlPointDrag | undefined;
+  #doubleClickZoomWasEnabled: boolean | undefined;
   #suppressNextClick = false;
   #clickSuppressionTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -78,6 +80,18 @@ export class MapLibrePlotInteraction {
 
     const plotId = this.#queryPlotId(mouseEvent);
     this.select(plotId);
+  };
+
+  readonly #onDoubleClick = (event: unknown): void => {
+    if (!this.#session) return;
+    const mouseEvent = asMouseEvent(event);
+    if (!mouseEvent) return;
+    mouseEvent.originalEvent?.preventDefault?.();
+    mouseEvent.originalEvent?.stopPropagation?.();
+    this.#focusCanvas();
+    this.#applyDrawSnapshot(
+      this.#session.doubleClick(toPosition(mouseEvent)),
+    );
   };
 
   readonly #onMouseMove = (event: unknown): void => {
@@ -206,6 +220,7 @@ export class MapLibrePlotInteraction {
     this.#idFactory = options.idFactory ?? createDefaultIdFactory();
 
     this.#map.on("click", this.#onClick);
+    this.#map.on("dblclick", this.#onDoubleClick);
     this.#map.on("mousemove", this.#onMouseMove);
     this.#map.on("mousedown", this.#onMouseDown);
     this.#map.on("mouseup", this.#onMouseUp);
@@ -225,12 +240,11 @@ export class MapLibrePlotInteraction {
     options: StartPlotDrawOptions = {},
   ): string {
     const definition = this.#registry.get(plotType);
-    if (
-      definition.controlSchema.minPoints !== 2 ||
-      definition.controlSchema.maxPoints !== 2
-    ) {
+    const { minPoints, maxPoints, completeOnDoubleClick } =
+      definition.controlSchema;
+    if (minPoints < 2 || maxPoints < minPoints) {
       throw new Error(
-        `Interactive drawing currently supports only two-point definitions; "${plotType}" requires ${definition.controlSchema.minPoints}-${definition.controlSchema.maxPoints} points.`,
+        `Interactive drawing requires a valid point range; "${plotType}" declares ${minPoints}-${maxPoints}.`,
       );
     }
 
@@ -239,7 +253,7 @@ export class MapLibrePlotInteraction {
     this.select(undefined);
 
     const id = options.id ?? this.#idFactory();
-    this.#session = new TwoPointDrawSession({
+    const sessionOptions = {
       id,
       plotType,
       definitionVersion: definition.version,
@@ -252,7 +266,19 @@ export class MapLibrePlotInteraction {
         ...(options.style ?? {}),
       },
       metadata: { ...(options.metadata ?? {}) },
-    });
+    };
+
+    this.#session =
+      minPoints === 2 && maxPoints === 2
+        ? new TwoPointDrawSession(sessionOptions)
+        : new MultiPointDrawSession({
+            ...sessionOptions,
+            minimumPoints: minPoints,
+            maximumPoints: maxPoints,
+            completeAtMaximum: completeOnDoubleClick !== true,
+          });
+
+    this.#disableDoubleClickZoom();
     this.#setCursor("crosshair");
     this.#focusCanvas();
     return id;
@@ -264,6 +290,7 @@ export class MapLibrePlotInteraction {
     this.#session = undefined;
     this.#draftFeature = undefined;
     this.#renderer.clearDraft();
+    this.#restoreDoubleClickZoom();
     this.#setCursor("");
     return true;
   }
@@ -291,8 +318,10 @@ export class MapLibrePlotInteraction {
   public destroy(): void {
     this.cancelDraw();
     this.#cancelDrag();
+    this.#restoreDoubleClickZoom();
     this.#unsubscribeStore();
     this.#map.off("click", this.#onClick);
+    this.#map.off("dblclick", this.#onDoubleClick);
     this.#map.off("mousemove", this.#onMouseMove);
     this.#map.off("mousedown", this.#onMouseDown);
     this.#map.off("mouseup", this.#onMouseUp);
@@ -317,6 +346,7 @@ export class MapLibrePlotInteraction {
       this.#session = undefined;
       this.#draftFeature = undefined;
       this.#renderer.clearDraft();
+      this.#restoreDoubleClickZoom();
       this.select(created.id);
       this.#setCursor("grab");
       return;
@@ -326,6 +356,7 @@ export class MapLibrePlotInteraction {
       this.#session = undefined;
       this.#draftFeature = undefined;
       this.#renderer.clearDraft();
+      this.#restoreDoubleClickZoom();
       this.#setCursor("");
     }
   }
@@ -392,6 +423,23 @@ export class MapLibrePlotInteraction {
 
   #restoreDragPan(drag: ControlPointDrag): void {
     if (drag.dragPanWasEnabled) this.#map.dragPan?.enable();
+  }
+
+  #disableDoubleClickZoom(): void {
+    if (this.#doubleClickZoomWasEnabled !== undefined) return;
+    const zoom = this.#map.doubleClickZoom;
+    if (!zoom) return;
+    const wasEnabled = zoom.isEnabled?.() ?? true;
+    this.#doubleClickZoomWasEnabled = wasEnabled;
+    if (wasEnabled) zoom.disable();
+  }
+
+  #restoreDoubleClickZoom(): void {
+    if (this.#doubleClickZoomWasEnabled === undefined) return;
+    if (this.#doubleClickZoomWasEnabled) {
+      this.#map.doubleClickZoom?.enable();
+    }
+    this.#doubleClickZoomWasEnabled = undefined;
   }
 
   #syncSelection(): void {
