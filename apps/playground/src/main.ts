@@ -34,7 +34,6 @@ const map = new Map({
   style: e2e ? offlineStyle : "https://demotiles.maplibre.org/style.json",
   center: [118.7969, 32.0603],
   zoom: 11.2,
-  attributionControl: true,
   canvasContextAttributes: {
     antialias: true,
   },
