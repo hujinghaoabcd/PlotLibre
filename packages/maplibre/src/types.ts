@@ -22,8 +22,8 @@ export interface MapLibreMouseEventLike {
 }
 
 export interface MapLibreRenderedFeatureLike {
-  readonly id?: string | number;
-  readonly properties?: Readonly<Record<string, unknown>>;
+  readonly id?: string | number | undefined;
+  readonly properties?: Readonly<Record<string, unknown>> | null | undefined;
 }
 
 export type MapLibreEventListener = (event: unknown) => void;
