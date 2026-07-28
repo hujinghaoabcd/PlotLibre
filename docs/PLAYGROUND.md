@@ -1,129 +1,111 @@
 # PlotLibre Playground 与 GitHub Pages
 
-## 1. 目标
-
-`apps/playground` 是 PlotLibre 的真实浏览器示例、人工验收入口和 GitHub Pages 站点。它直接使用 workspace 内的公开包，不复制算法，也不绕过 Store、History 或 MapLibre adapter。
-
-公开地址：
+## 1. 入口
 
 ```text
 https://hujinghaoabcd.github.io/PlotLibre/
 ```
 
+`apps/playground` 是真实 MapLibre 应用、人工验收入口、Playwright 测试目标和 GitHub Pages 站点。它只能使用公开 PlotLibre API。
+
 ## 2. 技术基线
 
-- MapLibre GL JS `6.0.0`；
-- Vite `8.1.5`；
-- Playwright Test `1.61.1`；
-- Node.js `20.19+`；
-- GitHub Pages base：`/PlotLibre/`；
-- workspace demo baseline：`0.0.6`。
-
-MapLibre GL JS 6 为 ESM-only，并要求 WebGL2。
-
-## 3. 当前符号与交互
-
-工具栏选择器：
-
 ```text
-arrow.straight     → 直箭头
-arrow.fine         → 细箭头
-arrow.fine.tailed  → 燕尾细箭头
+PlotLibre demo:       0.0.7
+MapLibre GL JS:       6.0.0
+Vite:                 8.1.5
+Playwright:           1.61.1
+Node.js:              20.19+
+Pages base:           /PlotLibre/
 ```
 
-三种符号都使用相同的两点语义：
+## 3. 当前符号
+
+选择器包含：
 
 ```text
-第一次点击 = tail center
-第二次点击 = tip
+arrow.straight           直箭头
+arrow.fine               细箭头
+arrow.fine.tailed        燕尾细箭头
+arrow.assault-direction  突击方向
 ```
 
-交互能力：
+四种类型当前都使用两点语义：
+
+```text
+第一次点击 = tail center / origin
+第二次点击 = tip / objective
+```
+
+交互：
 
 - pointer move 动态预览；
 - 第二次点击或 Enter 完成；
 - Escape 取消；
-- 点击对象选择；
-- 拖动两个语义控制点编辑；
-- 撤销和重做；
-- 绘制期间锁定选择器。
-
-`arrow.fine.tailed` 不是复制的第二套细箭头算法。它与 `arrow.fine` 共享内部 `FineArrowFrame`，仅增加参数化中心燕尾缺口。
+- Backspace/Delete 重置已收集起点；
+- 点击选择；
+- 拖动两个语义 handles；
+- undo/redo；
+- 样式编辑；
+- PlotJSON 导入导出。
 
 ## 4. 南京示例
 
-生产页面自动加载三个示例：
+生产页面自动加载：
 
 ```text
 1 × arrow.straight
 1 × arrow.fine
 1 × arrow.fine.tailed
+1 × arrow.assault-direction
 ```
 
-示例用于人工检查：
+突击方向使用独立紫色样式，便于与细箭头系列比较宽体箭身、肩部和角度定义箭头。
 
-- 三种轮廓差异；
-- 混合类型 committed Source；
-- 选择和 handles；
-- 样式；
-- PlotJSON；
-- Worker 和实际 MapLibre 渲染。
+## 5. 底图与启动
 
-## 5. 文档与样式操作
-
-- 删除选中；
-- 清空；
-- 加载示例；
-- 导入/导出 PlotJSON；
-- 填充颜色和透明度；
-- 边线颜色和宽度。
-
-样式修改通过 `PlotLibre.replace()` 进入 History，不直接操作派生 GeoJSON。
-
-## 6. 底图启动策略
-
-远程资源不得成为标绘初始化的前置条件：
+在线资源不能阻塞标绘：
 
 ```text
-本地 background style
+local background style
 → MapLibre load
-→ 可选 raster basemap
+→ optional raster basemap
 → PlotLibre renderer
 → PlaygroundApp
 ```
 
-在线瓦片失败时，页面继续显示本地深色背景，标绘、选择器和示例立即可用。
-
-完全禁用底图：
+禁用在线底图：
 
 ```text
 ?basemap=none
 ```
 
-## 7. MapLibre Worker 模块
+E2E 模式：
 
-构建时从已安装的 `maplibre-gl` 包复制：
+```text
+?e2e=1
+```
+
+两种模式都运行真实 PlotLibre 和 MapLibre Worker，只是不依赖远程瓦片。
+
+## 6. MapLibre 6 Worker
+
+构建时从已安装的 `maplibre-gl` 复制：
 
 ```text
 maplibre-gl-worker.mjs
 maplibre-gl-shared.mjs
 ```
 
-部署至：
-
-```text
-/PlotLibre/assets/
-```
-
-创建地图前：
+创建地图前设置：
 
 ```ts
 setWorkerUrl(`${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`);
 ```
 
-见 [`MAPLIBRE_WORKER_PACKAGING.md`](MAPLIBRE_WORKER_PACKAGING.md)。
+详见 [`MAPLIBRE_WORKER_PACKAGING.md`](MAPLIBRE_WORKER_PACKAGING.md)。
 
-## 8. 本地运行
+## 7. 本地运行
 
 ```bash
 npm install
@@ -136,108 +118,62 @@ npm run playground:dev
 http://127.0.0.1:5173/PlotLibre/
 ```
 
-构建与类型检查：
+构建和测试：
 
 ```bash
 npm run playground:typecheck
 npm run playground:build
-```
-
-## 9. 浏览器测试
-
-```bash
 npx playwright install --with-deps chromium
 npm run playground:e2e
 ```
 
-Playwright 覆盖：
+## 8. Chromium 覆盖
+
+Playwright 验证：
 
 - `/PlotLibre/` project path；
-- Worker entry/shared 返回 JavaScript；
-- WebGL2 初始化；
-- `?basemap=none` 立即启动；
-- 三种南京示例；
-- selector 三个 option；
-- 绘制直箭头；
-- 绘制细箭头；
-- 绘制燕尾细箭头；
-- Store 中正确 `plotType` 和两个控制点；
-- 燕尾派生 ring 长度为 9；
-- committed Source 包含三种类型；
-- `queryRenderedFeatures()` 返回真实 fill/line；
-- 撤销、重做、样式、删除和 PlotJSON。
+- Worker entry/shared 为 JavaScript；
+- 无在线底图时立即启动；
+- selector 有四个 option；
+- 四类南京示例；
+- committed Source 包含四种 `plotType`；
+- fill/line Layers 可见；
+- `queryRenderedFeatures()` 返回真实图形；
+- 绘制四种两点箭头；
+- 突击方向默认 `bodyWidthRatio = 0.18`；
+- 突击方向默认 `headAngleDegrees = 42`；
+- undo/redo、style、delete 和 PlotJSON 无回归。
 
-常规测试 URL：
+Milestone 005C 首轮：
 
 ```text
-?e2e=1
-```
-
-E2E 使用本地空白 Style，不依赖远程瓦片。
-
-## 10. CI
-
-Validate：
-
-- Node 20.19；
-- Node 22；
-- packages TypeScript；
-- Node tests；
-- Playground typecheck/build；
-- handover contract。
-
-Browser：
-
-- Chromium；
-- Worker 模块图；
-- committed Source；
-- 实际 rendered features；
-- 交互和 PlotJSON。
-
-Milestone 005B 首轮：
-
-```text
-Run ID: 30389925716
+Run ID: 30391839421
+Node tests: 47 passed
 validate 20.19: success
 validate 22: success
 browser: success
 ```
 
-## 11. GitHub Pages
+## 9. Pages 部署
 
-`.github/workflows/pages.yml` 从 `main` 构建并部署。Pages Source：
+`.github/workflows/pages.yml` 仅从 `main` 部署。
+
+仓库设置：
 
 ```text
 Settings → Pages → Build and deployment → GitHub Actions
 ```
 
-## 12. 强制设计约束
+## 10. 强制约束
 
-- Playground 只能使用公开 API；
-- 不直接编辑 committed Source；
-- 不把 Polygon 作为源数据；
-- 不在应用层复制几何算法；
-- 在线底图不能阻塞标绘；
+- Playground 不直接编辑 MapLibre Source；
+- Polygon 不是原始数据；
+- 应用层不复制几何算法；
+- 底图不能阻塞 PlotLibre；
 - dev、preview、E2E、Pages 统一 `/PlotLibre/`；
-- 每种新符号同阶段加入 selector、示例或可视化用例；
-- 浏览器测试必须验证真实 rendered feature；
-- MapLibre Worker 和 Shared 模块必须与安装版本一致。
+- 每个新符号同阶段加入 selector、示例和浏览器测试；
+- 浏览器测试必须验证 actual rendered feature，而不是只检查 Store 数量。
 
-## 13. 后续扩展
+## 11. 下一步
 
-近期：
-
-- `arrow.assault-direction`；
-- 数据驱动 Symbol Catalog；
-- 参数控制柄；
-- 截图视觉黄金基线。
-
-中长期：
-
-- 多点曲线和攻击箭头；
-- 可切换底图；
-- 图层树；
-- PlotJSON 文本编辑器；
-- PNG/SVG；
-- 触摸、Firefox/WebKit；
-- 性能基准。
+`arrow.curved` 将是第一个多点符号，需要先增加通用 `MultiPointDrawSession`，再接入曲线中心线、variable-width offset、控制点编辑和实际 Chromium 渲染测试。
