@@ -1,4 +1,4 @@
-# PlotLibre Development Handover — Milestone 006A Pincer Semantic Design
+# PlotLibre Development Handover — Milestone 006A Pincer Semantic Design Finalization
 
 日期：2026-07-29  
 仓库：`hujinghaoabcd/PlotLibre`  
@@ -6,7 +6,7 @@
 开发分支：`agent/pincer-arrow-semantic-design`  
 PR：`#20 Design canonical pincer arrow semantics`  
 Workspace：`0.0.12`  
-状态：设计文档与交接已完成；draft PR 开放；implementation 等待语义审查
+状态：设计已审查批准；完整 CI 全绿；等待 Ready、squash merge
 
 ## Current state
 
@@ -18,14 +18,15 @@ Node tests:        107
 Chromium tests:    15
 ```
 
-当前只进行 `arrow.pincer` canonical semantic design。权威文件：
+`arrow.pincer` 的独立 canonical semantic design 已完成审查。权威文件：
 
 ```text
 docs/design/arrow-pincer-semantic-design.md
 docs/handover/2026-07-29-milestone-006a-pincer-semantic-design.md
+docs/handover/2026-07-29-milestone-006a-pincer-semantic-design-finalization.md
 ```
 
-冻结的 canonical controls：
+批准的 canonical controls：
 
 ```text
 controlPoints[0] = outer tail A
@@ -60,68 +61,67 @@ arrow.pincer
 
 ## Completed in this milestone
 
-- 建立设计分支 `agent/pincer-arrow-semantic-design`；
-- 创建 draft PR #20；
-- 完成 clean-room behavior review，并记录参考仓库、revision 和 license 风险；
-- 冻结 exactly-five authored-control model；
-- 冻结 fixed-five、第五次有效点击自动完成；
-- 冻结 positional PlotJSON 1.0 角色；
-- 冻结 A-to-A 与 B-to-B 配对；
-- 冻结 simultaneous whole-arm swap invariance；
-- 明确独立交换 tail pair 或 objective pair 会改变语义，不要求几何不变；
-- 冻结 junction 为 final inner boundary 上的 exact semantic point；
-- 冻结一个无孔 closed simple Polygon；
-- 禁止 alias `arrow.double`、禁止调用 double public generator、禁止重命名复用 `DoubleArrowFrame`；
-- 定义独立 `PincerArrowFrame`、参数族、validation、geometry invariants 和 testing plan；
+- 建立并审查设计 PR #20；
+- 完成 clean-room behavior review；
+- 批准 exactly-five authored-control model；
+- 批准 fixed-five、第五次有效点击自动完成；
+- 批准 positional PlotJSON 1.0 角色；
+- 批准 A-to-A 与 B-to-B 配对；
+- 批准 simultaneous whole-arm swap invariance；
+- 明确独立交换 tail 或 objective 会改变 pairing，不要求 geometry invariance；
+- 批准 junction 为 final inner boundary 上的 exact semantic point；
+- 批准一个无孔 closed simple Polygon；
+- 禁止 alias `arrow.double`、调用 double public generator 或以 `DoubleArrowFrame` 作为 semantic frame；
+- 批准独立 `PincerArrowFrame`、parameter family、validation、geometry invariants 和 testing plan；
 - 明确四控制 double data 不能静默转换为五控制 pincer data；
-- 实施目标 workspace 为 `0.0.13`，本设计 slice 不改版本和运行时代码。
+- 修正 `AGENTS.md` 中把所有 compound symbols 强制为 shared-body topology 的错误泛化；
+- 将开发合同当前优先级切换到 pincer design；
+- 本 slice 未增加 public symbol、selector、sample 或版本号。
 
 ## Validation
 
-本 slice 是 docs-only，但 CI 必须保持完整基线：
+权威 CI：
 
 ```text
-npm run typecheck
-npm test
-npm run playground:typecheck
-npm run playground:build
-npm run handover:check
-npm run playground:e2e
+Run ID: 30458945657
+Node 20.19: success
+Node 22: success
+Typecheck/tests/build: success
+Handover contract: success
+Chromium: success
 ```
 
-最低回归：
+最低回归保持：
 
 ```text
 107 Node tests
 15 Chromium tests
 ```
 
-当前 PR #20 CI：等待本次文档提交触发并完成。
-
 ## Next tasks
 
-1. 确认 PR #20 CI 全绿；
-2. 审查五控制点模型；
-3. 审查 fifth junction 的 exact inner-boundary role；
-4. 审查 ordered A/B arm pairing；
-5. 审查 whole-arm swap invariance only；
-6. 审查 fixed-five completion；
-7. 审查 PlotJSON migration boundary；
-8. 设计获准后将 PR #20 Ready 并 merge；
-9. 新建实施分支，不在设计 PR 中写几何；
-10. 先新增 `docs/algorithms/arrow-pincer.md`，再完成参数、frame、ring、Definition、Registry、PlotJSON、Playground 和 Chromium；
-11. 扩展 all-arrow visibility matrix 从八类到九类；
+1. 将 PR #20 标记 Ready；
+2. 检查 unresolved review threads；
+3. squash merge PR #20；
+4. 确认 `main` 与 merge SHA identical；
+5. 从更新后的 `main` 新建 `agent/pincer-arrow-implementation`；
+6. 先写 `docs/algorithms/arrow-pincer.md`；
+7. 实现参数、`PincerArrowFrame` 和 ring；
+8. 添加 Definition、Registry、PlotJSON 和 interaction；
+9. 增加第九个 Playground option/sample；
+10. 扩展九类型 Chromium visibility/edit coverage；
+11. implementation slice 将 workspace 升至 `0.0.13`；
 12. 不并行开发其他复杂符号。
 
 ## Risks and decisions
 
 - 公开生态经常将 pincer 与 double 当作同义词，PlotLibre 明确不采用该兼容策略；
-- 第五点击增加交互成本，但换来完整、可编辑、可迁移的 semantic state；
-- junction admissible region 的最终数值范围尚未校准，不能从参考实现复制；
-- 参考 `zhous1993/cesium-symbol` 在检查 revision 未发现 LICENSE 或 package license，只能观察行为；
-- 参数名称已提出，但默认数值和 golden fixtures 属于下一 implementation slice；
-- semantic guide fallback、renderability preflight 和 fail-closed topology 必须保持；
-- 设计 PR 不应增加 public identifier、selector、sample 或 workspace version；
-- 在语义审查完成前不得实现 `arrow.pincer`。
+- 第五点击增加交互成本，但消除了 hidden state 和导入/编辑歧义；
+- junction admissible region 的最终数值范围必须由 PlotLibre fixtures 校准；
+- exact junction 无效时必须拒绝，不能 clamp 或替换为 midpoint；
+- 参考 `zhous1993/cesium-symbol` 未发现 LICENSE 或 package license，只能观察行为；
+- 参数名称已批准，但数值默认值属于 implementation slice；
+- semantic-guide fallback、renderability preflight 和 fail-closed topology 必须保持；
+- implementation 必须在设计 PR 合并后的独立分支进行。
 
-Continuation：后续必须先读 `AGENTS.md`、`docs/design/arrow-pincer-semantic-design.md` 和 006A handover。当前唯一任务是完成设计审查与合并，不得直接跳到 geometry implementation。
+Continuation：PR #20 合并后，读取 `AGENTS.md`、pincer design 与 006A finalization handover，从算法记录开始独立实现五控制点钳形箭头，不得退回四控制别名模型。
