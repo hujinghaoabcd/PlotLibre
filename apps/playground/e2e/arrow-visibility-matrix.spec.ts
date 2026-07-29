@@ -8,7 +8,8 @@ type ArrowType =
   | "arrow.curved"
   | "arrow.attack"
   | "arrow.attack.tailed"
-  | "arrow.double";
+  | "arrow.double"
+  | "arrow.pincer";
 
 async function openPlayground(page: Page): Promise<void> {
   await page.goto("/PlotLibre/?e2e=1");
@@ -160,6 +161,36 @@ test("all public arrow types show a draft and a committed rendering", async ({
     await page.mouse.move(objectiveB.x, objectiveB.y);
     await expectDraftVisible(page, plotType);
     await page.mouse.click(objectiveB.x, objectiveB.y);
+    await expectCommittedVisible(page, plotType);
+  }
+
+  await page.reload();
+  await openPlayground(page);
+  {
+    const plotType = "arrow.pincer" as const;
+    const box = await canvasBox(page);
+    await begin(page, plotType);
+    const tailA = { x: box.x + box.width * 0.38, y: box.y + box.height * 0.75 };
+    const tailB = { x: box.x + box.width * 0.62, y: box.y + box.height * 0.75 };
+    const objectiveA = {
+      x: box.x + box.width * 0.25,
+      y: box.y + box.height * 0.28,
+    };
+    const objectiveB = {
+      x: box.x + box.width * 0.75,
+      y: box.y + box.height * 0.28,
+    };
+    const junction = {
+      x: box.x + box.width * 0.50,
+      y: box.y + box.height * 0.62,
+    };
+    await page.mouse.click(tailA.x, tailA.y);
+    await page.mouse.click(tailB.x, tailB.y);
+    await page.mouse.click(objectiveA.x, objectiveA.y);
+    await page.mouse.click(objectiveB.x, objectiveB.y);
+    await page.mouse.move(junction.x, junction.y);
+    await expectDraftVisible(page, plotType);
+    await page.mouse.click(junction.x, junction.y);
     await expectCommittedVisible(page, plotType);
   }
 });
