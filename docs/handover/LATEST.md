@@ -1,134 +1,127 @@
-# PlotLibre Development Handover — Milestone 005K Arrow Rendering Reliability
+# PlotLibre Development Handover — Milestone 006A Pincer Semantic Design Finalization
 
 日期：2026-07-29  
 仓库：`hujinghaoabcd/PlotLibre`  
 目标分支：`main`  
-开发分支：`agent/arrow-render-reliability`  
-PR：`#19 Fix cross-symbol arrow rendering reliability`  
+开发分支：`agent/pincer-arrow-semantic-design`  
+PR：`#20 Design canonical pincer arrow semantics`  
 Workspace：`0.0.12`  
-状态：系统级代码与全功能验证完成；等待最终文档 CI、Ready、合并和 Pages 更新
+状态：设计已审查批准；完整 CI 全绿；等待 Ready、squash merge
 
 ## Current state
 
-用户报告多个箭头类型存在绘制过程中不显示的问题。根因位于共享交互/渲染链路，而非八个独立符号算法：
+跨类型箭头显示可靠性修复已通过 PR #19 合并：
 
 ```text
-transient geometry exception
-→ old adapter cleared draft
-→ user saw blank canvas
+main / merge SHA: d745aa2b7044f9ba9a710bf6ddeba3e630862ea4
+Node tests:        107
+Chromium tests:    15
 ```
 
-当前分支已改为：
+`arrow.pincer` 的独立 canonical semantic design 已完成审查。权威文件：
 
 ```text
-valid candidate
-→ complete derived arrow draft
-
-invalid candidate + previous valid draft
-→ keep previous valid draft
-
-invalid candidate + no previous valid draft
-→ semantic guide line + control points
+docs/design/arrow-pincer-semantic-design.md
+docs/handover/2026-07-29-milestone-006a-pincer-semantic-design.md
+docs/handover/2026-07-29-milestone-006a-pincer-semantic-design-finalization.md
 ```
 
-Completion 同时采用统一预检：
+批准的 canonical controls：
 
 ```text
-candidate
-→ Registry.generate()
-→ valid: complete
-→ invalid: remain drawing, no Store/History mutation
+controlPoints[0] = outer tail A
+controlPoints[1] = outer tail B
+controlPoints[2] = objective A
+controlPoints[3] = objective B
+controlPoints[4] = shared inner junction
 ```
 
-当前回归基线：
+核心配对：
+
+```text
+arm A = tail A → junction → objective A
+arm B = tail B → junction → objective B
+```
+
+与 `arrow.double` 的关键差异：
+
+```text
+arrow.double
+- 4 controls
+- unordered tail pair
+- unordered objective pair
+- derived branch/shared body
+
+arrow.pincer
+- 5 controls
+- authored A/B arm pairing
+- exact authored inner junction
+- no shared forward body
+```
+
+## Completed in this milestone
+
+- 建立并审查设计 PR #20；
+- 完成 clean-room behavior review；
+- 批准 exactly-five authored-control model；
+- 批准 fixed-five、第五次有效点击自动完成；
+- 批准 positional PlotJSON 1.0 角色；
+- 批准 A-to-A 与 B-to-B 配对；
+- 批准 simultaneous whole-arm swap invariance；
+- 明确独立交换 tail 或 objective 会改变 pairing，不要求 geometry invariance；
+- 批准 junction 为 final inner boundary 上的 exact semantic point；
+- 批准一个无孔 closed simple Polygon；
+- 禁止 alias `arrow.double`、调用 double public generator 或以 `DoubleArrowFrame` 作为 semantic frame；
+- 批准独立 `PincerArrowFrame`、parameter family、validation、geometry invariants 和 testing plan；
+- 明确四控制 double data 不能静默转换为五控制 pincer data；
+- 修正 `AGENTS.md` 中把所有 compound symbols 强制为 shared-body topology 的错误泛化；
+- 将开发合同当前优先级切换到 pincer design；
+- 本 slice 未增加 public symbol、selector、sample 或版本号。
+
+## Validation
+
+权威 CI：
+
+```text
+Run ID: 30458945657
+Node 20.19: success
+Node 22: success
+Typecheck/tests/build: success
+Handover contract: success
+Chromium: success
+```
+
+最低回归保持：
 
 ```text
 107 Node tests
 15 Chromium tests
 ```
 
-不可变记录：
-
-```text
-docs/handover/2026-07-29-milestone-005k-arrow-render-reliability.md
-```
-
-## Completed in this milestone
-
-- 为两点和多点 session 添加通用 `validateCompletion`；
-- 无效 completion 保持 active drawing，而非进入 terminal；
-- fixed-count 无效最后点保持可替换，不会卡住；
-- `create`、`replace`、import、drag 和 interactive completion 在 Store mutation 前执行完整 `Registry.generate()`；
-- 暂时无效 pointer 保留 last valid full draft；
-- 第一个完整 draft 尚无效时显示 transient semantic guide；
-- semantic guide 不进入 Store、History、handles 或 PlotJSON；
-- 新增八种 public Arrow 的 draft/committed Source 与 actual-rendered-feature Chromium 矩阵；
-- 更新 README 和 AGENTS 基线与强制规则。
-
-主要运行文件：
-
-```text
-packages/interaction/src/types.ts
-packages/interaction/src/two-point-draw-session.ts
-packages/interaction/src/multi-point-draw-session.ts
-packages/maplibre/src/interaction.ts
-packages/maplibre/src/renderer.ts
-packages/maplibre/src/plotlibre.ts
-```
-
-主要测试：
-
-```text
-tests/interaction.test.mjs
-tests/render-reliability.test.mjs
-apps/playground/e2e/arrow-visibility-matrix.spec.ts
-```
-
-## Validation
-
-权威全功能 CI：
-
-```text
-Run ID: 30456378912
-Node 20.19: success
-Node 22: success
-Node tests: 107 passed, 0 failed
-Playground typecheck/build: success
-handover contract: success
-Chromium: 15 passed
-```
-
-功能日志确认：
-
-```text
-1..107
-# pass 107
-# fail 0
-
-15 passed
-```
-
-当前 documentation-inclusive CI 仅因上一版 `LATEST.md` 缺少精确 `## Validation` 标题失败；该标题已在本版本补齐。
-
 ## Next tasks
 
-1. 等待当前 head 的 documentation-inclusive CI 全绿；
-2. 更新 PR #19 描述中的最终 run 与测试数量；
-3. 检查 unresolved review threads；
-4. 将 PR #19 标记 Ready；
-5. squash merge 到 `main`；
-6. 确认 `main` 与 merge SHA identical；
-7. 确认 `packages/**` 与 `apps/playground/**` 变更触发 Pages workflow；
-8. Pages 更新后强制刷新并人工复核八种箭头；
-9. 下一阶段仅开始 `arrow.pincer` canonical semantic design。
+1. 将 PR #20 标记 Ready；
+2. 检查 unresolved review threads；
+3. squash merge PR #20；
+4. 确认 `main` 与 merge SHA identical；
+5. 从更新后的 `main` 新建 `agent/pincer-arrow-implementation`；
+6. 先写 `docs/algorithms/arrow-pincer.md`；
+7. 实现参数、`PincerArrowFrame` 和 ring；
+8. 添加 Definition、Registry、PlotJSON 和 interaction；
+9. 增加第九个 Playground option/sample；
+10. 扩展九类型 Chromium visibility/edit coverage；
+11. implementation slice 将 workspace 升至 `0.0.13`；
+12. 不并行开发其他复杂符号。
 
 ## Risks and decisions
 
-- semantic guide 仅表示输入可见，不表示完整箭头已经合法；
-- strict finite/closed/simple/self-intersection validation 未放宽；
-- last-valid 策略可能暂时显示上一个合法 polygon，而非当前无效 pointer 的完整形状；
-- Playground 尚未显示具体 validation issue 文本，后续可增加错误提示，但不能以放宽 topology 代替；
-- programmatic create/replace/import 现在会更早抛出 generation error，这是预期 fail-closed 行为；
-- 当前环境不能可靠直接访问 GitHub Pages 域名，线上响应必须由部署记录或用户页面复核确认。
+- 公开生态经常将 pincer 与 double 当作同义词，PlotLibre 明确不采用该兼容策略；
+- 第五点击增加交互成本，但消除了 hidden state 和导入/编辑歧义；
+- junction admissible region 的最终数值范围必须由 PlotLibre fixtures 校准；
+- exact junction 无效时必须拒绝，不能 clamp 或替换为 midpoint；
+- 参考 `zhous1993/cesium-symbol` 未发现 LICENSE 或 package license，只能观察行为；
+- 参数名称已批准，但数值默认值属于 implementation slice；
+- semantic-guide fallback、renderability preflight 和 fail-closed topology 必须保持；
+- implementation 必须在设计 PR 合并后的独立分支进行。
 
-Continuation：后续开发必须先读 `AGENTS.md` 与 005K handover，保持 107/15 最低基线，不删除 semantic-guide fallback，不允许 session 在 renderability preflight 前 terminal，不允许不可渲染 feature 进入 Store。
+Continuation：PR #20 合并后，读取 `AGENTS.md`、pincer design 与 006A finalization handover，从算法记录开始独立实现五控制点钳形箭头，不得退回四控制别名模型。

@@ -160,7 +160,7 @@ New geometry requires numerical, degenerate, parameter-isolation and golden-fixt
 
 Variant tests must additionally show that changing the variant-specific parameter does not silently change shared body/head geometry.
 
-Compound-symbol tests must additionally cover shared-body topology, pair-role invariance, distinct objectives and the prohibition on independently persisted component arrows.
+Compound-symbol tests must additionally cover the symbol's declared coupling topology (for example a shared body, explicit junction or bridge), role and invariance claims, distinct objectives and the prohibition on independently persisted component arrows.
 
 MapLibre `querySourceFeatures()` may return duplicate tile copies. Semantic handle counts must be validated by unique `plotId + handleIndex`, not raw Feature count.
 
@@ -227,36 +227,34 @@ One complete high-quality vertical slice is preferred to many incomplete symbols
 
 ## 11. Current priority
 
-The active corrective slice is cross-symbol Arrow rendering reliability on:
+The active design-only slice is the independent canonical semantic design for `arrow.pincer` on:
 
 ```text
-branch: agent/arrow-render-reliability
-PR: #19 Fix cross-symbol arrow rendering reliability
+branch: agent/pincer-arrow-semantic-design
+PR: #20 Design canonical pincer arrow semantics
 workspace: 0.0.12
-Node tests: 107
-Chromium tests: 15
+Node baseline: 107
+Chromium baseline: 15
 ```
 
-The corrective contract is:
+The proposed version-1.0 contract is:
 
-1. temporary non-renderable geometry never makes an active drawing appear completely blank;
-2. the last valid full draft remains visible when later pointer geometry is invalid;
-3. before the first valid full draft, a semantic guide line and control points remain visible;
-4. invalid completion does not terminate the session or mutate Store/History;
-5. fixed-count symbols can replace a rejected final candidate;
-6. create, replace, import and drag acceptance use full Registry generation preflight;
-7. strict finite/closed/simple topology remains enabled;
-8. all eight public Arrow types pass draft and committed actual-rendering browser coverage.
+1. exactly five authored controls: outer tail A, outer tail B, objective A, objective B and shared inner junction;
+2. arm A pairs tail A with objective A, and arm B pairs tail B with objective B;
+3. only simultaneous whole-arm A/B exchange is geometry invariant;
+4. independent tail or objective swaps change the authored pairing and need not preserve geometry;
+5. drawing is fixed at five points and auto-completes only after a renderable fifth click;
+6. the inner junction is an exact semantic control on the final inner boundary and survives PlotJSON round trip;
+7. the final result is one coherent closed simple Polygon with no holes and no independently persisted component arrows;
+8. `arrow.pincer` cannot alias `arrow.double`, call the double public generator or reuse `DoubleArrowFrame` as its semantic frame;
+9. four-control double-arrow data cannot be silently relabeled or upgraded to pincer data;
+10. invalid draft, completion, edit and import geometry remains fail-closed and outside Store/History.
 
-After PR #19 is green and merged, the next development priority is an independent canonical semantic design for `arrow.pincer`. Before implementation, that design must freeze:
+Authoritative records:
 
-1. authored control count and role of every control;
-2. whether control groups are ordered or unordered;
-3. completion mode and minimum/maximum point policy;
-4. exact semantic handles versus derived branch/body/head vertices;
-5. one coherent compound topology rather than persisted component arrows;
-6. pair/input-order invariance claims;
-7. PlotJSON 1.0 representation and migration boundaries;
-8. failure policy for coincident, crossing and self-intersecting configurations.
+```text
+docs/design/arrow-pincer-semantic-design.md
+docs/handover/2026-07-29-milestone-006a-pincer-semantic-design.md
+```
 
-Do not implement `arrow.pincer` until its semantic design is reviewed. Do not implement pincer, route, corridor, squad-combat or other complex arrows in parallel or as aliases/default variants of `arrow.double`.
+Do not implement `arrow.pincer` until PR #20's semantic design is reviewed and merged. After approval, implementation must begin on a separate branch with `docs/algorithms/arrow-pincer.md` before runtime code. Do not implement pincer, route, corridor, squad-combat or other complex arrows in parallel or as aliases/default variants of `arrow.double`.
