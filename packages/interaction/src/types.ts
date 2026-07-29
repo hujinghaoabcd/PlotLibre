@@ -3,6 +3,8 @@ import type {
   PlotFeatureInput,
   PlotStyle,
   Position,
+  ValidationIssue,
+  ValidationResult,
 } from "@plotlibre/core";
 
 export type DrawSessionStatus =
@@ -11,10 +13,16 @@ export type DrawSessionStatus =
   | "completed"
   | "cancelled";
 
+export interface DrawSessionRejection {
+  readonly kind: "completion-validation";
+  readonly issues: readonly ValidationIssue[];
+}
+
 export interface DrawSessionSnapshot {
   readonly status: DrawSessionStatus;
   readonly draft?: PlotFeatureInput;
   readonly completed?: PlotFeatureInput;
+  readonly rejection?: DrawSessionRejection;
 }
 
 export interface DrawSession {
@@ -27,6 +35,8 @@ export interface DrawSession {
   cancel(): DrawSessionSnapshot;
 }
 
+export type DrawCompletionValidationResult = boolean | ValidationResult;
+
 export interface DrawSessionFeatureOptions {
   readonly id: string;
   readonly plotType: string;
@@ -36,11 +46,12 @@ export interface DrawSessionFeatureOptions {
   readonly metadata?: Readonly<Record<string, JsonValue>>;
   /**
    * Performs a full renderability preflight before a candidate becomes terminal.
-   * Returning false, or throwing, keeps the session active so the user can move
-   * or replace the rejected final point.
+   * Boolean callbacks remain supported. Returning a ValidationResult allows the
+   * session and adapters to expose stable rejection details without committing
+   * the invalid candidate.
    */
   readonly validateCompletion?:
-    | ((candidate: PlotFeatureInput) => boolean)
+    | ((candidate: PlotFeatureInput) => DrawCompletionValidationResult)
     | undefined;
 }
 
