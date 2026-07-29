@@ -4,6 +4,7 @@ import { attackArrowDefinition } from "./attack-arrow.js";
 import { curvedArrowDefinition } from "./curved-arrow.js";
 import { fineArrowDefinition } from "./fine-arrow.js";
 import { straightArrowDefinition } from "./straight-arrow.js";
+import { tailedAttackArrowDefinition } from "./tailed-attack-arrow.js";
 import { tailedFineArrowDefinition } from "./tailed-fine-arrow.js";
 
 export const arrowSymbols: readonly PlotDefinition[] = [
@@ -13,6 +14,7 @@ export const arrowSymbols: readonly PlotDefinition[] = [
   assaultDirectionDefinition,
   curvedArrowDefinition,
   attackArrowDefinition,
+  tailedAttackArrowDefinition,
 ];
 
 export const builtInSymbols: readonly PlotDefinition[] = [...arrowSymbols];
