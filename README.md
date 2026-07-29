@@ -19,18 +19,19 @@ arrow.curved
 arrow.attack
 arrow.attack.tailed
 arrow.double
+arrow.pincer
 ```
 
-The Playground supports two-point, variable multi-point and fixed-four-point drawing; live preview; definition-derived transient drafts; semantic-guide fallback for temporarily invalid draft geometry; double-click/Enter or maximum-point completion; semantic control-point editing; undo/redo; style editing; eight Nanjing samples; and PlotJSON import/export.
+The Playground supports two-point, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; definition-derived transient drafts; semantic-guide fallback for temporarily invalid draft geometry; double-click/Enter or maximum-point completion; semantic control-point editing; undo/redo; style editing; nine Nanjing samples; and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.12
+workspace version: 0.0.13
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
-Node tests:        107
-Chromium tests:    15
+Node tests:        122
+Chromium tests:    16
 ```
 
 Implemented foundations:
@@ -43,18 +44,18 @@ Implemented foundations:
 - last-valid-draft retention plus transient semantic guides when candidate geometry is temporarily invalid;
 - MapLibre committed, draft and semantic-handle Sources/Layers;
 - click, pointer preview, double-click, Enter, Escape and point-removal interaction;
-- fixed-maximum-point auto-completion for four-control symbols;
+- fixed-maximum-point auto-completion for four- and five-control symbols;
 - deferred double-click zoom restoration after variable multi-point completion;
 - explicit MapLibre 6 Worker and shared-module packaging;
 - local bootstrap style and optional non-blocking raster basemap;
 - vector, polyline, curve, offset, ring and geodesic primitives;
 - antimeridian and coordinate-mode policies;
 - deterministic golden fixtures, degenerate-input tests and Chromium actual-rendered-feature tests;
-- browser visibility matrix covering draft and committed rendering for all eight public Arrow types;
+- browser visibility matrix covering draft and committed rendering for all nine public Arrow types;
 - Definition-level complete renderability validation for topology-sensitive symbols;
-- reusable `FineArrowFrame`, `AttackArrowFrame` and pure `DoubleArrowFrame` boundaries.
+- reusable `FineArrowFrame`, `AttackArrowFrame`, pure `DoubleArrowFrame` and independent five-control `PincerArrowFrame` boundaries.
 
-The next planned single-symbol work starts with the independent semantic design of `arrow.pincer`; it must not be implemented as an alias of `arrow.double`.
+`arrow.pincer` stores exactly five authored controls: outer tail A, outer tail B, objective A, objective B and a shared inner junction. The two arms preserve their authored pairings and form one coherent Polygon; it is not an alias or renamed implementation of `arrow.double`.
 
 ## Why semantic plotting
 
