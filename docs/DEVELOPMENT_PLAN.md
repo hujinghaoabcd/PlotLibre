@@ -2,19 +2,21 @@
 
 ## 总体策略
 
-采用“单符号完整纵向切片”：一个新符号在同一 PR 中完成语义、纯几何、Definition、PlotJSON、交互、Playground、浏览器测试、算法记录和交接。只有存在未解决的语义争议时才单独创建设计 PR。
+采用“相关符号组完整纵向切片”：具有同一数学基础的 2–3 个符号可以在同一 PR 中完成共享几何、独立语义、Definition、PlotJSON、交互、Playground、浏览器测试、算法记录和交接。禁止为了批量开发而复制整套生成器，也禁止仅通过不同默认参数伪造新符号。
 
-当前用户目标是优先扩大符号库，不再继续钳形箭头边界加固。每完成一个符号即进入下一个符号；公共稳定性问题集中在阶段性回归中处理。
+单个复杂耦合符号仍可独立成组。只有存在未解决的语义争议时才单独创建设计 PR。
+
+当前用户目标是优先扩大符号库，不再继续钳形箭头边界加固。完成一个相关符号组后直接进入下一组；公共稳定性问题集中在阶段性回归中处理。
 
 ## 当前基线
 
 ```text
-workspace:          0.0.16
-public Arrow types: 10
-Node tests:         135
-Chromium tests:     19
-active branch:      agent/squad-combat-arrow
-active PR:          #27 Add squad combat arrow
+workspace:          0.0.17
+public Arrow types: 12
+Node tests:         145
+Chromium tests:     20
+active branch:      agent/route-corridor-symbol-group
+active PR:          #28 Add route and corridor symbol group
 ```
 
 公开箭头：
@@ -30,6 +32,8 @@ arrow.attack.tailed
 arrow.double
 arrow.pincer
 arrow.squad-combat
+arrow.route
+arrow.corridor
 ```
 
 ## 已完成里程碑
@@ -41,16 +45,19 @@ arrow.squad-combat
 | 005D–005G | MultiPoint、曲线箭头、攻击箭头、燕尾攻击箭头 | 已完成 |
 | 005H | 双箭头 | 已完成 |
 | 006A–006D | 钳形箭头、自然点击顺序、失败原因提示 | 已完成 |
-| 006E | 分队战斗箭头 | PR #27 |
+| 006E | 分队战斗箭头 | 已完成并合并 |
+| 006F–006G | 路线箭头 + 走廊箭头共享 PathRibbon 基础 | PR #28 |
 
-## Milestone 006E：`arrow.squad-combat`
+## Milestone 006F–006G：Route/Corridor 相关符号组
 
-### 语义控制点
+### 共享中心路径
+
+两个符号均保存用户定义的中心路径：
 
 ```text
-controlPoints[0]      = tail centre
-controlPoints[1..n-2] = optional action-path controls
-controlPoints[n-1]    = exact objective/tip
+controlPoints[0]      = path start / endpoint A
+controlPoints[1..n-2] = optional path controls
+controlPoints[n-1]    = objective tip / endpoint B
 ```
 
 ```text
@@ -59,60 +66,58 @@ maxPoints = 64
 completeOnDoubleClick = true
 ```
 
-两点可以直接形成直线分队战斗箭头；增加中间点可以改变行动路径。尾缘与尾宽由局部米制路径派生，不进入 Store、handles、History 或 PlotJSON。
+共享 `PathRibbonFrame` 负责：
 
-### 与攻击箭头的区别
-
-```text
-arrow.attack
-0 + 1 = authored tail edges
-2..n = authored spine and objective
-
-arrow.squad-combat
-0     = authored tail centre
-1..n  = authored path and objective
-derived left/right tail edges = transient geometry inputs
-```
-
-### 实现范围
-
-- 独立 centre-path → temporary-tail derivation；
-- 复用已验证的 AttackArrow body/head construction；
 - 局部米制投影；
-- path-length-derived tail width；
-- 两点和多点形态；
-- Definition/Registry/PlotJSON；
-- schema-driven variable two-point session；
-- 十类型 Playground selector/sample；
-- Node 与 Chromium 回归；
-- clean-room algorithm record；
-- workspace `0.0.16`。
+- Catmull–Rom 中心线采样；
+- 路径长度测量；
+- `width = pathLength × widthPathRatio`；
+- 左右 offset 与 bounded miter；
+- finite/closed/winding/simple topology validation。
+
+所有 sampled centerline、offset、width、neck、head 和 polygon vertices 均为派生数据，不进入 Store、handles、History 或 PlotJSON。
+
+### `arrow.route`
+
+有方向路径符号：
+
+- 起点为路线起点；
+- 末点为精确 objective/tip；
+- 路径带在派生 neck plane 截断；
+- 使用独立 exact-tip arrow head 闭合；
+- 不是分队战斗箭头的参数变体。
+
+### `arrow.corridor`
+
+无方向路径符号：
+
+- 两端均为普通走廊端点；
+- 左右边界以平头端盖闭合；
+- 不包含隐藏、零宽或退化箭头头部；
+- 与 route 共享路径带基础，但保持独立闭合结构。
 
 ### 合并条件
 
 1. Node 20.19 success；
 2. Node 22 success；
-3. 135 Node tests success；
+3. 145 Node tests success；
 4. Playground typecheck/build success；
-5. 19 Chromium tests success；
-6. handover contract success；
-7. unresolved review threads = 0；
-8. PR #27 Ready and squash merged；
-9. merge SHA 与 `main` identical。
+5. 20 Chromium tests success；
+6. 十二类型 draft/committed 实际渲染矩阵 success；
+7. handover contract success；
+8. unresolved review threads = 0；
+9. PR #28 Ready and squash merged；
+10. merge SHA 与 `main` identical。
 
-## 后续新符号顺序
+## 后续符号组顺序
 
-### Milestone 006F：`arrow.route`
+### Milestone 006H：多头路径扩展组
 
-下一符号。先冻结中心路线、左右边界、起终点和宽度语义，再完成单 PR 纵向切片。
+在 Route/Corridor 合并后开发 2–3 个共享分叉路径基础的多头符号。先冻结分叉点、目标点、路径耦合和 PlotJSON 语义，再决定具体公共标识符。不得把 `arrow.double` 直接重命名或套壳。
 
-### Milestone 006G：`arrow.corridor`
+### Milestone 006I：闭合行动区域组
 
-在 route 之后开发，明确 corridor 与 route 的宽度、端部和控制点差异。
-
-### Milestone 006H：multi-head extensions
-
-在 route/corridor 稳定后再开发多头扩展，不与前两个符号并行。
+开发 closed route、gathering place、freehand closed curve 等共享闭合曲线基础的区域符号。
 
 ### Milestone 007：专业编辑
 
