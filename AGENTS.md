@@ -26,7 +26,7 @@ public packages <- playground / wrappers
 Rules:
 
 - `core` cannot depend on MapLibre or DOM;
-- `geometry` cannot depend on MapLibre, Store, UI, or events;
+- `geometry` cannot depend on MapLibre, Store, UI or events;
 - `symbols` register behavior through `PlotDefinition`;
 - `interaction` remains engine-independent;
 - `maplibre` translates semantic state to Sources/Layers/events;
@@ -45,6 +45,7 @@ Rules:
 - A new public symbol needs a real semantic or structural distinction, not only new default values.
 - Multi-point arrow geometry must preserve semantic controls separately from curve samples and polygon vertices.
 - Self-intersection checks must not be removed merely to make a difficult path render.
+- For topology-sensitive symbols, `PlotDefinition.validate()` must cover complete renderability before Store mutation.
 
 ## 4. Clean-room and licensing
 
@@ -80,6 +81,7 @@ arrow.fine
 arrow.fine.tailed
 arrow.assault-direction
 arrow.curved
+arrow.attack
 ```
 
 ## 6. Interaction rules
@@ -91,9 +93,11 @@ arrow.curved
 - Enter and double-click completion must preserve all semantic controls.
 - Backspace/Delete removes one uncommitted multi-point control at a time.
 - Drawing-state point removal is not Store history.
-- MapLibre double-click zoom must be restored after complete, cancel or destroy.
+- MapLibre double-click zoom must stay disabled through the native `dblclick` event and be restored afterward.
+- Cancel and destroy must restore the previous zoom-handler state immediately.
 - One completed handle drag produces one `ReplacePlotCommand`.
-- Invalid handle previews do not enter Store.
+- Invalid handle previews do not enter Store or History.
+- Any geometry that can fail during render must be rejected before command execution.
 
 ## 7. Testing requirements
 
@@ -123,14 +127,15 @@ For MapLibre symbols, Store size is not sufficient. Tests must verify:
 New geometry requires numerical, degenerate, parameter-isolation and golden-fixture tests. Multi-point geometry must additionally test:
 
 - minimum point count;
-- exact semantic tip;
+- exact semantic tail/tip controls;
 - interior-control influence;
 - duplicate-control cleanup;
 - self-intersection policy;
 - full-path PlotJSON round trip;
 - double-click completion;
-- zoom restoration;
-- interior semantic handle edit and undo.
+- camera stability and zoom restoration;
+- semantic handle edit, history depth and undo;
+- invalid geometry rejection before Store mutation.
 
 MapLibre `querySourceFeatures()` may return duplicate tile copies. Semantic handle counts must be validated by unique `plotId + handleIndex`, not raw Feature count.
 
@@ -185,25 +190,26 @@ One complete high-quality vertical slice is preferred to many incomplete symbols
 
 ## 11. Current priority
 
-Milestone 005E completes `arrow.curved`, the first multi-point symbol, with:
+Milestone 005F completed `arrow.attack` with:
 
-- reusable `MultiPointDrawSession` integration;
-- Catmull–Rom/Hermite semantic centerline;
-- arc-length variable-width shaft;
-- tangent-aligned head;
-- explicit self-intersection rejection;
-- double-click/Enter completion;
-- interior semantic handle editing;
-- real Chromium rendered-feature validation.
+- exact two-edge tail semantics;
+- reusable `AttackArrowFrame`;
+- broad attack body and neck/head transition;
+- complete renderability validation;
+- multi-point drawing and semantic handle editing;
+- deferred double-click zoom restoration;
+- real Chromium rendering, history and undo validation.
 
-The next priority is Milestone 005F: `arrow.attack`.
+The next priority is Milestone 005G: `arrow.attack.tailed`.
 
-Before implementation:
+Required design:
 
-1. research public attack-arrow semantics and record clean-room provenance;
-2. establish a structural distinction from `arrow.curved`;
-3. design a reusable multi-point body/frame if it benefits both flat-tail and tailed attack variants;
-4. preserve the existing curved-arrow golden contract;
-5. add only `arrow.attack` in this slice.
+1. preserve the same semantic tail-edge and spine controls;
+2. reuse `AttackArrowFrame` rather than copy `buildAttackArrowRing()`;
+3. add an independent inward swallowtail closing strategy;
+4. define explicit notch depth/width parameters and validation;
+5. preserve flat-tail attack golden behavior;
+6. add only `arrow.attack.tailed` in this slice;
+7. complete Definition, PlotJSON, Playground, Chromium and handover together.
 
-Do not implement `arrow.attack.tailed`, double, pincer, route or corridor arrows in parallel.
+Do not implement double, pincer, route, corridor or other complex arrows in parallel.
