@@ -9,6 +9,8 @@ export * from "./fine-arrow.js";
 export * from "./geodesic.js";
 export * from "./local-projection.js";
 export * from "./offset.js";
+export * from "./pincer-arrow-frame.js";
+export * from "./pincer-arrow.js";
 export * from "./polyline.js";
 export * from "./ring.js";
 export * from "./straight-arrow.js";
