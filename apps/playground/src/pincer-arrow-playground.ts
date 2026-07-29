@@ -38,8 +38,8 @@ export function installPincerArrowPlayground(
       if (selectedPlotType() !== PINCER_ARROW_TYPE) return;
       setStatus(
         plot.interaction.isDrawing
-          ? "钳形箭头绘制中：依次确定两个外尾、两个配对目标和内侧汇合点；第五次有效点击自动完成。"
-          : "已选择钳形箭头。依次点击外尾A、外尾B、目标A、目标B和内侧汇合点。",
+          ? "钳形箭头绘制中：依次确定两个外尾、两个目标（左右顺序均可）和内侧汇合点；第五次有效点击自动完成。"
+          : "已选择钳形箭头。依次点击两个外尾、两个目标和内侧汇合点；目标将自动规范化为不交叉配对。",
         plot.interaction.isDrawing ? "drawing" : "ready",
       );
     });

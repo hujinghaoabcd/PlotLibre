@@ -82,18 +82,20 @@ export class PlotLibre {
 
   public create(input: PlotFeatureInput): PlotFeature {
     const definition = this.registry.get(input.plotType);
-    const feature = createPlotFeature({
-      ...input,
-      definitionVersion: input.definitionVersion ?? definition.version,
-      parameters: {
-        ...definition.defaultParameters,
-        ...(input.parameters ?? {}),
-      },
-      style: {
-        ...definition.defaultStyle,
-        ...(input.style ?? {}),
-      },
-    });
+    const feature = this.registry.canonicalize(
+      createPlotFeature({
+        ...input,
+        definitionVersion: input.definitionVersion ?? definition.version,
+        parameters: {
+          ...definition.defaultParameters,
+          ...(input.parameters ?? {}),
+        },
+        style: {
+          ...definition.defaultStyle,
+          ...(input.style ?? {}),
+        },
+      }),
+    );
     this.registry.generate(feature);
     this.history.execute(new CreatePlotCommand(this.store, feature));
     return this.store.get(feature.id);
@@ -101,10 +103,12 @@ export class PlotLibre {
 
   public replace(feature: PlotFeature): PlotFeature {
     const current = this.store.get(feature.id);
-    const next = createPlotFeature({
-      ...feature,
-      revision: current.revision + 1,
-    });
+    const next = this.registry.canonicalize(
+      createPlotFeature({
+        ...feature,
+        revision: current.revision + 1,
+      }),
+    );
     this.registry.generate(next);
     this.history.execute(new ReplacePlotCommand(this.store, next));
     return this.store.get(next.id);
@@ -158,7 +162,13 @@ export class PlotLibre {
   }
 
   public importDocument(value: PlotDocument | string | unknown): PlotDocument {
-    const document = parsePlotDocument(value);
+    const parsed = parsePlotDocument(value);
+    const document: PlotDocument = {
+      ...parsed,
+      features: parsed.features.map((feature) =>
+        this.registry.canonicalize(feature),
+      ),
+    };
 
     // Validate every feature, including full geometry generation, before
     // clearing the current document. This prevents partial imports and Store

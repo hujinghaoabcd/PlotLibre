@@ -22,16 +22,16 @@ arrow.double
 arrow.pincer
 ```
 
-The Playground supports two-point, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; definition-derived transient drafts; semantic-guide fallback for temporarily invalid draft geometry; double-click/Enter or maximum-point completion; semantic control-point editing; undo/redo; style editing; nine Nanjing samples; and PlotJSON import/export.
+The Playground supports two-point, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; semantic-guide fallback; maximum-point or explicit completion; semantic control-point editing; undo/redo; style editing; nine Nanjing samples; and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.13
+workspace version: 0.0.14
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
-Node tests:        122
-Chromium tests:    16
+Node tests:        124
+Chromium tests:    17
 ```
 
 Implemented foundations:
@@ -39,23 +39,33 @@ Implemented foundations:
 - engine-independent `PlotDefinition`, Registry, Store and CommandHistory;
 - PlotJSON 1.0 semantic serialization;
 - `TwoPointDrawSession` and reusable `MultiPointDrawSession`;
-- optional Definition-driven transient draft-control derivation that never enters Store, History or PlotJSON;
+- optional Definition-driven transient draft controls;
+- optional Definition-level canonical control-role ordering that may only permute authored coordinates;
 - full renderability preflight before interactive completion, create, replace or import mutates Store;
-- last-valid-draft retention plus transient semantic guides when candidate geometry is temporarily invalid;
+- last-valid-draft retention and transient semantic guides for temporarily invalid candidates;
 - MapLibre committed, draft and semantic-handle Sources/Layers;
 - click, pointer preview, double-click, Enter, Escape and point-removal interaction;
 - fixed-maximum-point auto-completion for four- and five-control symbols;
-- deferred double-click zoom restoration after variable multi-point completion;
-- explicit MapLibre 6 Worker and shared-module packaging;
-- local bootstrap style and optional non-blocking raster basemap;
-- vector, polyline, curve, offset, ring and geodesic primitives;
-- antimeridian and coordinate-mode policies;
-- deterministic golden fixtures, degenerate-input tests and Chromium actual-rendered-feature tests;
-- browser visibility matrix covering draft and committed rendering for all nine public Arrow types;
-- Definition-level complete renderability validation for topology-sensitive symbols;
-- reusable `FineArrowFrame`, `AttackArrowFrame`, pure `DoubleArrowFrame` and independent five-control `PincerArrowFrame` boundaries.
+- semantic handle edit, history and undo;
+- local-metre projection and strict finite/closed/simple topology validation;
+- deterministic golden fixtures and actual-rendered-feature Chromium tests;
+- browser visibility coverage for all nine public Arrow types.
 
-`arrow.pincer` stores exactly five authored controls: outer tail A, outer tail B, objective A, objective B and a shared inner junction. The two arms preserve their authored pairings and form one coherent Polygon; it is not an alias or renamed implementation of `arrow.double`.
+## Pincer arrow
+
+`arrow.pincer` Definition version `1.1.0` stores exactly five canonical controls:
+
+```text
+0 outer tail A
+1 outer tail B
+2 objective A
+3 objective B
+4 shared inner junction
+```
+
+Users may click the two objectives in either left/right order. When the clicked order would cross the two authored arms but swapping the two objective controls produces a valid pincer, the public Definition stores that valid permutation as the explicit A/B pairing. No coordinate is inserted, removed, moved or mirrored. The pure geometry API remains strict and positional, and invalid junction or topology cases remain fail-closed.
+
+`arrow.pincer` is not an alias or renamed implementation of `arrow.double`.
 
 ## Why semantic plotting
 

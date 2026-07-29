@@ -3,6 +3,7 @@ import type {
   PlotDefinition,
   PlotFeature,
   PolygonGeometry,
+  Position,
   RenderBundle,
 } from "@plotlibre/core";
 import {
@@ -17,7 +18,7 @@ export const pincerArrowDefinition: PlotDefinition = {
   type: PINCER_ARROW_TYPE,
   title: "Pincer Arrow",
   category: "arrow",
-  version: "1.0.0",
+  version: "1.1.0",
   controlSchema: {
     minPoints: 5,
     maxPoints: 5,
@@ -40,6 +41,9 @@ export const pincerArrowDefinition: PlotDefinition = {
     maximumTailSpanMeters: 100_000,
   },
   defaultStyle: DEFAULT_ARROW_STYLE,
+  canonicalizeControlPoints({ feature }) {
+    return canonicalizePincerControlPoints(feature);
+  },
   generate({ feature }) {
     return generatePincerArrow(feature);
   },
@@ -70,6 +74,28 @@ export const pincerArrowDefinition: PlotDefinition = {
     }
   },
 };
+
+export function canonicalizePincerControlPoints(
+  feature: PlotFeature,
+): readonly Position[] {
+  const direct = feature.controlPoints.map(clonePosition);
+  if (direct.length !== 5) return direct;
+
+  const parameters = readParameters({
+    ...pincerArrowDefinition.defaultParameters,
+    ...feature.parameters,
+  });
+  if (canBuildPincer(direct, parameters)) return direct;
+
+  const swapped = [
+    direct[0]!,
+    direct[1]!,
+    direct[3]!,
+    direct[2]!,
+    direct[4]!,
+  ];
+  return canBuildPincer(swapped, parameters) ? swapped : direct;
+}
 
 export function generatePincerArrow(feature: PlotFeature): RenderBundle {
   if (feature.controlPoints.length !== 5) {
@@ -126,6 +152,18 @@ export function generatePincerArrow(feature: PlotFeature): RenderBundle {
   };
 }
 
+function canBuildPincer(
+  controlPoints: readonly Position[],
+  parameters: PincerArrowParameters,
+): boolean {
+  try {
+    buildPincerArrowRing(controlPoints, parameters);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function readParameters(
   parameters: Readonly<Record<string, JsonValue>>,
 ): PincerArrowParameters {
@@ -172,4 +210,8 @@ function readNumber(
     throw new TypeError(`Pincer arrow parameter "${key}" must be finite.`);
   }
   return value;
+}
+
+function clonePosition([longitude, latitude]: Position): Position {
+  return [longitude, latitude];
 }
