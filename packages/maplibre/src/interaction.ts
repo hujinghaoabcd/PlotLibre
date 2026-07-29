@@ -272,6 +272,8 @@ export class MapLibrePlotInteraction {
         ...(options.style ?? {}),
       },
       metadata: { ...(options.metadata ?? {}) },
+      validateCompletion: (candidate: PlotFeatureInput): boolean =>
+        this.#isRenderableInput(candidate),
     };
 
     this.#session =
@@ -348,8 +350,13 @@ export class MapLibrePlotInteraction {
         this.#draftFeature = draft;
         this.#renderer.renderDraft(draft, this.#registry);
       } catch {
-        this.#draftFeature = undefined;
-        this.#renderer.clearDraft();
+        // Pointer candidates can briefly create coincident, self-intersecting,
+        // or otherwise non-renderable geometry. Preserve the last valid full
+        // draft when one exists. Before the first valid polygon, show the
+        // semantic control path and points so drawing never appears blank.
+        if (!this.#draftFeature) {
+          this.#renderer.renderDraftGuide(snapshot.draft);
+        }
       }
     } else if (snapshot.status === "ready" || snapshot.status === "drawing") {
       this.#draftFeature = undefined;
@@ -384,6 +391,15 @@ export class MapLibrePlotInteraction {
     }
   }
 
+  #isRenderableInput(input: PlotFeatureInput): boolean {
+    try {
+      this.#materialize(input);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   #materialize(input: PlotFeatureInput): PlotFeature {
     const definition = this.#registry.get(input.plotType);
     const feature = createPlotFeature({
@@ -398,7 +414,7 @@ export class MapLibrePlotInteraction {
         ...(input.style ?? {}),
       },
     });
-    this.#registry.assertValid(feature);
+    this.#registry.generate(feature);
     return feature;
   }
 
@@ -418,8 +434,11 @@ export class MapLibrePlotInteraction {
       revision: drag.original.revision + 1,
     });
 
-    const validation = this.#registry.validate(preview);
-    if (!validation.valid) return;
+    try {
+      this.#registry.generate(preview);
+    } catch {
+      return;
+    }
 
     drag.preview = preview;
     drag.moved = !sameControlPoints(

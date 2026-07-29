@@ -1,164 +1,134 @@
-# PlotLibre Development Handover — Milestone 005J Double Arrow Centerline Preview
+# PlotLibre Development Handover — Milestone 005K Arrow Rendering Reliability
 
 日期：2026-07-29  
 仓库：`hujinghaoabcd/PlotLibre`  
 目标分支：`main`  
-开发分支：`agent/double-arrow-preview-centerline`  
-PR：`#18 Fix double-arrow preview near the centerline`  
+开发分支：`agent/arrow-render-reliability`  
+PR：`#19 Fix cross-symbol arrow rendering reliability`  
 Workspace：`0.0.12`  
-状态：中心线第三点击预览修复已通过完整 Node/Chromium 验证；等待最终文档 CI、合并和 Pages 部署
+状态：系统级代码与全功能验证完成；等待最终文档 CI、Ready、合并和 Pages 更新
 
 ## Current state
 
-005I 已实现第三次点击立即生成临时第四目标，但存在一个实际盲区：第一目标点位于或接近双箭头前向中轴时，横向距离阈值会使 derivation 返回 `undefined`，因此线上仍可能没有草图。
-
-005J 已将该行为修正为：
+用户报告多个箭头类型存在绘制过程中不显示的问题。根因位于共享交互/渲染链路，而非八个独立符号算法：
 
 ```text
-click tail A
-→ click tail B
-→ click objective A（含中轴/近中轴）
-→ generate deterministic preview-only lateral spread
-→ immediately render transient complete draft
-→ pointer movement replaces preview objective
-→ fourth click commits real objective B
+transient geometry exception
+→ old adapter cleared draft
+→ user saw blank canvas
 ```
 
-Canonical state 始终保持：
+当前分支已改为：
 
 ```text
-controlPoints[0] = tail edge A
-controlPoints[1] = tail edge B
-controlPoints[2] = objective A
-controlPoints[3] = objective B
+valid candidate
+→ complete derived arrow draft
+
+invalid candidate + previous valid draft
+→ keep previous valid draft
+
+invalid candidate + no previous valid draft
+→ semantic guide line + control points
 ```
 
-临时目标不进入 Store、History、handles、PlotJSON 或 completion candidate。
-
-权威功能 CI：
+Completion 同时采用统一预检：
 
 ```text
-Head: a7eaf59475055d74351b6f390c3c8c455bc3b5d0
-Run ID: 30452991571
-Node.js 20.19: success
-Node.js 22: success
-Node tests: 103 passed, 0 failed
-Playground typecheck/build: success
-handover contract: success
-Chromium: 14 passed
+candidate
+→ Registry.generate()
+→ valid: complete
+→ invalid: remain drawing, no Store/History mutation
+```
+
+当前回归基线：
+
+```text
+107 Node tests
+15 Chromium tests
 ```
 
 不可变记录：
 
 ```text
-docs/handover/2026-07-29-milestone-005j-double-arrow-centerline-preview.md
-```
-
-前序记录：
-
-```text
-docs/handover/2026-07-29-milestone-005h-double-arrow-implementation.md
-docs/handover/2026-07-29-milestone-005h-double-arrow-finalization.md
-docs/handover/2026-07-29-milestone-005i-double-arrow-third-click-preview.md
+docs/handover/2026-07-29-milestone-005k-arrow-render-reliability.md
 ```
 
 ## Completed in this milestone
 
-### Centerline blind-spot removal
+- 为两点和多点 session 添加通用 `validateCompletion`；
+- 无效 completion 保持 active drawing，而非进入 terminal；
+- fixed-count 无效最后点保持可替换，不会卡住；
+- `create`、`replace`、import、drag 和 interactive completion 在 Store mutation 前执行完整 `Registry.generate()`；
+- 暂时无效 pointer 保留 last valid full draft；
+- 第一个完整 draft 尚无效时显示 transient semantic guide；
+- semantic guide 不进入 Store、History、handles 或 PlotJSON；
+- 新增八种 public Arrow 的 draft/committed Source 与 actual-rendered-feature Chromium 矩阵；
+- 更新 README 和 AGENTS 基线与强制规则。
 
-删除了“横向距离过小就不产生草图”的提前返回。第三点只要具有足够前向距离，即使位于尾缘中点前方的中轴，也会产生临时完整预览。
-
-### Deterministic preview spread
-
-当第三点横向偏移不足时，派生第四目标使用本地米制最小展开：
+主要运行文件：
 
 ```text
-max(
-  1 metre,
-  1.25 × tail baseline length,
-  min(0.35 × forward distance, 3 × tail baseline length)
-)
+packages/interaction/src/types.ts
+packages/interaction/src/two-point-draw-session.ts
+packages/interaction/src/multi-point-draw-session.ts
+packages/maplibre/src/interaction.ts
+packages/maplibre/src/renderer.ts
+packages/maplibre/src/plotlibre.ts
 ```
 
-已有足够横向偏移时保持原镜像逻辑；中心线时采用确定性侧向符号。前三个用户点击点完全不变。
-
-### Regression coverage
-
-Node 新增：
+主要测试：
 
 ```text
-tests/double-arrow-preview-centerline.test.mjs
-```
-
-覆盖 exact-centerline 与 near-centerline 两种输入，并验证派生四点可通过完整 Definition geometry validation。
-
-Chromium 更新：
-
-```text
-apps/playground/e2e/double-arrow-preview.spec.ts
-```
-
-第三点改为真实中轴位置，验证无需额外 mousemove 就存在 draft，Store 仍为 0。
-
-当前回归基线：
-
-```text
-103 Node tests
-14 Chromium tests
-```
-
-### Files
-
-```text
-packages/symbols/src/double-arrow.ts
-tests/double-arrow-preview-centerline.test.mjs
-apps/playground/e2e/double-arrow-preview.spec.ts
-docs/handover/LATEST.md
-docs/handover/2026-07-29-milestone-005j-double-arrow-centerline-preview.md
+tests/interaction.test.mjs
+tests/render-reliability.test.mjs
+apps/playground/e2e/arrow-visibility-matrix.spec.ts
 ```
 
 ## Validation
 
+权威全功能 CI：
+
 ```text
-npm run typecheck: success
-npm test: 103 passed, 0 failed
-npm run playground:typecheck: success
-npm run playground:build: success
-npm run handover:check: success
-npm run playground:e2e: 14 passed
+Run ID: 30456378912
+Node 20.19: success
+Node 22: success
+Node tests: 107 passed, 0 failed
+Playground typecheck/build: success
+handover contract: success
+Chromium: 15 passed
 ```
 
-Node 20.19 与 Node 22 均成功。原有 double-arrow topology、golden、pair swaps、PlotJSON、fourth-click completion、edit/history/undo 回归继续通过。
+功能日志确认：
+
+```text
+1..107
+# pass 107
+# fail 0
+
+15 passed
+```
+
+当前 documentation-inclusive CI 仅因上一版 `LATEST.md` 缺少精确 `## Validation` 标题失败；该标题已在本版本补齐。
 
 ## Next tasks
 
-1. 确认文档提交后的最终 CI 全绿；
-2. 检查 PR #18 unresolved review threads；
-3. 将 PR #18 标记 Ready；
-4. squash merge 到 `main`；
-5. 确认 `main` 与 merge SHA identical；
-6. 核验 main push 的 `Deploy Playground to GitHub Pages`；
-7. 线上强制刷新后复测第三点位于中轴的场景；
-8. 完成 005J 后，下一阶段仅开始 `arrow.pincer` canonical semantic design。
+1. 等待当前 head 的 documentation-inclusive CI 全绿；
+2. 更新 PR #19 描述中的最终 run 与测试数量；
+3. 检查 unresolved review threads；
+4. 将 PR #19 标记 Ready；
+5. squash merge 到 `main`；
+6. 确认 `main` 与 merge SHA identical；
+7. 确认 `packages/**` 与 `apps/playground/**` 变更触发 Pages workflow；
+8. Pages 更新后强制刷新并人工复核八种箭头；
+9. 下一阶段仅开始 `arrow.pincer` canonical semantic design。
 
 ## Risks and decisions
 
-### Preview-only permissiveness
+- semantic guide 仅表示输入可见，不表示完整箭头已经合法；
+- strict finite/closed/simple/self-intersection validation 未放宽；
+- last-valid 策略可能暂时显示上一个合法 polygon，而非当前无效 pointer 的完整形状；
+- Playground 尚未显示具体 validation issue 文本，后续可增加错误提示，但不能以放宽 topology 代替；
+- programmatic create/replace/import 现在会更早抛出 generation error，这是预期 fail-closed 行为；
+- 当前环境不能可靠直接访问 GitHub Pages 域名，线上响应必须由部署记录或用户页面复核确认。
 
-临时草图允许扩大派生目标间距以保证可见反馈，但正式四点提交仍执行原有严格 geometry/topology validation。不得将 fallback 用于修改正式控制点。
-
-### No hidden semantic state
-
-派生第四目标不能持久化、成为 handle、进入 History、PlotJSON 或通过 Enter 完成。
-
-### Local metre geometry
-
-镜像和最小展开必须在 local metre projection 中完成，不得直接在经纬度坐标上偏移。
-
-### Deployment boundary
-
-PR CI 全绿不等于线上 Pages 已更新。只有合并到 `main` 后，Pages workflow 完成部署且 CDN/浏览器缓存刷新，公开页面才会出现修复。
-
-### Scope control
-
-本修复不修改正式 ring topology、参数 defaults、Definition version 或 PlotJSON schema，不并行实现 pincer、route、corridor 或 squad-combat。
+Continuation：后续开发必须先读 `AGENTS.md` 与 005K handover，保持 107/15 最低基线，不删除 semantic-guide fallback，不允许 session 在 renderability preflight 前 terminal，不允许不可渲染 feature 进入 Store。
