@@ -27,16 +27,6 @@ export function installSquadCombatPlayground(
     app.refresh();
   };
 
-  if (!options.e2e && plot.store.size > 0) {
-    addSquadCombatSample(plot);
-    plot.history.clear();
-    setStatus(
-      "已加载南京十类箭头示例。分队战斗箭头保存中心行动路径，尾部宽度自动派生。",
-      "ready",
-    );
-    app.refresh();
-  }
-
   const refreshInstruction = (): void => {
     queueMicrotask(() => {
       if (selectedPlotType() !== SQUAD_COMBAT_ARROW_TYPE) return;
