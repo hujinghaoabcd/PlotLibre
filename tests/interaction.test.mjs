@@ -229,3 +229,65 @@ test("multipoint terminal sessions ignore later input", () => {
   assert.deepEqual(session.pointerMove([8, 8]), completed);
   assert.deepEqual(session.keyDown("Escape"), completed);
 });
+
+test("two-point completion rejection keeps the session editable", () => {
+  const session = new TwoPointDrawSession({
+    id: "two-point-retry",
+    plotType: "arrow.straight",
+    validateCompletion(candidate) {
+      return candidate.controlPoints[1]?.[0] === 2;
+    },
+  });
+
+  session.click([0, 0]);
+  const rejected = session.click([1, 0]);
+  assert.equal(rejected.status, "drawing");
+  assert.equal(rejected.completed, undefined);
+  assert.deepEqual(rejected.draft?.controlPoints, [
+    [0, 0],
+    [1, 0],
+  ]);
+
+  session.pointerMove([2, 0]);
+  const completed = session.click([2, 0]);
+  assert.equal(completed.status, "completed");
+  assert.deepEqual(completed.completed?.controlPoints, [
+    [0, 0],
+    [2, 0],
+  ]);
+});
+
+test("fixed-count completion rejection does not trap the final point", () => {
+  const session = new MultiPointDrawSession({
+    id: "fixed-retry",
+    plotType: "arrow.double",
+    minimumPoints: 4,
+    maximumPoints: 4,
+    validateCompletion(candidate) {
+      return candidate.controlPoints[3]?.[1] === 2;
+    },
+  });
+
+  session.click([0, 0]);
+  session.click([1, 0]);
+  session.click([0, 1]);
+  const rejected = session.click([1, 1]);
+  assert.equal(rejected.status, "drawing");
+  assert.equal(rejected.completed, undefined);
+  assert.deepEqual(rejected.draft?.controlPoints, [
+    [0, 0],
+    [1, 0],
+    [0, 1],
+    [1, 1],
+  ]);
+
+  session.pointerMove([1, 2]);
+  const completed = session.click([1, 2]);
+  assert.equal(completed.status, "completed");
+  assert.deepEqual(completed.completed?.controlPoints, [
+    [0, 0],
+    [1, 0],
+    [0, 1],
+    [1, 2],
+  ]);
+});
