@@ -1,16 +1,15 @@
-# PlotLibre Development Handover — Milestone 006B Pincer Arrow Implementation
+# PlotLibre Development Handover — Milestone 006B Pincer Arrow Finalization
 
 日期：2026-07-29  
 仓库：`hujinghaoabcd/PlotLibre`  
-目标分支：`main`  
-开发分支：`agent/pincer-arrow-implementation`  
-PR：`#21 Implement five-control pincer arrow`  
+实施 PR：`#21 Implement five-control pincer arrow`  
+实施 merge SHA：`b6c70191f926207fd12c798301b4ed4817d460b6`  
 Workspace：`0.0.13`  
-状态：完整运行时纵向切片已完成；122 Node / 16 Chromium 全绿；等待最终文档 CI、Ready 与 squash merge
+状态：PR #21 已 squash merge；`main` 与 merge SHA identical；等待 finalization docs PR
 
 ## Current state
 
-`arrow.pincer` version 1.0.0 已按 PR #20 批准设计完成实现。Canonical controls：
+`arrow.pincer` version 1.0.0 已成为第九个 public Arrow definition。
 
 ```text
 controlPoints[0] = outer tail A
@@ -20,26 +19,18 @@ controlPoints[3] = objective B
 controlPoints[4] = shared inner junction
 ```
 
-Authored pairing：
-
 ```text
 arm A = tail A → junction → objective A
 arm B = tail B → junction → objective B
 ```
 
-关键结构差异：
+Final topology：
 
 ```text
-arrow.double
-- exactly 4 controls
-- unordered tail/objective pairs
-- derived shared body/branch
-
-arrow.pincer
-- exactly 5 controls
-- authored A/B pairing
-- exact authored inner junction
-- no shared forward body
+one coherent closed counterclockwise simple Polygon
+no holes
+exact authored junction once in the open ring
+no independently persisted component arrows
 ```
 
 权威记录：
@@ -49,82 +40,75 @@ docs/design/arrow-pincer-semantic-design.md
 docs/algorithms/arrow-pincer.md
 docs/handover/2026-07-29-milestone-006a-pincer-semantic-design-finalization.md
 docs/handover/2026-07-29-milestone-006b-pincer-arrow-implementation.md
+docs/handover/2026-07-29-milestone-006b-pincer-arrow-finalization.md
 ```
 
 ## Completed in this milestone
 
-- 新增独立 clean-room `PincerArrowFrame`；
-- 在一个 local-metre projection 内构建两条 paired arms；
-- 精确保留 outer tails、objectives 和 shared inner junction；
-- 建立 junction admissibility、tail span、paired forwardness 和 centerline-crossing validation；
-- 使用 neck-plane trimming、offset shaft 和独立 outer/inner tension；
-- 拼装一个 no-hole closed simple Polygon；
-- junction 在 open ring 中恰好出现一次；
-- whole-arm simultaneous swap geometry invariant；
-- independent objective swap 改变或使 authored pairing 无效；
-- 新增 `arrow.pincer` public Definition、Registry catalog 和 exports；
-- stable issue code `INVALID_PINCER_ARROW_GEOMETRY`；
-- PlotJSON 精确保留五个 authored controls；
-- 四控制 double data relabel 为 pincer 会被拒绝；
-- generic fixed-five interaction，无 symbol-ID branch；
-- fifth pointer candidate 生成 draft，第五次有效点击自动完成；
-- invalid fifth point 保持 active、visible、replaceable；
-- 五个 semantic handles；
-- junction drag、history 和 undo；
-- Playground 增加第九类 selector、南京 sample 和明确交互说明；
-- all-arrow visibility matrix 扩展到九类实际渲染；
-- 新增 deterministic golden fixture；
-- workspace 与 demo 升至 `0.0.13`；
-- README 和 `AGENTS.md` 更新为正式九类 baseline。
+- PR #20 semantic design 已合并；
+- PR #21 complete runtime vertical slice 已 squash merge；
+- merge SHA：`b6c70191f926207fd12c798301b4ed4817d460b6`；
+- 已确认 merge SHA 与 `main` identical；
+- 新增独立 clean-room `PincerArrowFrame` 和 ring generator；
+- 新增 `arrow.pincer` Definition、Registry、PlotJSON 和 stable validation issue；
+- generic fixed-five drawing，第五次有效点击自动完成；
+- invalid fifth-point candidate 保持 active、visible、replaceable；
+- 五 semantic handles，junction edit/history/undo；
+- Playground 增加第九类 selector、sample 和说明；
+- visibility matrix 扩展到九类 draft/committed actual rendering；
+- deterministic golden fixture；
+- workspace 升至 `0.0.13`；
+- baseline 升至 122 Node / 16 Chromium；
+- README 和 `AGENTS.md` 已更新为正式 public contract；
+- exact junction、A/B pairing、whole-arm swap invariance 和 four-control rejection 均已测试。
 
 ## Validation
 
-权威代码 CI：
+权威最终 PR CI：
 
 ```text
-Run ID: 30462198386
+Run ID: 30462652109
 Node 20.19: success
 Node 22: success
 Typecheck/tests/build: success
 Node tests: 122 passed / 0 failed
 Handover contract: success
 Chromium tests: 16 passed / 0 failed
+Unresolved review threads: 0
 ```
 
-最低回归：
+Merge verification：
 
 ```text
-122 Node tests
-16 Chromium tests
-9 public Arrow types
+PR #21: merged
+merge SHA: b6c70191f926207fd12c798301b4ed4817d460b6
+compare merge SHA...main: identical
 ```
-
-本次文档提交后的最终 docs-inclusive CI：等待触发并完成。
 
 ## Next tasks
 
-1. 完成最终 docs-inclusive CI；
-2. 更新 PR #21 body 为完整实现范围和最终验证；
-3. 检查 unresolved review threads；
-4. 将 PR #21 标记 Ready；
-5. 使用 current head SHA squash merge；
-6. 确认 `main` 与 merge SHA identical；
-7. 添加 merge finalization immutable handover；
-8. 确认 Pages workflow 由 `main` 触发；
-9. 合并后优先做 pincer visual/robustness hardening；
-10. 在开始下一个复杂符号前先完成 independent semantic design review。
+1. 合并纯文档 finalization PR；
+2. 核对 Pages workflow 与线上 Playground；
+3. 进行 pincer visual/robustness hardening；
+4. 增加 asymmetric、off-center 和 junction-boundary fixtures；
+5. 增加 antimeridian/high-latitude cases；
+6. 根据真实反馈校准 junction admissibility；
+7. 检查不同地图尺度下的默认参数视觉稳定性；
+8. 用户报告问题时先添加 regression fixture；
+9. 下一复杂符号先完成 independent semantic design；
+10. 不并行堆叠多个复杂符号。
 
 ## Risks and decisions
 
-- junction admissibility 是初始自有校准，需要更多 asymmetric 和真实绘制样例；
-- invalid junction 不会被 clamp 或替换为 midpoint；
-- semantic guide 只保证输入可见，不赋予无效几何 completion 资格；
-- `PincerArrowFrame` 独立于 `DoubleArrowFrame`，但复用项目内部 pure primitives；
-- golden fixture 会阻止默认几何无审查漂移；
-- 当前 E2E 样例证明稳定可绘制点位，不代表所有点位都合法；
-- strict finite/closed/simple/self-intersection validation 不得为提高表面成功率而删除；
-- four-control compatibility 需要未来显式 adapter 和 migration，不能静默处理；
-- packages 仍为 `UNLICENSED`，公开发布前需决定 license；
-- PR #21 合并后不应立即堆叠新箭头，应先处理用户实际绘制反馈。
+- junction admissibility 是初始自有校准，可能需要根据真实点位调整；
+- invalid junction 不 clamp、不替换为 midpoint；
+- semantic guide 保证可见但不使无效候选可提交；
+- golden fixture 阻止无审查形状漂移，但仍需人工视觉复核；
+- nine-type E2E 证明稳定样例，不代表所有组合均合法；
+- strict finite/closed/CCW/simple/self-intersection checks 不得删除；
+- four-control double data 不能静默转换为 pincer；
+- `PincerArrowFrame` 独立于 `DoubleArrowFrame`；
+- packages 仍为 `UNLICENSED`；
+- 下一阶段先做质量强化，不立即添加新复杂箭头。
 
-Continuation：PR #21 未合并时只完成最终 CI、review、merge 与 finalization。合并后从 pincer quality hardening 开始，先验证 symmetric/asymmetric、junction 边界、antimeridian/high-latitude 和实际交互，再决定下一 semantic-design milestone。
+Continuation：当前实现已进入 `main`。后续先核对 Pages 与真实绘制表现，再扩展 asymmetric/junction boundary/antimeridian tests。任何缺陷都先建立复现与回归，禁止通过静默 clamp、删拓扑检查或回退为 double alias 修复。
