@@ -1,6 +1,6 @@
 {
   "name": "plotlibre-workspace",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "private": true,
   "description": "A MapLibre-native framework for parametric situation plotting and tactical graphics.",
   "type": "module",
