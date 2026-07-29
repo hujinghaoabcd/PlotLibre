@@ -10,5 +10,6 @@ export * from "./offset.js";
 export * from "./polyline.js";
 export * from "./ring.js";
 export * from "./straight-arrow.js";
+export * from "./tailed-attack-arrow.js";
 export * from "./tailed-fine-arrow.js";
 export * from "./vector.js";
