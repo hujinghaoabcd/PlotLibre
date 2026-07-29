@@ -282,6 +282,7 @@ export class MapLibrePlotInteraction {
             minimumPoints: minPoints,
             maximumPoints: maxPoints,
             completeAtMaximum: completeOnDoubleClick !== true,
+            deriveDraftControlPoints: definition.deriveDraftControlPoints,
           });
 
     this.#disableDoubleClickZoom();
@@ -342,9 +343,14 @@ export class MapLibrePlotInteraction {
     options: ApplyDrawSnapshotOptions = {},
   ): void {
     if (snapshot.draft) {
-      const draft = this.#materialize(snapshot.draft);
-      this.#draftFeature = draft;
-      this.#renderer.renderDraft(draft, this.#registry);
+      try {
+        const draft = this.#materialize(snapshot.draft);
+        this.#draftFeature = draft;
+        this.#renderer.renderDraft(draft, this.#registry);
+      } catch {
+        this.#draftFeature = undefined;
+        this.#renderer.clearDraft();
+      }
     } else if (snapshot.status === "ready" || snapshot.status === "drawing") {
       this.#draftFeature = undefined;
       this.#renderer.clearDraft();

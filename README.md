@@ -21,7 +21,7 @@ arrow.attack.tailed
 arrow.double
 ```
 
-The Playground supports two-point, variable multi-point and fixed-four-point drawing; live preview; double-click/Enter or maximum-point completion; semantic control-point editing; undo/redo; style editing; eight Nanjing samples; and PlotJSON import/export.
+The Playground supports two-point, variable multi-point and fixed-four-point drawing; live preview; definition-derived transient drafts; double-click/Enter or maximum-point completion; semantic control-point editing; undo/redo; style editing; eight Nanjing samples; and PlotJSON import/export.
 
 ## Current baseline
 
@@ -30,7 +30,7 @@ workspace version: 0.0.12
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
 Node tests:        101
-Chromium tests:    13
+Chromium tests:    14
 ```
 
 Implemented foundations:
@@ -38,6 +38,7 @@ Implemented foundations:
 - engine-independent `PlotDefinition`, Registry, Store and CommandHistory;
 - PlotJSON 1.0 semantic serialization;
 - `TwoPointDrawSession` and reusable `MultiPointDrawSession`;
+- optional Definition-driven transient draft-control derivation that never enters Store, History or PlotJSON;
 - MapLibre committed, draft and semantic-handle Sources/Layers;
 - click, pointer preview, double-click, Enter, Escape and point-removal interaction;
 - fixed-maximum-point auto-completion for four-control symbols;
@@ -170,8 +171,11 @@ Canonical behavior:
 - exactly four authored controls;
 - tail and objective pairs are unordered;
 - swapping either pair preserves geometry;
+- the third click immediately shows a temporary mirrored four-point draft;
+- pointer movement replaces the temporary objective with the live fourth candidate;
+- the temporary counterpart is never committed, serialized or exposed as a handle;
 - fourth click auto-completes drawing;
-- all four controls remain semantic handles;
+- all four authored controls remain semantic handles;
 - branch center, wing curves, heads and inner bridge are derived;
 - both tail edges and both objective tips remain exact;
 - output is one finite, closed, counterclockwise, simple Polygon;
@@ -212,10 +216,10 @@ Double-arrow drawing flow:
 
 1. click tail edge A;
 2. click tail edge B;
-3. click objective A;
-4. move the pointer to preview the complete compound arrow;
+3. click objective A and immediately see a transient mirrored draft;
+4. move the pointer to replace the temporary counterpart with the live objective-B candidate;
 5. click objective B to auto-complete;
-6. drag any of the four handles to reshape it;
+6. drag any of the four authored handles to reshape it;
 7. call `plot.undo()` to undo a complete handle drag in one step.
 
 ## PlotJSON example

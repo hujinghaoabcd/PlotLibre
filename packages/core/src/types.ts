@@ -158,6 +158,14 @@ export interface PlotDefinition {
   readonly controlSchema: ControlSchema;
   readonly defaultParameters: Readonly<Record<string, JsonValue>>;
   readonly defaultStyle: PlotStyle;
+  /**
+   * Optionally derives a complete transient control set from the currently
+   * authored controls. The result is used only for draft rendering and must
+   * never be persisted as canonical feature state.
+   */
+  deriveDraftControlPoints?(
+    controlPoints: readonly Position[],
+  ): readonly Position[] | undefined;
   generate(context: GenerateContext): RenderBundle;
   validate?(context: GenerateContext): ValidationResult;
 }

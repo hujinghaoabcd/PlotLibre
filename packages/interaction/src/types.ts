@@ -46,4 +46,13 @@ export interface MultiPointDrawSessionOptions extends DrawSessionFeatureOptions 
    * Defaults to true.
    */
   readonly completeAtMaximum?: boolean;
+  /**
+   * Produces a complete, transient draft control set from committed controls.
+   * Derived controls are never used for completion or persisted state.
+   */
+  readonly deriveDraftControlPoints?:
+    | ((
+        controlPoints: readonly Position[],
+      ) => readonly Position[] | undefined)
+    | undefined;
 }

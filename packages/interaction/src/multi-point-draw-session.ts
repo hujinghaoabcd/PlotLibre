@@ -11,8 +11,9 @@ import type {
  * requires three or more control points.
  *
  * Draft output is emitted only when the committed points plus pointer preview
- * satisfy minimumPoints, so a renderer never receives an invalid semantic
- * feature solely for early guide feedback.
+ * satisfy minimumPoints, or when the Definition supplies a complete transient
+ * control set derived from the committed controls. Derived draft controls are
+ * never used for completion or persisted state.
  */
 export class MultiPointDrawSession implements DrawSession {
   readonly #options: MultiPointDrawSessionOptions;
@@ -163,10 +164,33 @@ export class MultiPointDrawSession implements DrawSession {
     if (this.#isTerminal()) {
       return undefined;
     }
+
     const candidate = this.#candidatePoints();
-    return candidate.length >= this.#minimumPoints
-      ? this.#createFeature(candidate)
-      : undefined;
+    if (candidate.length >= this.#minimumPoints) {
+      return this.#createFeature(candidate);
+    }
+
+    if (this.#cursor || !this.#options.deriveDraftControlPoints) {
+      return undefined;
+    }
+
+    try {
+      const derived = this.#options.deriveDraftControlPoints(
+        this.#points.map(clonePosition),
+      );
+      if (!derived || derived.length < this.#minimumPoints) {
+        return undefined;
+      }
+      if (
+        this.#maximumPoints !== undefined &&
+        derived.length > this.#maximumPoints
+      ) {
+        return undefined;
+      }
+      return this.#createFeature(derived.map(clonePosition));
+    } catch {
+      return undefined;
+    }
   }
 
   #candidatePoints(): readonly Position[] {

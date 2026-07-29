@@ -3,10 +3,12 @@ import type {
   PlotDefinition,
   PlotFeature,
   PolygonGeometry,
+  Position,
   RenderBundle,
 } from "@plotlibre/core";
 import {
   buildDoubleArrowRing,
+  createLocalProjection,
   type DoubleArrowParameters,
 } from "@plotlibre/geometry";
 import { createRenderProperties, DEFAULT_ARROW_STYLE } from "./style.js";
@@ -40,6 +42,9 @@ export const doubleArrowDefinition: PlotDefinition = {
     maximumTailWidthMeters: 100_000,
   },
   defaultStyle: DEFAULT_ARROW_STYLE,
+  deriveDraftControlPoints(controlPoints) {
+    return deriveDoubleArrowDraftControlPoints(controlPoints);
+  },
   generate({ feature }) {
     return generateDoubleArrow(feature);
   },
@@ -70,6 +75,90 @@ export const doubleArrowDefinition: PlotDefinition = {
     }
   },
 };
+
+/**
+ * Builds a transient fourth objective for the three-click drawing state.
+ *
+ * The first objective is reflected across the forward axis that passes through
+ * the tail midpoint and is perpendicular to the tail baseline. Projection and
+ * reflection are performed in local metres. The returned fourth point is only
+ * a draft convenience; both objectives remain explicit authored controls in
+ * canonical PlotJSON and Store state.
+ */
+export function deriveDoubleArrowDraftControlPoints(
+  controlPoints: readonly Position[],
+): readonly Position[] | undefined {
+  if (controlPoints.length !== 3) return undefined;
+
+  const tailA = controlPoints[0];
+  const tailB = controlPoints[1];
+  const objectiveA = controlPoints[2];
+  if (!tailA || !tailB || !objectiveA) return undefined;
+
+  try {
+    const projection = createLocalProjection(tailA);
+    const tailBLocal = projection.project(tailB);
+    const objectiveLocal = projection.project(objectiveA);
+    const baselineLength = Math.hypot(tailBLocal.x, tailBLocal.y);
+    if (!Number.isFinite(baselineLength) || baselineLength <= 1e-6) {
+      return undefined;
+    }
+
+    const lateralUnit = {
+      x: tailBLocal.x / baselineLength,
+      y: tailBLocal.y / baselineLength,
+    };
+    const tailCenter = {
+      x: tailBLocal.x / 2,
+      y: tailBLocal.y / 2,
+    };
+    const objectiveDelta = {
+      x: objectiveLocal.x - tailCenter.x,
+      y: objectiveLocal.y - tailCenter.y,
+    };
+    const unsignedForward = {
+      x: -lateralUnit.y,
+      y: lateralUnit.x,
+    };
+    const forwardProjection = dot(objectiveDelta, unsignedForward);
+    const forwardSign = forwardProjection >= 0 ? 1 : -1;
+    const forwardUnit = {
+      x: unsignedForward.x * forwardSign,
+      y: unsignedForward.y * forwardSign,
+    };
+    const forwardDistance = dot(objectiveDelta, forwardUnit);
+    const lateralDistance = dot(objectiveDelta, lateralUnit);
+
+    if (
+      !Number.isFinite(forwardDistance) ||
+      !Number.isFinite(lateralDistance) ||
+      forwardDistance <= Math.max(1, baselineLength * 0.5) ||
+      Math.abs(lateralDistance) <= Math.max(0.25, baselineLength * 0.05)
+    ) {
+      return undefined;
+    }
+
+    const mirroredObjective = projection.unproject({
+      x:
+        tailCenter.x +
+        forwardUnit.x * forwardDistance -
+        lateralUnit.x * lateralDistance,
+      y:
+        tailCenter.y +
+        forwardUnit.y * forwardDistance -
+        lateralUnit.y * lateralDistance,
+    });
+
+    return [
+      clonePosition(tailA),
+      clonePosition(tailB),
+      clonePosition(objectiveA),
+      clonePosition(mirroredObjective),
+    ];
+  } catch {
+    return undefined;
+  }
+}
 
 export function generateDoubleArrow(feature: PlotFeature): RenderBundle {
   if (feature.controlPoints.length !== 4) {
@@ -171,4 +260,15 @@ function readNumber(
     throw new TypeError(`Double arrow parameter "${key}" must be finite.`);
   }
   return value;
+}
+
+function dot(
+  left: Readonly<{ x: number; y: number }>,
+  right: Readonly<{ x: number; y: number }>,
+): number {
+  return left.x * right.x + left.y * right.y;
+}
+
+function clonePosition([longitude, latitude]: Position): Position {
+  return [longitude, latitude];
 }
