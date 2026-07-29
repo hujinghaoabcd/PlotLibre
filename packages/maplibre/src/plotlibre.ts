@@ -94,7 +94,7 @@ export class PlotLibre {
         ...(input.style ?? {}),
       },
     });
-    this.registry.assertValid(feature);
+    this.registry.generate(feature);
     this.history.execute(new CreatePlotCommand(this.store, feature));
     return this.store.get(feature.id);
   }
@@ -105,7 +105,7 @@ export class PlotLibre {
       ...feature,
       revision: current.revision + 1,
     });
-    this.registry.assertValid(next);
+    this.registry.generate(next);
     this.history.execute(new ReplacePlotCommand(this.store, next));
     return this.store.get(next.id);
   }
@@ -159,11 +159,18 @@ export class PlotLibre {
 
   public importDocument(value: PlotDocument | string | unknown): PlotDocument {
     const document = parsePlotDocument(value);
+
+    // Validate every feature, including full geometry generation, before
+    // clearing the current document. This prevents partial imports and Store
+    // states that cannot be rendered by one of the registered definitions.
+    for (const feature of document.features) {
+      this.registry.generate(feature);
+    }
+
     this.interaction.cancelDraw();
     this.interaction.select(undefined);
     this.store.clear();
     for (const feature of document.features) {
-      this.registry.assertValid(feature);
       this.store.add(feature);
     }
     this.history.clear();
