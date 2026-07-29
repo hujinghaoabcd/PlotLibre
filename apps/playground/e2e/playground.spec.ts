@@ -316,7 +316,7 @@ test("edits an attack tail edge in one undoable command", async ({ page }) => {
   await openPlayground(page);
   await drawAttackArrow(page);
   const tail = await projectControl(page, 0);
-  await dragControl(page, tail, { x: -18, y: 10 });
+  await dragControl(page, tail, { x: -12, y: -12 });
   const edited = await page.evaluate(({ selectedId, control }) => {
     const playground = window.__plotlibrePlayground;
     if (!playground) throw new Error("Playground API is unavailable.");
