@@ -3,9 +3,11 @@ import {
   InvalidPlotFeatureError,
   PlotDefinitionNotFoundError,
 } from "./errors.js";
+import { createPlotFeature } from "./types.js";
 import type {
   PlotDefinition,
   PlotFeature,
+  Position,
   RenderBundle,
   ValidationResult,
 } from "./types.js";
@@ -57,10 +59,34 @@ export class PlotRegistry {
     );
   }
 
-  public validate(feature: PlotFeature): ValidationResult {
+  public canonicalize(feature: PlotFeature): PlotFeature {
     const definition = this.get(feature.plotType);
-    const pointCount = feature.controlPoints.length;
+    const controlPoints = definition.canonicalizeControlPoints?.({ feature });
+    if (!controlPoints) return feature;
+
+    assertControlPointPermutation(feature.controlPoints, controlPoints);
+    return createPlotFeature({ ...feature, controlPoints });
+  }
+
+  public validate(feature: PlotFeature): ValidationResult {
     const issues = [];
+    let canonical = feature;
+    try {
+      canonical = this.canonicalize(feature);
+    } catch (error) {
+      issues.push({
+        code: "INVALID_CONTROL_POINT_CANONICALIZATION",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Control-point canonicalization failed.",
+        severity: "error" as const,
+      });
+      return { valid: false, issues };
+    }
+
+    const definition = this.get(canonical.plotType);
+    const pointCount = canonical.controlPoints.length;
 
     if (pointCount < definition.controlSchema.minPoints) {
       issues.push({
@@ -78,7 +104,7 @@ export class PlotRegistry {
       });
     }
 
-    for (const [index, point] of feature.controlPoints.entries()) {
+    for (const [index, point] of canonical.controlPoints.entries()) {
       const [longitude, latitude] = point;
       if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
         issues.push({
@@ -96,7 +122,7 @@ export class PlotRegistry {
       }
     }
 
-    const custom = definition.validate?.({ feature });
+    const custom = definition.validate?.({ feature: canonical });
     if (custom) {
       issues.push(...custom.issues);
     }
@@ -117,25 +143,64 @@ export class PlotRegistry {
   }
 
   public generate(feature: PlotFeature): RenderBundle {
-    this.assertValid(feature);
-    return this.get(feature.plotType).generate({ feature });
+    const canonical = this.canonicalize(feature);
+    this.assertValid(canonical);
+    return this.get(canonical.plotType).generate({ feature: canonical });
   }
 
   #assertDefinition(definition: PlotDefinition): void {
     if (!definition.type.trim()) {
       throw new InvalidPlotFeatureError("Plot definition type must not be empty.");
     }
-    if (!Number.isInteger(definition.controlSchema.minPoints) || definition.controlSchema.minPoints < 0) {
-      throw new InvalidPlotFeatureError("controlSchema.minPoints must be a non-negative integer.");
+    if (
+      !Number.isInteger(definition.controlSchema.minPoints) ||
+      definition.controlSchema.minPoints < 0
+    ) {
+      throw new InvalidPlotFeatureError(
+        "controlSchema.minPoints must be a non-negative integer.",
+      );
     }
     if (
       !Number.isFinite(definition.controlSchema.maxPoints) &&
       definition.controlSchema.maxPoints !== Number.POSITIVE_INFINITY
     ) {
-      throw new InvalidPlotFeatureError("controlSchema.maxPoints must be finite or Infinity.");
+      throw new InvalidPlotFeatureError(
+        "controlSchema.maxPoints must be finite or Infinity.",
+      );
     }
-    if (definition.controlSchema.maxPoints < definition.controlSchema.minPoints) {
-      throw new InvalidPlotFeatureError("controlSchema.maxPoints must be >= minPoints.");
+    if (
+      definition.controlSchema.maxPoints < definition.controlSchema.minPoints
+    ) {
+      throw new InvalidPlotFeatureError(
+        "controlSchema.maxPoints must be >= minPoints.",
+      );
     }
+  }
+}
+
+function assertControlPointPermutation(
+  original: readonly Position[],
+  canonical: readonly Position[],
+): void {
+  if (canonical.length !== original.length) {
+    throw new InvalidPlotFeatureError(
+      "Control-point canonicalization must preserve the control count.",
+    );
+  }
+
+  const used = new Array<boolean>(original.length).fill(false);
+  for (const point of canonical) {
+    const match = original.findIndex(
+      (candidate, index) =>
+        !used[index] &&
+        candidate[0] === point[0] &&
+        candidate[1] === point[1],
+    );
+    if (match < 0) {
+      throw new InvalidPlotFeatureError(
+        "Control-point canonicalization must only reorder existing coordinates.",
+      );
+    }
+    used[match] = true;
   }
 }
