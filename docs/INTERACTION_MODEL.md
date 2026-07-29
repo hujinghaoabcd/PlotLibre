@@ -47,17 +47,11 @@ interface DrawSession {
 }
 ```
 
-A snapshot may contain:
-
-- `draft`: a temporary semantic `PlotFeatureInput` candidate;
-- `completed`: the final semantic feature input;
-- only `status` when no candidate reaches minimum point count.
+A snapshot may contain a temporary semantic `draft`, a final `completed` feature input, or only status when minimum point count has not been reached.
 
 Sessions do not know symbol geometry. The adapter materializes candidates with Definition defaults and asks Registry for validity.
 
 ## 4. Shared guarantees
-
-All sessions obey:
 
 1. `ready` and `drawing` are non-terminal;
 2. `completed` and `cancelled` are terminal;
@@ -94,11 +88,7 @@ arrow.fine.tailed
 arrow.assault-direction
 ```
 
-The completed feature always contains exactly two semantic controls.
-
 ## 6. MultiPointDrawSession
-
-`MultiPointDrawSession` serves Definitions requiring three or more semantic points.
 
 ```text
 ready
@@ -120,30 +110,31 @@ Candidate rule:
 candidate = committed points + distinct pointer preview
 ```
 
-A semantic draft snapshot exists only when candidate length reaches `minimumPoints`. Geometry validity is checked later by Registry.
+A semantic draft exists only when candidate length reaches `minimumPoints`. Geometry validity is checked by Registry.
 
 Current users:
 
 ```text
 arrow.curved
 arrow.attack
+arrow.attack.tailed
 ```
 
-For `arrow.curved`:
+Semantic controls:
 
 ```text
+arrow.curved
 0       = tail center
 1..n-2  = path controls
 n-1     = exact tip
-```
 
-For `arrow.attack`:
-
-```text
+arrow.attack / arrow.attack.tailed
 0 + 1   = exact tail edges
 2..n-2  = attack-spine controls
 n-1     = exact objective/tip
 ```
+
+The tailed attack variant does not add notch roots or notch tip to the session. Those are derived vertices generated from parameters and `AttackArrowFrame`.
 
 ## 7. Enter, double-click and point removal
 
@@ -153,19 +144,9 @@ Double-click uses an immutable candidate copy and de-duplicates the final point 
 
 Backspace/Delete removes one uncommitted semantic point at a time. This is local drawing-state undo and does not touch `CommandHistory`.
 
-Additional points and previews beyond `maximumPoints` are ignored. `completeAtMaximum` supports fixed-count symbols; Definitions with `completeOnDoubleClick` retain explicit completion.
-
 ## 8. Definition-driven session selection
 
-`MapLibrePlotInteraction.startDraw()` reads:
-
-```text
-PlotDefinition.controlSchema.minPoints
-PlotDefinition.controlSchema.maxPoints
-PlotDefinition.controlSchema.completeOnDoubleClick
-```
-
-Selection rule:
+`MapLibrePlotInteraction.startDraw()` reads the Definition control schema.
 
 ```text
 minPoints = 2 and maxPoints = 2
@@ -179,8 +160,6 @@ The adapter does not hard-code symbol identifiers.
 
 ## 9. MapLibre event adapter
 
-The adapter translates:
-
 ```text
 click      → DrawSession.click / plot selection
 mousemove  → DrawSession.pointerMove / handle preview
@@ -191,28 +170,15 @@ style.load → restore sources, layers and visual state
 keydown    → session or selection keyboard action
 ```
 
-During active drawing:
+During active multi-point drawing:
 
-- mouse events are converted to WGS84 `Position` values;
+- events are converted to WGS84 Positions;
 - double-click default behavior is prevented and propagation stopped;
-- MapLibre double-click zoom is disabled and its previous state is remembered;
-- cancellation and destroy restore zoom immediately;
-- completion defers restoration until the current native `dblclick` event has ended.
+- MapLibre double-click zoom is disabled and its previous state remembered;
+- cancel and destroy restore zoom immediately;
+- completion defers restoration until the current native `dblclick` event ends.
 
-### Why completion restoration is deferred
-
-Real Chromium trace showed that enabling MapLibre double-click zoom inside PlotLibre's completion callback was too early. MapLibre's default handler could still observe the re-enabled state later in the same event dispatch and execute a 2× zoom.
-
-Current lifecycle:
-
-```text
-dblclick begins
-→ PlotLibre handler prevents default and completes semantic feature
-→ zoom remains disabled for the rest of the event dispatch
-→ next task restores the remembered state
-```
-
-If another draw session starts before the deferred callback, the new session remains authoritative and zoom is not incorrectly enabled.
+This prevents MapLibre's later default handler from observing an already re-enabled state and executing a 2× camera zoom.
 
 ## 10. Source separation
 
@@ -226,9 +192,9 @@ The active drawing preview or handle-drag preview. It is never exported.
 
 ### `plotlibre-handles`
 
-Semantic control points for the selected object. Generated curve samples and polygon vertices are not editable handles.
+Semantic control points for the selected object. Generated curve samples, notch vertices, head vertices and polygon vertices are not handles.
 
-`map.querySourceFeatures()` may return tile duplicates. Handle tests must compare unique `plotId + handleIndex` identities.
+`querySourceFeatures()` may return tile duplicates. Handle tests compare unique `plotId + handleIndex` identities.
 
 ## 11. Completion transaction
 
@@ -244,7 +210,7 @@ session completed
 → render semantic handles
 ```
 
-For topology-sensitive Definitions such as `arrow.attack`, Registry validation must include complete geometry renderability, not only point and parameter checks.
+For topology-sensitive Definitions, Registry validation includes complete geometry renderability before Store mutation.
 
 ## 12. Handle-drag transaction
 
@@ -267,23 +233,23 @@ Guarantees:
 - invalid previews are ignored and the last valid preview remains active;
 - one valid drag produces one undo step;
 - Escape restores the original feature without a command;
-- every curved or attack semantic control is editable;
-- moving a control regenerates geometry from semantic state.
+- every curved or attack-family semantic control is editable;
+- moving a control regenerates the full geometry from semantic state.
 
 ### Renderability validation and partial-commit prevention
 
-A Definition may pass lightweight checks but still fail during geometry generation. If that failure is first discovered by a synchronous Store render listener, Store may already contain the replacement while `CommandHistory.execute()` has not yet pushed the command.
+If geometry failure is first discovered by a synchronous Store render listener, Store may already contain the replacement while `CommandHistory.execute()` has not yet pushed the command.
 
-Therefore topology-sensitive Definitions must include generation-equivalent validation before command execution. `attackArrowDefinition.validate()` returns `INVALID_ATTACK_ARROW_GEOMETRY` for self-intersecting or otherwise non-generatable candidates, preventing Store mutation and History inconsistency.
+Therefore `attackArrowDefinition.validate()` and `tailedAttackArrowDefinition.validate()` perform generation-equivalent checks before command execution. They return symbol-specific validation issues for non-generatable candidates, preventing Store mutation and History inconsistency.
 
 ## 13. Selection, cursor and keyboard
 
-When not drawing, clicking committed fill or line layers selects the corresponding semantic object. Clicking empty space clears selection.
+Clicking committed fill or line layers selects the semantic object. Clicking empty space clears selection.
 
 ```text
 crosshair  active draw session
 grab       selected object or handle hover
-grabbbing  active handle drag
+grabbing   active handle drag
 empty      idle
 ```
 
@@ -291,36 +257,32 @@ The map canvas is keyboard-focusable.
 
 ## 14. Style lifecycle
 
-Calling `map.setStyle()` removes application-added sources and layers. PlotLibre restores:
-
-1. committed, draft and handles sources;
-2. rendering layers;
-3. committed Store features;
-4. active draft;
-5. selected semantic handles.
-
-All renderer initialization methods are idempotent.
+Calling `map.setStyle()` removes application-added sources and layers. PlotLibre restores sources, layers, committed Store features, an active draft and selected semantic handles. Renderer initialization is idempotent.
 
 ## 15. Current limitations
 
 - no visible guide before a multi-point candidate reaches minimum semantic validity;
 - no snapping or angle constraints;
-- no touch-specific double-tap/finish gesture;
-- no control-point insertion/removal after a feature is committed;
+- no touch-specific completion gesture;
+- no committed control-point insertion/removal;
 - no box or lasso selection;
-- no parameter handles for width, head length, neck, body bulge or tension;
-- invalid previews are ignored but the Playground does not yet surface detailed validation messages;
-- hit testing currently uses fill and line layers rather than a separate expanded hit-area layer;
-- Core Store listener exceptions do not yet have a general transaction rollback mechanism.
+- no parameter handles for width, head, neck, body bulge, tension or notch;
+- invalid previews are ignored but detailed issues are not yet shown in the Playground;
+- hit testing does not yet use a separate expanded hit-area layer;
+- Core Store listener exceptions do not yet have general transaction rollback.
 
-## 16. Next extension: `arrow.attack.tailed`
+## 16. Next extension: `arrow.double`
 
-The next multi-point slice reuses the current interaction contract and `AttackArrowFrame`:
+The next slice can reuse `MultiPointDrawSession`, but it requires a new semantic model rather than an interaction special case.
 
-1. preserve exact two-edge tail and spine controls;
-2. add an independent inward swallowtail closing strategy;
-3. validate notch depth/width and topology;
-4. preserve flat-tail attack golden behavior;
-5. complete PlotJSON, Playground and Chromium coverage;
-6. keep one valid tail/spine drag as one undoable command;
-7. do not copy the complete flat-tail generator.
+Before implementation define:
+
+1. the shared tail/connection controls;
+2. the left and right objectives;
+3. the derived branch or crossing point policy;
+4. input-order-independent handedness;
+5. minimum point count and completion rule;
+6. two-head topology validation;
+7. which branch/head points remain derived rather than semantic handles.
+
+The adapter should remain Definition-driven. No `arrow.double` identifier checks should be added to the interaction package or MapLibre adapter.

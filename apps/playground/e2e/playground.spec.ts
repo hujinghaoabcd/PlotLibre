@@ -6,7 +6,9 @@ type TwoPointArrowType =
   | "arrow.fine.tailed"
   | "arrow.assault-direction";
 
-type ArrowType = TwoPointArrowType | "arrow.curved" | "arrow.attack";
+type AttackArrowType = "arrow.attack" | "arrow.attack.tailed";
+type MultiPointArrowType = "arrow.curved" | AttackArrowType;
+type ArrowType = TwoPointArrowType | MultiPointArrowType;
 
 interface ScreenPoint {
   readonly x: number;
@@ -38,7 +40,10 @@ async function drawTwoPointArrow(
   await expect(page.getByTestId("plot-count")).toHaveText("1 个标绘");
 }
 
-async function beginMultiPoint(page: Page, plotType: "arrow.curved" | "arrow.attack") {
+async function beginMultiPoint(
+  page: Page,
+  plotType: MultiPointArrowType,
+): Promise<void> {
   await page.getByTestId("symbol-select").selectOption(plotType);
   await page.getByTestId("draw-button").click();
   expect(
@@ -76,9 +81,12 @@ async function drawCurvedArrow(page: Page): Promise<void> {
   await expect(page.getByTestId("plot-count")).toHaveText("1 个标绘");
 }
 
-async function drawAttackArrow(page: Page): Promise<void> {
+async function drawAttackArrow(
+  page: Page,
+  plotType: AttackArrowType = "arrow.attack",
+): Promise<void> {
   const box = await canvasBox(page);
-  await beginMultiPoint(page, "arrow.attack");
+  await beginMultiPoint(page, plotType);
   const tailA = { x: box.x + box.width * 0.30, y: box.y + box.height * 0.62 };
   const tailB = { x: box.x + box.width * 0.38, y: box.y + box.height * 0.72 };
   const spine = { x: box.x + box.width * 0.55, y: box.y + box.height * 0.5 };
@@ -170,16 +178,16 @@ async function dragControl(
   await page.mouse.up();
 }
 
-test("loads six symbols from the GitHub Pages project path", async ({ page }) => {
+test("loads seven symbols from the GitHub Pages project path", async ({ page }) => {
   await openPlayground(page);
   await expect(page).toHaveTitle("PlotLibre Playground");
   await expect(page.getByTestId("plot-count")).toHaveText("0 个标绘");
-  await expect(page.getByTestId("symbol-select").locator("option")).toHaveCount(6);
+  await expect(page.getByTestId("symbol-select").locator("option")).toHaveCount(7);
 });
 
-test("loads all six Nanjing samples without the optional basemap", async ({ page }) => {
+test("loads all seven Nanjing samples without the optional basemap", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
-  await expect(page.getByTestId("plot-count")).toHaveText("6 个标绘");
+  await expect(page.getByTestId("plot-count")).toHaveText("7 个标绘");
   const types = await page.evaluate(() => {
     const playground = window.__plotlibrePlayground;
     if (!playground) throw new Error("Playground API is unavailable.");
@@ -192,14 +200,15 @@ test("loads all six Nanjing samples without the optional basemap", async ({ page
     "arrow.assault-direction",
     "arrow.curved",
     "arrow.attack",
+    "arrow.attack.tailed",
   ]) {
     expect(types).toContain(expected);
   }
 });
 
-test("renders all six sample types through committed layers", async ({ page }) => {
+test("renders all seven sample types through committed layers", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
-  await expect(page.getByTestId("plot-count")).toHaveText("6 个标绘");
+  await expect(page.getByTestId("plot-count")).toHaveText("7 个标绘");
   await expect
     .poll(async () =>
       page.evaluate(() => {
@@ -211,13 +220,14 @@ test("renders all six sample types through committed layers", async ({ page }) =
         });
         const types = new Set(source.map((feature) => feature.properties?.plotType));
         return {
-          featureCount: source.length >= 12,
+          featureCount: source.length >= 14,
           straight: types.has("arrow.straight"),
           fine: types.has("arrow.fine"),
           tailed: types.has("arrow.fine.tailed"),
           assault: types.has("arrow.assault-direction"),
           curved: types.has("arrow.curved"),
           attack: types.has("arrow.attack"),
+          tailedAttack: types.has("arrow.attack.tailed"),
           rendered: rendered.length > 0,
         };
       }),
@@ -230,6 +240,7 @@ test("renders all six sample types through committed layers", async ({ page }) =
       assault: true,
       curved: true,
       attack: true,
+      tailedAttack: true,
       rendered: true,
     });
 });
@@ -268,7 +279,9 @@ test("draws and edits a curved arrow", async ({ page }) => {
     if (!playground) throw new Error("Playground API is unavailable.");
     const feature = playground.plot.store.get(selectedId);
     return {
-      changed: feature.controlPoints[1]?.[0] !== control[0] || feature.controlPoints[1]?.[1] !== control[1],
+      changed:
+        feature.controlPoints[1]?.[0] !== control[0] ||
+        feature.controlPoints[1]?.[1] !== control[1],
       revision: feature.revision,
       zoom: playground.map.doubleClickZoom.isEnabled(),
     };
@@ -284,37 +297,50 @@ test("draws and edits a curved arrow", async ({ page }) => {
   ).toEqual(middle.control);
 });
 
-test("draws an attack arrow with exact tail controls and restored zoom", async ({ page }) => {
-  await openPlayground(page);
-  await drawAttackArrow(page);
-  await expectSelectedRenderedType(page, "arrow.attack", 4);
-  expect(await uniqueHandleCount(page)).toBe(4);
-  const semantic = await page.evaluate(() => {
-    const playground = window.__plotlibrePlayground;
-    if (!playground) throw new Error("Playground API is unavailable.");
-    const selectedId = playground.plot.interaction.selectedId;
-    if (!selectedId) throw new Error("No plot is selected.");
-    const feature = playground.plot.store.get(selectedId);
-    const bundle = playground.plot.registry.generate(feature);
-    const geometry = bundle.fills[0]?.geometry;
-    return {
-      bodyBulgeRatio: feature.parameters.bodyBulgeRatio,
-      ringLength: geometry?.type === "Polygon" ? geometry.coordinates[0]?.length : 0,
-      zoom: playground.map.doubleClickZoom.isEnabled(),
-      tailsDistinct:
-        feature.controlPoints[0]?.[0] !== feature.controlPoints[1]?.[0] ||
-        feature.controlPoints[0]?.[1] !== feature.controlPoints[1]?.[1],
-    };
-  });
-  expect(semantic.bodyBulgeRatio).toBe(1.08);
-  expect(semantic.ringLength).toBeGreaterThan(20);
-  expect(semantic.zoom).toBe(true);
-  expect(semantic.tailsDistinct).toBe(true);
+test("draws both attack-arrow variants with exact tails and restored zoom", async ({ page }) => {
+  for (const type of ["arrow.attack", "arrow.attack.tailed"] as const) {
+    await openPlayground(page);
+    await drawAttackArrow(page, type);
+    await expectSelectedRenderedType(page, type, 4);
+    expect(await uniqueHandleCount(page)).toBe(4);
+    const semantic = await page.evaluate(() => {
+      const playground = window.__plotlibrePlayground;
+      if (!playground) throw new Error("Playground API is unavailable.");
+      const selectedId = playground.plot.interaction.selectedId;
+      if (!selectedId) throw new Error("No plot is selected.");
+      const feature = playground.plot.store.get(selectedId);
+      const bundle = playground.plot.registry.generate(feature);
+      const geometry = bundle.fills[0]?.geometry;
+      return {
+        bodyBulgeRatio: feature.parameters.bodyBulgeRatio,
+        notchDepth: feature.parameters.tailNotchDepthRatio,
+        notchWidth: feature.parameters.tailNotchWidthRatio,
+        ringLength:
+          geometry?.type === "Polygon" ? geometry.coordinates[0]?.length : 0,
+        zoom: playground.map.doubleClickZoom.isEnabled(),
+        tailsDistinct:
+          feature.controlPoints[0]?.[0] !== feature.controlPoints[1]?.[0] ||
+          feature.controlPoints[0]?.[1] !== feature.controlPoints[1]?.[1],
+      };
+    });
+    expect(semantic.bodyBulgeRatio).toBe(1.08);
+    expect(semantic.ringLength).toBeGreaterThan(20);
+    expect(semantic.zoom).toBe(true);
+    expect(semantic.tailsDistinct).toBe(true);
+    if (type === "arrow.attack.tailed") {
+      expect(semantic.notchDepth).toBe(0.75);
+      expect(semantic.notchWidth).toBe(0.65);
+    } else {
+      expect(semantic.notchDepth).toBeUndefined();
+      expect(semantic.notchWidth).toBeUndefined();
+    }
+    await page.reload();
+  }
 });
 
-test("edits an attack tail edge in one undoable command", async ({ page }) => {
+test("edits a tailed attack edge in one undoable command", async ({ page }) => {
   await openPlayground(page);
-  await drawAttackArrow(page);
+  await drawAttackArrow(page, "arrow.attack.tailed");
   const tail = await projectControl(page, 0);
   await dragControl(page, tail, { x: 4, y: 4 });
   const edited = await page.evaluate(({ selectedId, control }) => {
@@ -322,7 +348,9 @@ test("edits an attack tail edge in one undoable command", async ({ page }) => {
     if (!playground) throw new Error("Playground API is unavailable.");
     const feature = playground.plot.store.get(selectedId);
     return {
-      changed: feature.controlPoints[0]?.[0] !== control[0] || feature.controlPoints[0]?.[1] !== control[1],
+      changed:
+        feature.controlPoints[0]?.[0] !== control[0] ||
+        feature.controlPoints[0]?.[1] !== control[1],
       revision: feature.revision,
       undoDepth: playground.plot.history.undoDepth,
     };

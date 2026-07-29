@@ -6,6 +6,7 @@ import {
   CURVED_ARROW_TYPE,
   FINE_ARROW_TYPE,
   STRAIGHT_ARROW_TYPE,
+  TAILED_ATTACK_ARROW_TYPE,
   TAILED_FINE_ARROW_TYPE,
 } from "@plotlibre/symbols";
 import type { Map } from "maplibre-gl";
@@ -197,6 +198,22 @@ export class PlaygroundApp {
           lineWidth: 2,
         },
       },
+      {
+        id: "sample-tailed-attack-direction",
+        plotType: TAILED_ATTACK_ARROW_TYPE,
+        controlPoints: [
+          [118.695, 32.105],
+          [118.707, 32.1],
+          [118.732, 32.13],
+          [118.77, 32.165],
+        ] as const,
+        style: {
+          fillColor: "#f2c94c",
+          fillOpacity: 0.54,
+          lineColor: "#8a6812",
+          lineWidth: 2,
+        },
+      },
     ];
 
     for (const sample of samples) {
@@ -213,13 +230,13 @@ export class PlaygroundApp {
     this.#plot.select(samples[0]?.id);
     this.#map.fitBounds(
       [
-        [118.69, 31.99],
-        [118.94, 32.18],
+        [118.67, 31.99],
+        [118.94, 32.19],
       ],
       { padding: 72, duration: 500 },
     );
     this.setStatus(
-      "已加载南京六类箭头示例。攻击箭头的前两个控制点是精确尾缘。",
+      "已加载南京七类箭头示例。平尾与燕尾攻击箭头共享语义尾缘和进攻骨架。",
       "ready",
     );
     this.refresh();
@@ -365,6 +382,8 @@ export class PlaygroundApp {
         return "已选择曲线箭头。第一个点为尾部中心，后续点定义路径；双击或 Enter 完成。";
       case ATTACK_ARROW_TYPE:
         return "已选择攻击箭头。前两个点定义尾缘宽度，后续点定义进攻骨架和目标。";
+      case TAILED_ATTACK_ARROW_TYPE:
+        return "已选择燕尾攻击箭头。控制点与攻击箭头一致，尾部使用独立内凹燕尾。";
       default:
         return `已选择${this.#selectedSymbolLabel()}。点击“开始绘制”后确定箭尾和箭尖。`;
     }
@@ -376,6 +395,8 @@ export class PlaygroundApp {
         return "正在绘制曲线箭头：点击尾部中心与路径点；第三个候选点开始预览，双击或 Enter 完成。";
       case ATTACK_ARROW_TYPE:
         return "正在绘制攻击箭头：先点击两个尾缘点，再点击进攻骨架；双击目标点或 Enter 完成。";
+      case TAILED_ATTACK_ARROW_TYPE:
+        return "正在绘制燕尾攻击箭头：先点击两个尾缘点，再点击进攻骨架；双击目标点或 Enter 完成。";
       default:
         return `正在绘制${this.#selectedSymbolLabel()}：请点击箭尾，再移动鼠标并点击箭尖。`;
     }
@@ -387,6 +408,8 @@ export class PlaygroundApp {
         return "曲线箭头绘制中：继续点击路径点，双击最后一点或按 Enter 完成；Backspace 退点。";
       case ATTACK_ARROW_TYPE:
         return "攻击箭头绘制中：前两点是尾缘，继续点击骨架/目标；双击或 Enter 完成。";
+      case TAILED_ATTACK_ARROW_TYPE:
+        return "燕尾攻击箭头绘制中：前两点是尾缘，继续点击骨架/目标；双击或 Enter 完成。";
       default:
         return "绘制中：再次点击地图完成；Escape 取消。";
     }
