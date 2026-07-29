@@ -201,7 +201,7 @@ test("programmatic create and replace reject non-renderable geometry before Stor
   assert.equal(plot.history.undoDepth, 1);
 });
 
-test("interactive drawing preserves the last valid draft and retries rejected completion", () => {
+test("interactive drawing shows a guide, preserves the last valid draft and retries completion", () => {
   const map = new FakeMap();
   const plot = new PlotLibre(map, {
     definitions: [reliabilityDefinition],
@@ -210,9 +210,22 @@ test("interactive drawing preserves the last valid draft and retries rejected co
 
   plot.draw(reliabilityDefinition.type);
   map.fire("click", mouse(0, 0));
-  map.fire("mousemove", mouse(2, 0));
+  map.fire("mousemove", mouse(1, 0));
 
   const draftSource = map.getSource("plotlibre-draft");
+  assert.equal(draftSource.data.features.length, 3);
+  assert.equal(
+    draftSource.data.features.every(
+      (feature) => feature.properties.draftKind === "semantic-guide",
+    ),
+    true,
+  );
+  assert.deepEqual(draftSource.data.features[0].geometry.coordinates, [
+    [0, 0],
+    [1, 0],
+  ]);
+
+  map.fire("mousemove", mouse(2, 0));
   assert.equal(draftSource.data.features.length, 1);
   assert.deepEqual(draftSource.data.features[0].geometry.coordinates, [
     [0, 0],
