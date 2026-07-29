@@ -61,6 +61,11 @@ export interface MultiPointDrawSessionOptions extends DrawSessionFeatureOptions 
   readonly minimumPoints: number;
   readonly maximumPoints?: number;
   /**
+   * Enables a variable path whose minimum is exactly two controls. This remains
+   * opt-in so existing multipoint callers keep the historical minimum of three.
+   */
+  readonly allowTwoPointMinimum?: boolean;
+  /**
    * When true, reaching maximumPoints commits immediately after a click.
    * Defaults to true.
    */
