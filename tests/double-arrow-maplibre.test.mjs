@@ -121,7 +121,7 @@ const controls = [
   [0.004, 0.012],
 ];
 
-test("fixed-four double-arrow drawing previews at the fourth candidate and auto-completes", () => {
+test("fixed-four double-arrow drawing previews immediately after the third click and auto-completes", () => {
   const { map, plot } = createPlot();
   plot.draw(DOUBLE_ARROW_TYPE, { id: "double-draw" });
 
@@ -129,7 +129,8 @@ test("fixed-four double-arrow drawing previews at the fourth candidate and auto-
   map.fire("click", mouse(...controls[0]));
   map.fire("click", mouse(...controls[1]));
   map.fire("click", mouse(...controls[2]));
-  assert.equal(map.getSource("plotlibre-draft").data.features.length, 0);
+  assert.equal(map.getSource("plotlibre-draft").data.features.length, 2);
+  assert.equal(plot.store.size, 0);
 
   map.fire("mousemove", mouse(...controls[3]));
   assert.equal(map.getSource("plotlibre-draft").data.features.length, 2);
