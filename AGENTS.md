@@ -49,6 +49,7 @@ Rules:
 - A variant golden test should prove unchanged shared geometry rather than only snapshot the final polygon.
 - A compound symbol must be one coherent semantic geometry, not an array of independently persisted simpler symbols.
 - Shaft/head joins must not retain derived offset points beyond the head neck plane.
+- Every new compound symbol must declare its coupling topology explicitly: shared body, explicit junction, bridge or another reviewed semantic structure.
 
 ## 4. Clean-room and licensing
 
@@ -88,9 +89,22 @@ arrow.curved
 arrow.attack
 arrow.attack.tailed
 arrow.double
+arrow.pincer
 ```
 
-`arrow.double` version 1.0 stores exactly four authored controls. A three-click mirrored draft objective or fifth connection/branch control is not canonical PlotJSON and requires a future explicit adapter or migration before it could become persisted state.
+`arrow.double` version 1.0 stores exactly four authored controls. Its temporary mirrored objective and derived branch/body vertices are not canonical PlotJSON.
+
+`arrow.pincer` version 1.0 stores exactly five authored controls in this positional order:
+
+```text
+0 outer tail A
+1 outer tail B
+2 objective A
+3 objective B
+4 shared inner junction
+```
+
+Its A/B arm pairing and exact inner junction are canonical. Four-control double-arrow data cannot be relabeled or silently migrated to pincer data.
 
 ## 6. Interaction rules
 
@@ -114,8 +128,10 @@ arrow.double
 - Invalid transient pointer geometry preserves the last valid full draft.
 - If no valid full draft exists yet, MapLibre renders a transient semantic guide line and control points rather than a blank canvas.
 - `create`, `replace` and document import must run full Registry generation before Store mutation; partial invisible state is prohibited.
-- Derived notch/head/body/branch/bridge vertices are never semantic handles.
+- Derived notch/head/body/branch/bridge/junction-shoulder vertices are never semantic handles.
 - `arrow.double` must show either a complete transient draft or a visible semantic guide immediately after the third click, replace it with the live fourth-point candidate on movement, and auto-complete only when the fourth-click geometry is renderable.
+- `arrow.pincer` uses four committed controls plus the fifth pointer candidate for its first full draft; only a renderable fifth click auto-completes.
+- An invalid pincer junction candidate remains visible and replaceable and must not enter Store or History.
 
 ## 7. Testing requirements
 
@@ -160,18 +176,29 @@ New geometry requires numerical, degenerate, parameter-isolation and golden-fixt
 
 Variant tests must additionally show that changing the variant-specific parameter does not silently change shared body/head geometry.
 
-Compound-symbol tests must additionally cover the symbol's declared coupling topology (for example a shared body, explicit junction or bridge), role and invariance claims, distinct objectives and the prohibition on independently persisted component arrows.
+Compound-symbol tests must additionally cover the symbol's declared coupling topology, role and invariance claims, distinct objectives and the prohibition on independently persisted component arrows.
+
+Pincer tests must additionally prove:
+
+- all five authored controls occur exactly according to the geometry/handle contract;
+- the inner junction appears exactly once in the normalized open ring;
+- simultaneous whole-arm A/B exchange preserves normalized geometry;
+- independent objective exchange changes or invalidates authored pairing;
+- moving the junction changes both arm interiors while preserving exact tips;
+- four-control relabeling is rejected;
+- one coherent no-hole simple Polygon is produced;
+- `PincerArrowFrame` remains independent of `DoubleArrowFrame`.
 
 MapLibre `querySourceFeatures()` may return duplicate tile copies. Semantic handle counts must be validated by unique `plotId + handleIndex`, not raw Feature count.
 
-Current minimum regression baseline after the cross-symbol rendering-reliability slice:
+Current minimum regression baseline after the pincer-arrow implementation slice:
 
 ```text
-107 Node tests
-15 Chromium tests
+122 Node tests
+16 Chromium tests
 ```
 
-The Chromium suite includes a draft-and-committed visibility matrix for all eight public Arrow types.
+The Chromium suite includes a draft-and-committed visibility matrix for all nine public Arrow types.
 
 ## 8. Playground and Pages
 
@@ -184,6 +211,7 @@ The Chromium suite includes a draft-and-committed visibility matrix for all eigh
 - Multi-point symbols require visible instructions for their actual completion mode and point removal.
 - Fixed-count symbols must clearly state automatic maximum-point completion.
 - The double-arrow browser suite must assert visible draft output immediately after the third click without requiring a later `mousemove`.
+- The pincer browser suite must assert a full draft from the fifth pointer candidate, fifth-click completion, five unique handles and junction edit/undo.
 - The all-arrow matrix must verify both Source presence and actual rendered features for draft and committed states.
 - Pages deploys only from `main`.
 
@@ -227,17 +255,17 @@ One complete high-quality vertical slice is preferred to many incomplete symbols
 
 ## 11. Current priority
 
-The active design-only slice is the independent canonical semantic design for `arrow.pincer` on:
+The active implementation slice is the independent five-control `arrow.pincer` vertical slice on:
 
 ```text
-branch: agent/pincer-arrow-semantic-design
-PR: #20 Design canonical pincer arrow semantics
-workspace: 0.0.12
-Node baseline: 107
-Chromium baseline: 15
+branch: agent/pincer-arrow-implementation
+PR: #21 Implement five-control pincer arrow
+workspace: 0.0.13
+Node baseline: 122
+Chromium baseline: 16
 ```
 
-The proposed version-1.0 contract is:
+The implemented version-1.0 contract is:
 
 1. exactly five authored controls: outer tail A, outer tail B, objective A, objective B and shared inner junction;
 2. arm A pairs tail A with objective A, and arm B pairs tail B with objective B;
@@ -246,7 +274,7 @@ The proposed version-1.0 contract is:
 5. drawing is fixed at five points and auto-completes only after a renderable fifth click;
 6. the inner junction is an exact semantic control on the final inner boundary and survives PlotJSON round trip;
 7. the final result is one coherent closed simple Polygon with no holes and no independently persisted component arrows;
-8. `arrow.pincer` cannot alias `arrow.double`, call the double public generator or reuse `DoubleArrowFrame` as its semantic frame;
+8. `PincerArrowFrame` is independent and does not call the double generator or use `DoubleArrowFrame` as its semantic frame;
 9. four-control double-arrow data cannot be silently relabeled or upgraded to pincer data;
 10. invalid draft, completion, edit and import geometry remains fail-closed and outside Store/History.
 
@@ -254,7 +282,9 @@ Authoritative records:
 
 ```text
 docs/design/arrow-pincer-semantic-design.md
-docs/handover/2026-07-29-milestone-006a-pincer-semantic-design.md
+docs/algorithms/arrow-pincer.md
+docs/handover/2026-07-29-milestone-006a-pincer-semantic-design-finalization.md
+docs/handover/2026-07-29-milestone-006b-pincer-arrow-implementation.md
 ```
 
-Do not implement `arrow.pincer` until PR #20's semantic design is reviewed and merged. After approval, implementation must begin on a separate branch with `docs/algorithms/arrow-pincer.md` before runtime code. Do not implement pincer, route, corridor, squad-combat or other complex arrows in parallel or as aliases/default variants of `arrow.double`.
+After PR #21 is green and merged, do not immediately add another complex symbol. First perform pincer quality hardening: visual review across symmetric/asymmetric fixtures, junction admissibility calibration, antimeridian/high-latitude cases, documentation/API review and any user-reported drawing issues. A future symbol begins with an independent semantic design PR and must not be implemented as an alias/default variant of an existing arrow.
