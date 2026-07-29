@@ -22,16 +22,16 @@ arrow.double
 arrow.pincer
 ```
 
-The Playground supports two-point, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; semantic-guide fallback; maximum-point or explicit completion; semantic control-point editing; undo/redo; style editing; nine Nanjing samples; and PlotJSON import/export.
+The Playground supports two-point, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; semantic-guide fallback; maximum-point or explicit completion; structured completion-rejection feedback; semantic control-point editing; undo/redo; style editing; nine Nanjing samples; and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.14
+workspace version: 0.0.15
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
-Node tests:        124
-Chromium tests:    17
+Node tests:        127
+Chromium tests:    18
 ```
 
 Implemented foundations:
@@ -42,6 +42,8 @@ Implemented foundations:
 - optional Definition-driven transient draft controls;
 - optional Definition-level canonical control-role ordering that may only permute authored coordinates;
 - full renderability preflight before interactive completion, create, replace or import mutates Store;
+- `ValidationResult`-backed completion rejection details with backward-compatible boolean validators;
+- public `MapLibrePlotInteraction.drawRejection` state that clears on movement, completion or cancellation;
 - last-valid-draft retention and transient semantic guides for temporarily invalid candidates;
 - MapLibre committed, draft and semantic-handle Sources/Layers;
 - click, pointer preview, double-click, Enter, Escape and point-removal interaction;
@@ -64,6 +66,8 @@ Implemented foundations:
 ```
 
 Users may click the two objectives in either left/right order. When the clicked order would cross the two authored arms but swapping the two objective controls produces a valid pincer, the public Definition stores that valid permutation as the explicit A/B pairing. No coordinate is inserted, removed, moved or mirrored. The pure geometry API remains strict and positional, and invalid junction or topology cases remain fail-closed.
+
+When a fifth point is rejected, the session remains active and exposes stable validation issues. The Playground translates those issue codes into actionable guidance, such as moving a junction back into the admissible longitudinal zone or toward the space between the two arms. Moving the pointer clears the stale reason and allows an immediate retry; rejected candidates never enter Store, History or PlotJSON.
 
 `arrow.pincer` is not an alias or renamed implementation of `arrow.double`.
 
@@ -88,6 +92,6 @@ PlotLibre preserves this model so geometry can be regenerated after editing, pro
 | `@plotlibre/core` | Domain types, Registry, Store, commands, history and PlotJSON |
 | `@plotlibre/geometry` | Pure planar and geodesic geometry |
 | `@plotlibre/symbols` | Built-in parametric definitions |
-| `@plotlibre/interaction` | Engine-independent draw sessions |
-| `@plotlibre/maplibre` | MapLibre rendering and event adapter |
+| `@plotlibre/interaction` | Engine-independent draw sessions and completion rejection state |
+| `@plotlibre/maplibre` | MapLibre rendering, event adapter and draw-rejection exposure |
 | `@plotlibre/playground` | Browser demo, E2E and GitHub Pages site |
