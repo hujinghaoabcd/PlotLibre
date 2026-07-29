@@ -6,7 +6,7 @@
 PR：`#25 Add actionable pincer completion feedback`  
 Workspace：`0.0.15`  
 Pincer Definition：`1.1.0`  
-状态：实现已进入 Draft PR；核心 CI 已通过，等待最终 Chromium、文档 CI、Ready 和合并
+状态：实现与开发契约完成；127 Node / 18 Chromium 全绿；无 review threads；等待 Ready、合并和 Pages 核对
 
 ## Current state
 
@@ -49,36 +49,38 @@ PR #25
 - Playground 将 issue code 翻译为具体中文调整建议；
 - pointer move、退点、取消和成功完成会清除旧拒绝；
 - workspace/demo 升至 `0.0.15`；
-- 新增 Node structured rejection/retry 测试；
-- 新增 pincer out-of-zone code 测试；
-- 新增 Chromium 无效第五点提示与恢复测试；
-- 预期基线：127 Node / 18 Chromium；
-- 初始 Node 20.19/22、typecheck、tests、build、handover check 已通过。
+- 新增 structured rejection、legacy boolean fallback 与 retry recovery Node 测试；
+- 新增 pincer duplicate-control 与 out-of-zone code 测试；
+- 新增 Chromium 无效第五点 → 具体原因 → 移动清除 → 有效重试场景；
+- 更新 README、interaction model 和 development contract；
+- 新基线为 127 Node / 18 Chromium；
+- PR #25 当前无 unresolved review threads。
 
 ## Validation
 
 ```text
-Initial CI run: 30470057074
+Initial implementation CI: 30470057074
+Final docs-inclusive CI: 30470638589
 Node 20.19: success
 Node 22: success
+Node tests: 127 passed / 0 failed
+Chromium tests: 18 passed / 0 failed
 Typecheck/tests/build: success
 Handover contract: success
-Chromium: pending at latest-handover update time
+Unresolved review threads: 0
 ```
 
 ## Next tasks
 
-1. 完成 Chromium 回归；
-2. 更新 interaction model 与 development contract；
-3. 完成 docs-inclusive CI；
-4. 检查 review threads；
-5. Ready 并 squash merge PR #25；
-6. 验证 merge SHA 与 `main` identical；
-7. 创建 006D finalization handover；
-8. 核对 Pages `v0.0.15 demo` 与中文第五点错误提示；
-9. 下一阶段增加 asymmetric/off-center/junction-boundary fixtures；
-10. 随后增加 antimeridian/high-latitude cases；
-11. 暂不开发下一个复杂符号。
+1. 将 PR #25 标记 Ready；
+2. squash merge 到 `main`；
+3. 验证 merge SHA 与 `main` identical；
+4. 创建 006D finalization handover；
+5. 核对 Pages `v0.0.15 demo` 与中文第五点错误提示；
+6. 下一阶段增加 asymmetric/off-center/junction-boundary fixtures；
+7. 随后增加 antimeridian/high-latitude cases；
+8. 补 interaction diagnostics API 迁移说明；
+9. 暂不开发下一个复杂符号。
 
 ## Risks and decisions
 
@@ -92,4 +94,4 @@ Chromium: pending at latest-handover update time
 - Definition 仍为 `1.1.0`，workspace 为 `0.0.15`；
 - packages 仍为 `UNLICENSED`。
 
-Continuation：继续 PR #25。先看 Chromium 日志；若失败，区分实现错误、测试点位与事件刷新顺序。修复后更新最终 CI、merge SHA、main compare 与 Pages 状态，并新增 immutable finalization handover。
+Continuation：PR #25 已通过完整 CI。下一步直接 Ready、检查 head 未移动后 squash merge，验证 main compare，然后创建单独 immutable finalization handover。线上应显示 `v0.0.15 demo`；选择钳形箭头并点击无效第五点时应显示具体中文原因，移动鼠标后原因应清除。
