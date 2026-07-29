@@ -81,9 +81,11 @@ export const doubleArrowDefinition: PlotDefinition = {
  *
  * The first objective is reflected across the forward axis that passes through
  * the tail midpoint and is perpendicular to the tail baseline. Projection and
- * reflection are performed in local metres. The returned fourth point is only
- * a draft convenience; both objectives remain explicit authored controls in
- * canonical PlotJSON and Store state.
+ * reflection are performed in local metres. When the authored objective is on
+ * or very near that axis, the preview receives a deterministic minimum lateral
+ * spread so the third click still produces a renderable compound-arrow draft.
+ * The returned fourth point is only a draft convenience; both objectives remain
+ * explicit authored controls in canonical PlotJSON and Store state.
  */
 export function deriveDoubleArrowDraftControlPoints(
   controlPoints: readonly Position[],
@@ -132,21 +134,31 @@ export function deriveDoubleArrowDraftControlPoints(
     if (
       !Number.isFinite(forwardDistance) ||
       !Number.isFinite(lateralDistance) ||
-      forwardDistance <= Math.max(1, baselineLength * 0.5) ||
-      Math.abs(lateralDistance) <= Math.max(0.25, baselineLength * 0.05)
+      forwardDistance <= Math.max(1, baselineLength * 0.5)
     ) {
       return undefined;
     }
+
+    const minimumPreviewLateralDistance = Math.max(
+      1,
+      baselineLength * 1.25,
+      Math.min(forwardDistance * 0.35, baselineLength * 3),
+    );
+    const previewLateralSign =
+      Math.abs(lateralDistance) > 1e-9 ? Math.sign(lateralDistance) : 1;
+    const previewLateralDistance =
+      previewLateralSign *
+      Math.max(Math.abs(lateralDistance), minimumPreviewLateralDistance);
 
     const mirroredObjective = projection.unproject({
       x:
         tailCenter.x +
         forwardUnit.x * forwardDistance -
-        lateralUnit.x * lateralDistance,
+        lateralUnit.x * previewLateralDistance,
       y:
         tailCenter.y +
         forwardUnit.y * forwardDistance -
-        lateralUnit.y * lateralDistance,
+        lateralUnit.y * previewLateralDistance,
     });
 
     return [
