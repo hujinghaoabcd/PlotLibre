@@ -139,6 +139,10 @@ export interface GenerateContext {
   readonly feature: PlotFeature;
 }
 
+export interface CanonicalizeControlPointsContext {
+  readonly feature: PlotFeature;
+}
+
 export interface ValidationIssue {
   readonly code: string;
   readonly message: string;
@@ -158,6 +162,14 @@ export interface PlotDefinition {
   readonly controlSchema: ControlSchema;
   readonly defaultParameters: Readonly<Record<string, JsonValue>>;
   readonly defaultStyle: PlotStyle;
+  /**
+   * Optionally reorders an existing authored control set into the Definition's
+   * canonical positional roles. The result must be a deterministic permutation
+   * of the input coordinates: controls may not be added, removed or moved.
+   */
+  canonicalizeControlPoints?(
+    context: CanonicalizeControlPointsContext,
+  ): readonly Position[];
   /**
    * Optionally derives a complete transient control set from the currently
    * authored controls. The result is used only for draft rendering and must
