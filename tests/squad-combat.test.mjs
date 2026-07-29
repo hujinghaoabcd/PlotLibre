@@ -25,8 +25,8 @@ import {
 
 const controls = [
   [118.75, 32.03],
-  [118.79, 32.07],
-  [118.84, 32.1],
+  [118.775, 32.065],
+  [118.82, 32.105],
 ];
 
 test("squad combat derives symmetric tail edges from the semantic path", () => {
@@ -77,17 +77,17 @@ test("squad combat responds to path shape and derived-width ratio", () => {
   ]);
   const curved = buildSquadCombatRing([
     [0, 0],
-    [0.004, 0.005],
+    [0.0015, 0.005],
     [0, 0.01],
   ]);
   assert.notDeepEqual(straight, curved);
 
-  const projection = createLocalProjection([0, 0]);
+  const projection = createLocalProjection(controls[0]);
   const narrow = buildSquadCombatRing(controls, {
-    tailWidthPathRatio: 0.06,
+    tailWidthPathRatio: 0.02,
   }).map((point) => projection.project(point));
   const wide = buildSquadCombatRing(controls, {
-    tailWidthPathRatio: 0.14,
+    tailWidthPathRatio: 0.05,
   }).map((point) => projection.project(point));
   assert.ok(Math.abs(signedRingArea(wide)) > Math.abs(signedRingArea(narrow)));
 });
