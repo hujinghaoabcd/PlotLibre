@@ -2,6 +2,7 @@ import type {
   GeoJsonFeature,
   GeoJsonFeatureCollection,
   PlotFeature,
+  PlotFeatureInput,
   PlotGeometry,
   PlotRegistry,
   PlotRenderProperties,
@@ -111,6 +112,74 @@ export class MapLibrePlotRenderer {
           PlotGeometry,
           PlotRenderProperties
         >);
+    this.#getSource(this.#sourceIds.draft).setData(collection);
+    return collection;
+  }
+
+  /**
+   * Shows authored/temporary semantic controls when a complete symbol polygon
+   * cannot yet be generated. The guide is transient derived output in the draft
+   * source only; it is never persisted as PlotJSON or Store state.
+   */
+  public renderDraftGuide(
+    input: PlotFeatureInput,
+  ): GeoJsonFeatureCollection<PlotGeometry, PlotRenderProperties> {
+    this.initialize();
+    const style = input.style ?? {};
+    const baseProperties = {
+      plotId: input.id,
+      plotType: input.plotType,
+      lineColor: style.lineColor ?? "#8e0000",
+      lineOpacity: style.lineOpacity ?? 1,
+      lineWidth: Math.max(style.lineWidth ?? 2, 2),
+      pointColor: style.pointColor ?? style.lineColor ?? "#1976d2",
+      pointRadius: Math.max(style.pointRadius ?? 5, 5),
+      draftKind: "semantic-guide",
+    } as const;
+    const features: GeoJsonFeature<PlotGeometry, PlotRenderProperties>[] = [];
+
+    if (input.controlPoints.length >= 2) {
+      const id = `${input.id}:draft-guide-line`;
+      features.push({
+        type: "Feature",
+        id,
+        geometry: {
+          type: "LineString",
+          coordinates: input.controlPoints.map(clonePosition),
+        },
+        properties: {
+          ...baseProperties,
+          role: "line",
+          plotRenderId: id,
+        },
+      });
+    }
+
+    for (const [index, position] of input.controlPoints.entries()) {
+      const id = `${input.id}:draft-guide-point:${index}`;
+      features.push({
+        type: "Feature",
+        id,
+        geometry: {
+          type: "Point",
+          coordinates: clonePosition(position),
+        },
+        properties: {
+          ...baseProperties,
+          role: "point",
+          plotRenderId: id,
+          handleIndex: index,
+        },
+      });
+    }
+
+    const collection: GeoJsonFeatureCollection<
+      PlotGeometry,
+      PlotRenderProperties
+    > = {
+      type: "FeatureCollection",
+      features,
+    };
     this.#getSource(this.#sourceIds.draft).setData(collection);
     return collection;
   }
@@ -331,4 +400,8 @@ function createHandleFeature(
       plotRenderId: `${feature.id}:handle:${index}`,
     },
   };
+}
+
+function clonePosition([longitude, latitude]: Position): Position {
+  return [longitude, latitude];
 }
