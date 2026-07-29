@@ -71,7 +71,7 @@ Never copy proprietary Mapbox code. Current packages remain `UNLICENSED` until t
 - Breaking changes require migration notes and a PlotJSON migration plan.
 - Definition defaults are part of the visual/data contract.
 - Every authored semantic control must survive PlotJSON round trip.
-- Derived centerline, offset, notch, branch, bridge, shoulder and polygon vertices must not be serialized as controls.
+- Derived centerline, offset, notch, branch, bridge, shoulder, tail edge and polygon vertices must not be serialized as controls.
 - Definition-derived draft controls and semantic guides are transient and never enter Store, History, handles or PlotJSON.
 - A Definition may provide `canonicalizeControlPoints` to reorder authored coordinates into stable positional roles.
 - Canonicalization must be deterministic and may only permute the exact input coordinates.
@@ -92,6 +92,7 @@ arrow.attack
 arrow.attack.tailed
 arrow.double
 arrow.pincer
+arrow.squad-combat
 ```
 
 `arrow.double` version 1.0 stores four authored controls. Its mirrored draft objective and derived branch/body vertices are not canonical PlotJSON.
@@ -106,12 +107,23 @@ arrow.pincer
 4 shared inner junction
 ```
 
-The two objective clicks may arrive in either left/right order. The Definition first tests the direct positional pairing; when it is invalid but swapping controls 2 and 3 is renderable, it persists the swapped permutation as the explicit A/B pairing. The pure geometry API remains strict and positional. Four-control double-arrow data cannot be relabeled as pincer data.
+The two objective clicks may arrive in either left/right order. The Definition first tests the direct positional pairing; when it is invalid but swapping controls 2 and 3 is renderable, it persists the swapped permutation as the explicit A/B pairing. The pure geometry API remains strict and positional.
+
+`arrow.squad-combat` Definition version 1.0 stores a center action path:
+
+```text
+0      tail centre
+1..n-2 optional path controls
+n-1    exact objective/tip
+```
+
+Its two tail edges and tail width are derived in local metres. Derived tails never enter Store, handles, History or PlotJSON. `arrow.squad-combat` is distinct from `arrow.attack`, whose two tail edges are authored controls.
 
 ## 6. Interaction and rejection rules
 
 - Exact two-point Definitions use `TwoPointDrawSession`.
-- Definitions requiring three or more points use `MultiPointDrawSession`.
+- Fixed or variable schemas that are not exact-two use `MultiPointDrawSession`.
+- A variable schema may use `minPoints = 2` only when `maxPoints > 2` is explicit.
 - Session choice comes from `controlSchema`, never hard-coded symbol IDs.
 - Fixed-count symbols use maximum-point completion; variable-count symbols use explicit completion.
 - Pointer drafts may use committed controls plus the live pointer candidate.
@@ -122,9 +134,8 @@ The two objective clicks may arrive in either left/right order. The Definition f
 - Rejection is non-terminal and must never enter Store, History or PlotJSON.
 - Rejected completion remains active so the final candidate can be replaced.
 - Rejected fixed-count candidates must not trap the session at maximum points.
-- A rejected fixed-count candidate may remain visible together with its structured rejection reason.
 - Pointer movement, Backspace/Delete, cancellation, a new session and successful completion clear stale rejection state.
-- `MapLibrePlotInteraction.drawRejection` exposes only the most recent completion rejection; it is not continuous validation for every pointer draft.
+- `MapLibrePlotInteraction.drawRejection` exposes only the most recent completion rejection.
 - Registry issues are the source of truth; Playground must translate stable issue codes rather than duplicate geometry logic.
 - Backspace/Delete removes one uncommitted multi-point control.
 - Drawing-state point removal is not Store history.
@@ -134,9 +145,8 @@ The two objective clicks may arrive in either left/right order. The Definition f
 - Invalid handle previews never enter Store or History.
 - Double-arrow must show a complete draft or guide immediately after the third click.
 - Pincer uses four committed controls plus the fifth pointer candidate for its first full draft.
-- Pincer must complete on a renderable fifth click for both objective click orders.
-- Invalid pincer junction/topology candidates remain active and visible; canonicalization must not make genuinely invalid geometry valid by moving controls.
-- Stable pincer rejection codes must remain covered by tests and actionable Playground guidance.
+- Squad combat must show a full draft after one committed tail centre plus the live objective candidate.
+- Squad combat completes with double-click or Enter and preserves only authored centre-path controls.
 
 ## 7. Testing requirements
 
@@ -160,56 +170,51 @@ For MapLibre symbols, tests must verify committed/draft Source data, correct `pl
 
 New geometry additionally requires:
 
-- exact control-count and exact semantic controls;
+- exact semantic controls;
 - interior-control influence where applicable;
-- declared pair/order invariance;
 - duplicate-control policy;
 - finite/closed/winding/simple topology;
 - parameter isolation;
-- deterministic golden fixture;
 - PlotJSON round trip;
-- completion mode and rejected-completion recovery;
-- handle edit, history and undo;
+- completion mode;
+- handle edit/history/undo where the slice changes editing behavior;
 - invalid geometry rejection before Store mutation.
 
 Canonicalization tests additionally require:
 
-- output is an exact permutation of the input controls;
+- output is an exact permutation of input controls;
 - idempotence;
 - no invented or moved coordinates;
 - raw and canonical generation behavior;
 - Store and PlotJSON persist canonical roles;
-- browser coverage for the user-reported click order.
+- browser coverage for reported click order.
 
 Structured rejection tests additionally require:
 
 - detailed `ValidationResult` issues survive into the session snapshot;
 - legacy boolean rejection receives a stable generic fallback issue;
 - rejected candidates remain outside Store, History and PlotJSON;
-- the candidate remains visible and replaceable;
 - pointer movement clears stale rejection;
-- a valid retry completes normally;
-- browser status text provides an actionable explanation derived from the stable issue code.
+- a valid retry completes normally.
 
-Pincer tests additionally prove:
+Squad-combat tests additionally prove:
 
-- exact five controls and exact junction;
-- junction occurs once in the open normalized ring;
-- whole-arm exchange invariance;
-- strict pure geometry remains pairing-sensitive;
-- public Definition accepts either objective click order by permutation only;
-- moving the junction changes both arms while preserving objectives;
-- one coherent no-hole simple Polygon;
-- four-control relabel rejection;
-- stable validation issue codes for representative invalid fifth points;
-- `PincerArrowFrame` remains independent of `DoubleArrowFrame`.
+- a two-control straight case is valid;
+- intermediate path controls affect derived geometry;
+- temporary tail edges are symmetric around the authored tail centre;
+- tail width responds to `tailWidthPathRatio`;
+- the exact objective/tip survives;
+- derived tail edges do not survive PlotJSON;
+- variable two-minimum multipoint drawing is schema-driven rather than symbol-hard-coded;
+- one coherent no-hole simple Polygon is produced;
+- actual browser draft and committed rendering are visible.
 
 Current minimum regression baseline:
 
 ```text
-127 Node tests
-18 Chromium tests
-9 public Arrow types
+135 Node tests
+19 Chromium tests
+10 public Arrow types
 ```
 
 ## 8. Playground and Pages
@@ -221,9 +226,8 @@ Current minimum regression baseline:
 - MapLibre 6 Worker and Shared modules must remain aligned.
 - Every public symbol gets selector, sample and browser coverage in the same slice.
 - Fixed-count symbols clearly state automatic maximum-point completion.
-- Pincer instructions state that its two objectives may be clicked in either order.
-- A genuinely invalid pincer fifth point must show a specific adjustment reason while keeping the session active.
-- Moving the pointer after a rejection must remove the stale error instruction.
+- Variable symbols clearly state double-click/Enter completion.
+- Production exposes squad combat by default; its E2E fixture uses `?e2e=1&squad=1` so the legacy nine-symbol suite remains stable while the ten-type matrix verifies the new public symbol.
 - Pages deploys only from `main`.
 
 ## 9. Documentation and handover
@@ -244,36 +248,36 @@ The handover contract requires these exact headings:
 ## Risks and decisions
 ```
 
-Never rewrite earlier immutable handovers. A later merge/deployment finalization gets a new immutable file.
+Never rewrite earlier immutable handovers.
 
 ## 10. Scope control
 
-Prefer one complete high-quality vertical slice to many incomplete symbols. Do not develop multiple complex Arrow types in parallel.
+Prefer one complete vertical slice to many incomplete symbols. Do not develop multiple complex Arrow types in parallel. For routine new symbols, use one implementation PR unless a genuinely unresolved semantic design requires a separate design review.
 
 ## 11. Current priority
 
-Active quality-hardening slice:
+Active new-symbol slice:
 
 ```text
-branch: agent/pincer-rejection-feedback
-PR: #25 Add actionable pincer completion feedback
-workspace: 0.0.15
-pincer Definition: 1.1.0
-Node baseline: 127
-Chromium baseline: 18
+branch: agent/squad-combat-arrow
+PR: #27 Add squad combat arrow
+workspace: 0.0.16
+squad-combat Definition: 1.0.0
+expected Node baseline: 135
+expected Chromium baseline: 19
 ```
 
-The approved behavior is:
+Approved behavior:
 
-1. Registry `ValidationResult` is the authority for completion rejection;
-2. session snapshots preserve structured issues without becoming terminal;
-3. rejected final candidates remain visible and replaceable;
-4. rejected candidates never mutate Store, History or PlotJSON;
-5. MapLibre exposes the latest reason through `drawRejection`;
-6. Playground translates stable pincer issue codes into actionable Chinese instructions;
-7. pointer movement clears stale feedback and a valid retry completes normally;
-8. no geometry, canonical-control or PlotJSON semantics are changed;
-9. topology checks remain strict;
-10. `arrow.pincer` stays Definition 1.1.0 while the workspace advances to 0.0.15.
+1. authored data is a centre action path;
+2. minimum two controls produce a straight form;
+3. optional intermediate controls shape the path;
+4. tail edges and width are derived, transient and symmetric;
+5. existing attack-arrow body/head construction may be reused after the independent derivation layer;
+6. strict simple-ring validation remains;
+7. Store and PlotJSON contain only authored center-path controls;
+8. no symbol-ID branch is added to the generic interaction engine;
+9. Playground exposes a tenth symbol and ten-symbol sample set;
+10. this work stays in one implementation PR.
 
-After PR #25 reaches `main` and Pages, continue pincer robustness work: asymmetric/off-center fixtures, junction-boundary calibration, high-latitude/antimeridian cases and API/migration review. Do not begin another complex symbol until this feedback loop is complete.
+After PR #27, continue directly to the next new symbol from the roadmap rather than returning to pincer hardening. The next planned complex arrow is `arrow.route`.
