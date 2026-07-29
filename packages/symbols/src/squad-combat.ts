@@ -37,7 +37,7 @@ export const squadCombatArrowDefinition: PlotDefinition = {
     miterLimit: 3,
     minimumTailWidthMeters: 1,
     maximumTailWidthMeters: 100000,
-    tailWidthPathRatio: 0.1,
+    tailWidthPathRatio: 0.04,
   },
   defaultStyle: DEFAULT_ARROW_STYLE,
   generate({ feature }) {
