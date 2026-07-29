@@ -143,15 +143,15 @@ test("all public arrow types show a draft and a committed rendering", async ({
     const plotType = "arrow.double" as const;
     const box = await canvasBox(page);
     await begin(page, plotType);
-    const tailA = { x: box.x + box.width * 0.40, y: box.y + box.height * 0.74 };
-    const tailB = { x: box.x + box.width * 0.60, y: box.y + box.height * 0.74 };
+    const tailA = { x: box.x + box.width * 0.42, y: box.y + box.height * 0.74 };
+    const tailB = { x: box.x + box.width * 0.58, y: box.y + box.height * 0.74 };
     const objectiveA = {
-      x: box.x + box.width * 0.32,
-      y: box.y + box.height * 0.31,
+      x: box.x + box.width * 0.30,
+      y: box.y + box.height * 0.32,
     };
     const objectiveB = {
-      x: box.x + box.width * 0.68,
-      y: box.y + box.height * 0.31,
+      x: box.x + box.width * 0.70,
+      y: box.y + box.height * 0.32,
     };
     await page.mouse.click(tailA.x, tailA.y);
     await page.mouse.click(tailB.x, tailB.y);
