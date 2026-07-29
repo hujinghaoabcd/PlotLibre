@@ -8,6 +8,7 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { installDoubleArrowPlayground } from "./double-arrow-playground.js";
+import { installPathSymbolsPlayground } from "./path-symbols-playground.js";
 import { installPincerArrowPlayground } from "./pincer-arrow-playground.js";
 import { PlaygroundApp } from "./playground-app.js";
 import { installSquadCombatPlayground } from "./squad-combat-playground.js";
@@ -27,6 +28,7 @@ root.innerHTML = playgroundTemplate;
 const query = new URLSearchParams(window.location.search);
 const e2e = query.get("e2e") === "1";
 const squadCombatE2e = query.get("squad") === "1";
+const pathSymbolsE2e = query.get("paths") === "1";
 const basemapDisabled = e2e || query.get("basemap") === "none";
 
 const bootstrapStyle = {
@@ -91,6 +93,10 @@ map.once("load", () => {
   installSquadCombatPlayground(app, plot, map, {
     e2e,
     enableInE2e: squadCombatE2e,
+  });
+  installPathSymbolsPlayground(app, plot, map, {
+    e2e,
+    enableInE2e: pathSymbolsE2e,
   });
 
   window.__plotlibrePlayground = { map, plot, app };
