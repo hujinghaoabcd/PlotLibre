@@ -10,10 +10,12 @@ type ArrowType =
   | "arrow.attack.tailed"
   | "arrow.double"
   | "arrow.pincer"
-  | "arrow.squad-combat";
+  | "arrow.squad-combat"
+  | "arrow.route"
+  | "arrow.corridor";
 
 async function openPlayground(page: Page): Promise<void> {
-  await page.goto("/PlotLibre/?e2e=1&squad=1");
+  await page.goto("/PlotLibre/?e2e=1&squad=1&paths=1");
   await expect(page.getByTestId("status-text")).toContainText("准备就绪");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
 }
@@ -123,15 +125,18 @@ test("all public arrow types show a draft and a committed rendering", async ({
     await expectCommittedVisible(page, plotType);
   }
 
-  await page.reload();
-  await openPlayground(page);
-  {
-    const plotType = "arrow.squad-combat" as const;
+  for (const plotType of [
+    "arrow.squad-combat",
+    "arrow.route",
+    "arrow.corridor",
+  ] as const) {
+    await page.reload();
+    await openPlayground(page);
     const box = await canvasBox(page);
     await begin(page, plotType);
-    const tail = { x: box.x + box.width * 0.28, y: box.y + box.height * 0.70 };
+    const start = { x: box.x + box.width * 0.28, y: box.y + box.height * 0.70 };
     const tip = { x: box.x + box.width * 0.72, y: box.y + box.height * 0.30 };
-    await page.mouse.click(tail.x, tail.y);
+    await page.mouse.click(start.x, start.y);
     await page.mouse.move(tip.x, tip.y);
     await expectDraftVisible(page, plotType);
     await page.mouse.dblclick(tip.x, tip.y, { delay: 60 });

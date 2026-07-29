@@ -21,18 +21,20 @@ arrow.attack.tailed
 arrow.double
 arrow.pincer
 arrow.squad-combat
+arrow.route
+arrow.corridor
 ```
 
-The Playground supports exact two-point, variable two-point-path, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; semantic-guide fallback; maximum-point or explicit completion; structured completion-rejection feedback; semantic control-point editing; undo/redo; style editing; ten-symbol samples; and PlotJSON import/export.
+The Playground supports exact two-point, variable two-point-path, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; semantic-guide fallback; maximum-point or explicit completion; structured completion-rejection feedback; semantic control-point editing; undo/redo; style editing; twelve-symbol samples; and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.16
+workspace version: 0.0.17
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
-Node tests:        135
-Chromium tests:    19
+Node tests:        145
+Chromium tests:    20
 ```
 
 Implemented foundations:
@@ -52,8 +54,35 @@ Implemented foundations:
 - fixed-maximum-point auto-completion for four- and five-control symbols;
 - semantic handle edit, history and undo;
 - local-metre projection and strict finite/closed/simple topology validation;
+- shared pure geometry frames for related symbol groups;
 - deterministic geometry fixtures and actual-rendered-feature Chromium tests;
-- browser visibility coverage for all ten public Arrow types.
+- browser visibility coverage for all twelve public Arrow types.
+
+## Route and corridor group
+
+`arrow.route` and `arrow.corridor` share a pure path-ribbon foundation while keeping independent public semantics.
+
+### Route arrow
+
+```text
+0      route origin
+1..n-2 optional path controls
+n-1    exact objective/tip
+```
+
+The shaft is a constant-width derived ribbon. The terminal path segment is trimmed at a derived neck plane and completed by an exact-tip arrow head.
+
+### Corridor arrow
+
+```text
+0      corridor endpoint A
+1..n-2 optional path controls
+n-1    corridor endpoint B
+```
+
+The output is an undirected constant-width ribbon with flat end caps and no arrow head. It is not a route arrow with a hidden or zero-sized head.
+
+Both symbols persist only authored center-path controls. Sampled centerlines, offsets, widths, necks, heads and polygon vertices remain derived geometry.
 
 ## Squad combat arrow
 

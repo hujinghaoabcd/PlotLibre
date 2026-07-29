@@ -1,88 +1,96 @@
-# PlotLibre Development Handover — Milestone 006E Squad Combat Arrow
+# PlotLibre Development Handover — Route and Corridor Group
 
 日期：2026-07-30  
 仓库：`hujinghaoabcd/PlotLibre`  
-分支：`agent/squad-combat-arrow`  
-PR：`#27 Add squad combat arrow`  
-Workspace：`0.0.16`  
-Definition：`arrow.squad-combat@1.0.0`  
-状态：第十个公共箭头已完成；135 Node / 19 Chromium 全绿；等待最终 docs-inclusive CI、Ready 和合并
+分支：`agent/route-corridor-symbol-group`  
+PR：`#28 Add route and corridor symbol group`  
+Workspace：`0.0.17`  
+Definitions：`arrow.route@1.0.0`、`arrow.corridor@1.0.0`  
+状态：十二个公共符号已完成；145 Node / 20 Chromium 及最终 docs-inclusive CI 全绿；等待 review-thread 检查、Ready 和合并
 
 ## Current state
 
 ```text
-arrow.squad-combat
-0      tail centre
-1..n-2 optional action-path controls
-n-1    exact objective/tip
+shared PathRibbonFrame
+├── arrow.route    directed, exact terminal tip
+└── arrow.corridor undirected, flat end caps
 ```
 
-左右尾缘与尾宽由路径在局部米制坐标中派生，不进入 Store、handles、History 或 PlotJSON。两点形成直线形态；增加中间点形成曲线路径；双击或 Enter 完成。
+公共语义：
+
+```text
+controlPoints[0]      = path start / endpoint A
+controlPoints[1..n-2] = optional path controls
+controlPoints[n-1]    = exact route tip / corridor endpoint B
+```
+
+两个符号均支持两点直线形态和多点曲线路径。中心线采样、路径宽度、左右 offset、route neck/head 和最终 Polygon 均为派生数据。
 
 权威记录：
 
 ```text
-docs/algorithms/arrow-squad-combat.md
-docs/handover/2026-07-30-milestone-006e-squad-combat-arrow.md
-PR #27
+docs/design/route-corridor-group.md
+docs/algorithms/arrow-route-corridor.md
+docs/handover/2026-07-30-milestone-006f-006g-route-corridor.md
+PR #28
 ```
 
 ## Completed in this milestone
 
-- 新增 `arrow.squad-combat@1.0.0`；
-- 新增独立 center-path → temporary tail-edge derivation；
-- 复用 AttackArrow body/head construction，不复制完整生成器；
-- derived tails 保持 transient；
-- 新增 schema-driven `2..N` MultiPointDrawSession；
-- 两点直线和多点曲线均可绘制；
-- strict finite/closed/simple topology 保持；
-- Registry、RenderBundle、PlotJSON 和 invalid-before-Store 已覆盖；
-- production Playground 增加第十个 selector；
-- Load Sample 生成十类示例；
-- 十类型 draft/committed 实际渲染矩阵；
-- workspace/demo 升至 `0.0.16`；
-- Node baseline 升至 135；
-- Chromium baseline 升至 19；
-- README、AGENTS、DEVELOPMENT_PLAN、算法记录已更新；
-- pincer hardening 已冻结；
-- 下一符号为 `arrow.route`；
-- 本轮只使用一个实施 PR。
+- 新增共享 `PathRibbonFrame`；
+- 新增 `arrow.route@1.0.0`；
+- 新增 `arrow.corridor@1.0.0`；
+- route 具有派生 neck plane 和 exact-tip head；
+- corridor 具有独立无方向平头闭合；
+- Registry 公共符号增至 12；
+- PlotJSON 仅保存 authored center paths；
+- workspace/demo 升至 `0.0.17`；
+- Node baseline 升至 145；
+- Chromium baseline 升至 20；
+- 十二类型 draft/committed 实际渲染矩阵通过；
+- 生产默认提供十二个 selector；
+- 点击“加载示例”生成完整十二类；
+- 旧页面初始化九示例兼容测试继续通过；
+- 相关符号 2–3 个成组开发规则已写入 AGENTS 和路线图；
+- pincer hardening 继续冻结。
 
 ## Validation
 
 ```text
-Implementation CI run: 30475433907
-Node 20.19: success
-Node 22: success
-Node tests: 135 passed / 0 failed
-Chromium tests: 19 passed / 0 failed
-Typecheck: success
-Package build: success
-Playground typecheck/build: success
-Handover contract: success
-Final docs-inclusive CI: pending
+Implementation CI:        30478662756
+Compatibility-fix CI:     30479120532
+Docs-inclusive CI:        30479502073
+Node 20.19:               success
+Node 22:                  success
+Node tests:               145 passed / 0 failed
+Chromium tests:           20 passed / 0 failed
+Typecheck/build:          success
+Playground build:         success
+Handover contract:        success
 ```
 
 ## Next tasks
 
-1. 完成最终 docs-inclusive CI；
-2. 检查 unresolved review threads；
-3. 更新 PR #27 最终描述；
-4. 标记 Ready；
-5. squash merge 并确认 head SHA；
-6. 验证 merge SHA 与 `main` identical；
-7. 核对 Pages `v0.0.16 demo`；
-8. 下一轮直接开发 `arrow.route`；
-9. 不创建 finalization PR；
+1. 检查 unresolved review threads；
+2. 更新 PR #28 最终说明；
+3. 标记 Ready；
+4. squash merge；
+5. 确认 merge SHA 与 `main` identical；
+6. 核对 Pages `v0.0.17 demo`；
+7. 下一组开发 multi-head path extensions；
+8. 实现前冻结公共标识符和控制点语义；
+9. 每组限制在 2–3 个真实共享基础的符号；
 10. 不返回 pincer 细节加固。
 
 ## Risks and decisions
 
-- 急转路径可能被 simple-ring 校验拒绝，这是严格拓扑策略，不通过删除校验解决；
-- `tailWidthPathRatio=0.04` 是 Definition 1.0.0 的视觉合同；
-- production 总是启用第十符号；E2E 以 `?e2e=1&squad=1` 扩展十类型矩阵；
-- initial automatic sample 保持旧九类，点击 Load Sample 后生成完整十类；
-- 当前工具不能可靠直接读取 Pages 缓存；
+- route/corridor 共享数学内核，但不是参数变体；
+- route 必须保留 exact authored tip；
+- corridor 不得包含隐藏 head；
+- sampled/offset/head vertices 永不持久化；
+- 急转或过宽路径继续 fail closed；
+- 生产公共符号数与默认初始化样例数是两个独立概念；
+- 当前工具不能可靠直接确认 Pages 缓存；
 - packages 仍为 `UNLICENSED`。
 
-Continuation：继续 PR #27。最终 CI 全绿后直接 Ready、检查 review threads、squash merge并 compare main。下一开发切片是 `arrow.route`，仍采用单实施 PR。
+Continuation：检查 PR #28 review threads，标记 Ready、squash merge并 compare main。下一组进入 multi-head path extensions。
