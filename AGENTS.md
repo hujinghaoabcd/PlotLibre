@@ -48,6 +48,7 @@ Rules:
 - For topology-sensitive symbols, `PlotDefinition.validate()` must cover complete renderability before Store mutation.
 - A variant golden test should prove unchanged shared geometry rather than only snapshot the final polygon.
 - A compound symbol must be one coherent semantic geometry, not an array of independently persisted simpler symbols.
+- Shaft/head joins must not retain derived offset points beyond the head neck plane.
 
 ## 4. Clean-room and licensing
 
@@ -85,9 +86,10 @@ arrow.assault-direction
 arrow.curved
 arrow.attack
 arrow.attack.tailed
+arrow.double
 ```
 
-`arrow.double` is designed but is not public until the complete 005H vertical slice passes validation and is merged.
+`arrow.double` version 1.0 stores exactly four controls. A three-point mirrored objective or fifth connection/branch control is not canonical PlotJSON and requires a future explicit adapter or migration.
 
 ## 6. Interaction rules
 
@@ -104,7 +106,8 @@ arrow.attack.tailed
 - One completed handle drag produces one `ReplacePlotCommand`.
 - Invalid handle previews do not enter Store or History.
 - Any geometry that can fail during render must be rejected before command execution.
-- Derived notch/head/body/branch vertices are never semantic handles.
+- Derived notch/head/body/branch/bridge vertices are never semantic handles.
+- `arrow.double` must auto-complete on the fourth click through the generic maximum-point session path.
 
 ## 7. Testing requirements
 
@@ -147,7 +150,16 @@ New geometry requires numerical, degenerate, parameter-isolation and golden-fixt
 
 Variant tests must additionally show that changing the variant-specific parameter does not silently change shared body/head geometry.
 
+Compound-symbol tests must additionally cover shared-body topology, pair-role invariance, distinct objectives and the prohibition on independently persisted component arrows.
+
 MapLibre `querySourceFeatures()` may return duplicate tile copies. Semantic handle counts must be validated by unique `plotId + handleIndex`, not raw Feature count.
+
+Current minimum regression baseline after 005H:
+
+```text
+101 Node tests
+13 Chromium tests
+```
 
 ## 8. Playground and Pages
 
@@ -158,6 +170,7 @@ MapLibre `querySourceFeatures()` may return duplicate tile copies. Semantic hand
 - MapLibre 6 Worker and Shared modules remain aligned with the installed package.
 - Every public symbol gets a selector/catalog entry and browser test in the same slice.
 - Multi-point symbols require visible instructions for their actual completion mode and point removal.
+- Fixed-count symbols must clearly state automatic maximum-point completion.
 - Pages deploys only from `main`.
 
 ## 9. Documentation and handover
@@ -200,40 +213,47 @@ One complete high-quality vertical slice is preferred to many incomplete symbols
 
 ## 11. Current priority
 
-Milestone 005G completed and merged `arrow.attack.tailed` with shared `AttackArrowFrame`, independent swallowtail closing, complete validation, PlotJSON, seven-symbol Playground, 90 Node tests and 12 Chromium scenarios.
+Milestone 005H implements `arrow.double` as one connected compound geometry with:
 
-Milestone 005H semantic design for `arrow.double` is approved in:
+1. exactly four explicit semantic controls;
+2. unordered exact tail pair at indices 0/1;
+3. unordered exact objective pair at indices 2/3;
+4. `minPoints = 4`, `maxPoints = 4`;
+5. fourth-click `completeAtMaximum` completion;
+6. no persisted three-point mirror;
+7. no fifth branch control in PlotJSON 1.0;
+8. branch center derived from `branchPositionRatio`;
+9. pair-swap geometry invariance;
+10. all four controls as handles;
+11. one shared body, two wings, two heads and one inner bridge;
+12. one finite, closed, counterclockwise simple Polygon;
+13. strict full-generation Definition validation;
+14. eighth Playground selector/sample and actual browser render coverage.
+
+Authoritative records:
 
 ```text
 docs/design/arrow-double-semantic-design.md
+docs/algorithms/arrow-double.md
+docs/handover/2026-07-29-milestone-005h-double-arrow-implementation.md
 ```
 
-Binding version-1.0 decisions:
+Current branch/PR:
 
-1. exactly four explicit semantic controls;
-2. controls 0/1 are an unordered pair of exact tail edges;
-3. controls 2/3 are an unordered pair of exact objective tips;
-4. `minPoints = 4` and `maxPoints = 4`;
-5. the fourth click auto-completes through `completeAtMaximum`;
-6. no persisted three-point mirrored objective;
-7. no fifth branch control in PlotJSON 1.0;
-8. branch center is derived from `branchPositionRatio`;
-9. pair swapping must not change generated geometry;
-10. all four controls are handles; branch/head/body vertices are derived;
-11. the result is one closed simple Polygon with a shared body and two heads;
-12. it must not be implemented as two complete arrows or a union of two arrow Polygons;
-13. introduce a pure `DoubleArrowFrame` before the public ring generator;
-14. complete Definition, PlotJSON, eight-symbol Playground, Chromium and handover in the same slice.
+```text
+agent/double-arrow-vertical-slice
+PR #15
+workspace 0.0.12
+101 Node tests
+13 Chromium tests
+```
 
-Next implementation order:
+Immediate order:
 
-1. clean-room algorithm record;
-2. `DoubleArrowFrame`;
-3. coupled wing centerlines and two heads;
-4. shared inner bridge and one ring;
-5. topology and golden tests;
-6. Definition/Registry/PlotJSON;
-7. Playground and Chromium;
-8. public docs and immutable handover.
+1. keep PR #15 latest CI green;
+2. mark Ready and merge;
+3. validate main and Pages eight-symbol deployment;
+4. write a new immutable 005H Finalization handover;
+5. only then begin an independent `arrow.pincer` canonical semantic design.
 
-Do not implement pincer, route, corridor, squad-combat or other complex arrows in parallel.
+Do not implement pincer, route, corridor, squad-combat or other complex arrows in parallel or as aliases of `arrow.double`.
