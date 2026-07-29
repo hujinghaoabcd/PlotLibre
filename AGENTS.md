@@ -75,6 +75,7 @@ Never copy proprietary Mapbox code. Current project packages remain `UNLICENSED`
 - Definition defaults are part of the visual/data contract.
 - Every semantic path control must survive PlotJSON round trip.
 - Derived centerline samples, offset vertices, notch vertices, branch points and polygon vertices must not be serialized as semantic controls.
+- Definition-derived draft controls are transient rendering aids only and must never enter Store, History, handles or PlotJSON.
 
 Current public Arrow identifiers:
 
@@ -89,7 +90,7 @@ arrow.attack.tailed
 arrow.double
 ```
 
-`arrow.double` version 1.0 stores exactly four controls. A three-point mirrored objective or fifth connection/branch control is not canonical PlotJSON and requires a future explicit adapter or migration.
+`arrow.double` version 1.0 stores exactly four authored controls. A three-click mirrored draft objective or fifth connection/branch control is not canonical PlotJSON and requires a future explicit adapter or migration before it could become persisted state.
 
 ## 6. Interaction rules
 
@@ -97,7 +98,9 @@ arrow.double
 - Definitions requiring three or more points use `MultiPointDrawSession`.
 - Session choice is derived from `PlotDefinition.controlSchema`, not hard-coded symbol IDs.
 - Fixed-count multi-point symbols use `completeAtMaximum`; variable-count symbols use explicit completion.
-- Draft output is allowed only after minimum semantic validity is reached.
+- Normal pointer drafts require a candidate satisfying the minimum semantic point count.
+- A Definition may optionally derive a complete transient draft control set from an incomplete authored state.
+- Derived draft controls are for rendering only; completion always uses actual committed points plus an actual pointer candidate when present.
 - Enter and double-click completion must preserve all semantic controls when enabled by the Definition.
 - Backspace/Delete removes one uncommitted multi-point control at a time.
 - Drawing-state point removal is not Store history.
@@ -105,9 +108,10 @@ arrow.double
 - Cancel and destroy must restore the previous zoom-handler state immediately.
 - One completed handle drag produces one `ReplacePlotCommand`.
 - Invalid handle previews do not enter Store or History.
+- Invalid transient draw drafts are cleared without completing, cancelling or mutating the active session.
 - Any geometry that can fail during render must be rejected before command execution.
 - Derived notch/head/body/branch/bridge vertices are never semantic handles.
-- `arrow.double` must auto-complete on the fourth click through the generic maximum-point session path.
+- `arrow.double` must show a transient mirrored draft immediately after the third click, replace it with the live pointer candidate on movement, and auto-complete on the fourth click through the generic maximum-point session path.
 
 ## 7. Testing requirements
 
@@ -146,7 +150,8 @@ New geometry requires numerical, degenerate, parameter-isolation and golden-fixt
 - declared completion mode: fixed maximum, double-click or Enter;
 - camera stability and zoom restoration when double-click is used;
 - semantic handle edit, history depth and undo;
-- invalid geometry rejection before Store mutation.
+- invalid geometry rejection before Store mutation;
+- any Definition-derived draft remains transient and cannot satisfy completion by itself.
 
 Variant tests must additionally show that changing the variant-specific parameter does not silently change shared body/head geometry.
 
@@ -154,11 +159,11 @@ Compound-symbol tests must additionally cover shared-body topology, pair-role in
 
 MapLibre `querySourceFeatures()` may return duplicate tile copies. Semantic handle counts must be validated by unique `plotId + handleIndex`, not raw Feature count.
 
-Current minimum regression baseline after 005H:
+Current minimum regression baseline after the double-arrow third-click preview fix:
 
 ```text
 101 Node tests
-13 Chromium tests
+14 Chromium tests
 ```
 
 ## 8. Playground and Pages
@@ -171,6 +176,7 @@ Current minimum regression baseline after 005H:
 - Every public symbol gets a selector/catalog entry and browser test in the same slice.
 - Multi-point symbols require visible instructions for their actual completion mode and point removal.
 - Fixed-count symbols must clearly state automatic maximum-point completion.
+- The double-arrow browser suite must assert a rendered draft immediately after the third click without requiring a later `mousemove`.
 - Pages deploys only from `main`.
 
 ## 9. Documentation and handover
@@ -213,20 +219,28 @@ One complete high-quality vertical slice is preferred to many incomplete symbols
 
 ## 11. Current priority
 
-Milestone 005H `arrow.double` has been merged to `main` as one connected compound geometry.
-
-Authoritative merge state:
+The active corrective slice is the `arrow.double` third-click preview fix on:
 
 ```text
-PR #15: merged
-merge SHA: 7c155869598d913b9b5b0281e3e7282c5cf61fbc
+branch: agent/double-arrow-third-click-preview
+PR: #17 Fix double-arrow third-click preview
 workspace: 0.0.12
-public Arrow definitions: 8
 Node tests: 101
-Chromium tests: 13
+Chromium tests: 14
 ```
 
-Authoritative records:
+The corrective contract is:
+
+1. the third click immediately renders a complete transient mirrored draft;
+2. reflection is computed in local metres around the forward axis perpendicular to the tail baseline;
+3. pointer movement replaces the mirrored objective with the real fourth-point candidate;
+4. pressing Enter with only three authored controls does not complete;
+5. the fourth click remains the only normal fixed-count completion event;
+6. Store, History, handles and PlotJSON contain only the four authored controls;
+7. invalid transient draft geometry clears the draft without breaking the draw session;
+8. no symbol-ID branch is added to the interaction or MapLibre packages.
+
+Authoritative double-arrow records remain:
 
 ```text
 docs/design/arrow-double-semantic-design.md
@@ -235,17 +249,10 @@ docs/handover/2026-07-29-milestone-005h-double-arrow-implementation.md
 docs/handover/2026-07-29-milestone-005h-double-arrow-finalization.md
 ```
 
-Immediate operational order:
-
-1. confirm the `main` push run for `Deploy Playground to GitHub Pages`;
-2. verify the public Playground shows eight selector options and renders `arrow.double`;
-3. merge the finalization documentation branch;
-4. close Milestone 005H completely.
-
-The next development priority is an independent canonical semantic design for `arrow.pincer`. Before any implementation, the design must freeze:
+After PR #17 is green and merged, the next development priority is an independent canonical semantic design for `arrow.pincer`. Before implementation, that design must freeze:
 
 1. authored control count and role of every control;
-2. whether any control groups are ordered or unordered;
+2. whether control groups are ordered or unordered;
 3. completion mode and minimum/maximum point policy;
 4. exact semantic handles versus derived branch/body/head vertices;
 5. one coherent compound topology rather than persisted component arrows;
