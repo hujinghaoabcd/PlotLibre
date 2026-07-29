@@ -32,16 +32,6 @@ export function installPathSymbolsPlayground(
     app.refresh();
   };
 
-  if (!options.e2e && plot.store.size > 0) {
-    addPathSamples(plot);
-    plot.history.clear();
-    setStatus(
-      "已加载南京十二类箭头示例。路线箭头与走廊箭头共享路径带基础，但保持独立结构。",
-      "ready",
-    );
-    app.refresh();
-  }
-
   const refreshInstruction = (): void => {
     queueMicrotask(() => {
       const plotType = selectedPlotType();
