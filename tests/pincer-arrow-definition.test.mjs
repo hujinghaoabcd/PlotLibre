@@ -48,7 +48,7 @@ test("pincer arrow is registered with the fixed-five semantic contract", () => {
   assert.equal(bundle.hitAreas[0]?.properties.role, "hit-area");
 });
 
-test("pincer definition reports a stable geometry issue before mutation", () => {
+test("pincer definition reports a stable duplicate-control issue before mutation", () => {
   const invalid = createPlotFeature({
     id: "pincer-invalid",
     plotType: PINCER_ARROW_TYPE,
@@ -64,7 +64,29 @@ test("pincer definition reports a stable geometry issue before mutation", () => 
   });
   const validation = pincerArrowDefinition.validate({ feature: invalid });
   assert.equal(validation.valid, false);
-  assert.equal(validation.issues[0]?.code, "INVALID_PINCER_ARROW_GEOMETRY");
+  assert.equal(
+    validation.issues[0]?.code,
+    "PINCER_CONTROL_POINTS_NOT_DISTINCT",
+  );
+});
+
+test("pincer definition distinguishes an out-of-zone fifth point", () => {
+  const invalid = createPlotFeature({
+    id: "pincer-invalid-junction",
+    plotType: PINCER_ARROW_TYPE,
+    definitionVersion: pincerArrowDefinition.version,
+    controlPoints: [
+      controls[0],
+      controls[1],
+      controls[2],
+      controls[3],
+      [0, 0.02],
+    ],
+    parameters: pincerArrowDefinition.defaultParameters,
+  });
+  const validation = pincerArrowDefinition.validate({ feature: invalid });
+  assert.equal(validation.valid, false);
+  assert.equal(validation.issues[0]?.code, "PINCER_JUNCTION_OUTSIDE_ZONE");
 });
 
 test("PlotJSON round-trips exactly five authored controls including the junction", () => {

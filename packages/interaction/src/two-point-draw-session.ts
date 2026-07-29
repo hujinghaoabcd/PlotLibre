@@ -1,6 +1,8 @@
 import type { PlotFeatureInput, Position } from "@plotlibre/core";
+import { evaluateCompletion } from "./completion-validation.js";
 import type {
   DrawSession,
+  DrawSessionRejection,
   DrawSessionSnapshot,
   DrawSessionStatus,
   TwoPointDrawSessionOptions,
@@ -12,6 +14,7 @@ export class TwoPointDrawSession implements DrawSession {
   #start: Position | undefined;
   #cursor: Position | undefined;
   #completed: PlotFeatureInput | undefined;
+  #rejection: DrawSessionRejection | undefined;
 
   public constructor(options: TwoPointDrawSessionOptions) {
     if (!options.id.trim()) {
@@ -33,7 +36,11 @@ export class TwoPointDrawSession implements DrawSession {
     }
 
     const draft = this.#createDraft();
-    return draft ? { status: this.#status, draft } : { status: this.#status };
+    return {
+      status: this.#status,
+      ...(draft ? { draft } : {}),
+      ...(this.#rejection ? { rejection: this.#rejection } : {}),
+    };
   }
 
   public click(position: Position): DrawSessionSnapshot {
@@ -45,6 +52,7 @@ export class TwoPointDrawSession implements DrawSession {
     if (!this.#start) {
       this.#start = point;
       this.#cursor = undefined;
+      this.#rejection = undefined;
       this.#status = "drawing";
       return this.snapshot();
     }
@@ -54,6 +62,7 @@ export class TwoPointDrawSession implements DrawSession {
     }
 
     this.#cursor = point;
+    this.#rejection = undefined;
     return this.#tryComplete([this.#start, point]);
   }
 
@@ -67,6 +76,7 @@ export class TwoPointDrawSession implements DrawSession {
     }
 
     const point = clonePosition(position);
+    this.#rejection = undefined;
     this.#cursor = samePosition(this.#start, point) ? undefined : point;
     return this.snapshot();
   }
@@ -83,11 +93,13 @@ export class TwoPointDrawSession implements DrawSession {
     if (key === "Backspace" || key === "Delete") {
       this.#start = undefined;
       this.#cursor = undefined;
+      this.#rejection = undefined;
       this.#status = "ready";
       return this.snapshot();
     }
 
     if (key === "Enter" && this.#start && this.#cursor) {
+      this.#rejection = undefined;
       return this.#tryComplete([this.#start, this.#cursor]);
     }
 
@@ -99,6 +111,7 @@ export class TwoPointDrawSession implements DrawSession {
       this.#status = "cancelled";
       this.#start = undefined;
       this.#cursor = undefined;
+      this.#rejection = undefined;
     }
     return this.snapshot();
   }
@@ -112,24 +125,20 @@ export class TwoPointDrawSession implements DrawSession {
 
   #tryComplete(controlPoints: readonly Position[]): DrawSessionSnapshot {
     const candidate = this.#createFeature(controlPoints);
-    if (!this.#canComplete(candidate)) {
+    const evaluation = evaluateCompletion(
+      this.#options.validateCompletion,
+      candidate,
+    );
+    if (!evaluation.valid) {
+      this.#rejection = evaluation.rejection;
       this.#status = "drawing";
       return this.snapshot();
     }
 
     this.#completed = candidate;
+    this.#rejection = undefined;
     this.#status = "completed";
     return this.snapshot();
-  }
-
-  #canComplete(candidate: PlotFeatureInput): boolean {
-    const validate = this.#options.validateCompletion;
-    if (!validate) return true;
-    try {
-      return validate(candidate);
-    } catch {
-      return false;
-    }
   }
 
   #createFeature(controlPoints: readonly Position[]): PlotFeatureInput {

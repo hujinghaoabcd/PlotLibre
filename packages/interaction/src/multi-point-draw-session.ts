@@ -1,6 +1,8 @@
 import type { PlotFeatureInput, Position } from "@plotlibre/core";
+import { evaluateCompletion } from "./completion-validation.js";
 import type {
   DrawSession,
+  DrawSessionRejection,
   DrawSessionSnapshot,
   DrawSessionStatus,
   MultiPointDrawSessionOptions,
@@ -24,6 +26,7 @@ export class MultiPointDrawSession implements DrawSession {
   #points: Position[] = [];
   #cursor: Position | undefined;
   #completed: PlotFeatureInput | undefined;
+  #rejection: DrawSessionRejection | undefined;
 
   public constructor(options: MultiPointDrawSessionOptions) {
     validateFeatureOptions(options);
@@ -58,7 +61,11 @@ export class MultiPointDrawSession implements DrawSession {
     }
 
     const draft = this.#createDraft();
-    return draft ? { status: this.#status, draft } : { status: this.#status };
+    return {
+      status: this.#status,
+      ...(draft ? { draft } : {}),
+      ...(this.#rejection ? { rejection: this.#rejection } : {}),
+    };
   }
 
   public click(position: Position): DrawSessionSnapshot {
@@ -72,6 +79,7 @@ export class MultiPointDrawSession implements DrawSession {
       return this.snapshot();
     }
 
+    this.#rejection = undefined;
     const candidate = [...this.#points, point];
     if (
       this.#completeAtMaximum &&
@@ -109,6 +117,7 @@ export class MultiPointDrawSession implements DrawSession {
           : [...this.#points, point];
 
     this.#cursor = undefined;
+    this.#rejection = undefined;
     if (candidate.length >= this.#minimumPoints) {
       const completed = this.#tryComplete(candidate);
       if (completed) return completed;
@@ -119,7 +128,9 @@ export class MultiPointDrawSession implements DrawSession {
       candidate.length >= this.#maximumPoints &&
       !(last && samePosition(last, point))
     ) {
-      this.#points = candidate.slice(0, this.#maximumPoints - 1).map(clonePosition);
+      this.#points = candidate
+        .slice(0, this.#maximumPoints - 1)
+        .map(clonePosition);
       this.#cursor = point;
     } else {
       this.#points = candidate.map(clonePosition);
@@ -135,6 +146,7 @@ export class MultiPointDrawSession implements DrawSession {
 
     const point = clonePosition(position);
     const last = this.#points.at(-1);
+    this.#rejection = undefined;
     this.#cursor =
       !last || samePosition(last, point) || this.#isAtMaximum()
         ? undefined
@@ -154,12 +166,14 @@ export class MultiPointDrawSession implements DrawSession {
     if (key === "Backspace" || key === "Delete") {
       this.#points = this.#points.slice(0, -1);
       this.#cursor = undefined;
+      this.#rejection = undefined;
       this.#status = this.#points.length === 0 ? "ready" : "drawing";
       return this.snapshot();
     }
 
     if (key === "Enter") {
       const candidate = this.#candidatePoints();
+      this.#rejection = undefined;
       if (candidate.length >= this.#minimumPoints) {
         const completed = this.#tryComplete(candidate);
         if (completed) return completed;
@@ -174,6 +188,7 @@ export class MultiPointDrawSession implements DrawSession {
       this.#status = "cancelled";
       this.#points = [];
       this.#cursor = undefined;
+      this.#rejection = undefined;
     }
     return this.snapshot();
   }
@@ -231,25 +246,21 @@ export class MultiPointDrawSession implements DrawSession {
     }
 
     const candidate = this.#createFeature(limited);
-    if (!this.#canComplete(candidate)) {
+    const evaluation = evaluateCompletion(
+      this.#options.validateCompletion,
+      candidate,
+    );
+    if (!evaluation.valid) {
+      this.#rejection = evaluation.rejection;
       return undefined;
     }
 
     this.#completed = candidate;
     this.#points = limited.map(clonePosition);
     this.#cursor = undefined;
+    this.#rejection = undefined;
     this.#status = "completed";
     return this.snapshot();
-  }
-
-  #canComplete(candidate: PlotFeatureInput): boolean {
-    const validate = this.#options.validateCompletion;
-    if (!validate) return true;
-    try {
-      return validate(candidate);
-    } catch {
-      return false;
-    }
   }
 
   #createFeature(controlPoints: readonly Position[]): PlotFeatureInput {

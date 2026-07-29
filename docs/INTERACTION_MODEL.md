@@ -11,7 +11,7 @@ TwoPointDrawSession
 MultiPointDrawSession
 ```
 
-Both return semantic `PlotFeatureInput` snapshots. Neither writes to Store nor renders a layer.
+Both return semantic snapshots. Neither writes to Store nor renders a layer.
 
 ## 2. Package boundary
 
@@ -45,13 +45,44 @@ interface DrawSession {
   keyDown(key: string): DrawSessionSnapshot;
   cancel(): DrawSessionSnapshot;
 }
+
+interface DrawSessionSnapshot {
+  readonly status: DrawSessionStatus;
+  readonly draft?: PlotFeatureInput;
+  readonly completed?: PlotFeatureInput;
+  readonly rejection?: DrawSessionRejection;
+}
 ```
 
-A snapshot may contain a temporary semantic `draft`, a final `completed` feature input, or only status when no complete draft candidate exists.
+A non-terminal snapshot may contain:
 
-Sessions do not know symbol geometry. The adapter materializes candidates with Definition defaults and asks Registry for validity. A Definition may optionally provide `deriveDraftControlPoints()` to build a complete transient draft from an incomplete authored state.
+- a temporary semantic `draft`;
+- a structured `rejection` from the most recent completion attempt;
+- both draft and rejection when a rejected fixed-count final point remains visible;
+- only status when no complete candidate exists.
 
-## 4. Shared guarantees
+A terminal completed snapshot contains the final `completed` feature input. Sessions do not know symbol geometry. The adapter materializes candidates with Definition defaults and asks Registry for validity.
+
+## 4. Completion validation
+
+`validateCompletion` accepts either the legacy boolean result or a full Core `ValidationResult`:
+
+```ts
+type DrawCompletionValidationResult = boolean | ValidationResult;
+```
+
+Rules:
+
+1. `true` completes the candidate;
+2. `false` rejects it with generic issue code `DRAW_COMPLETION_REJECTED`;
+3. a valid `ValidationResult` completes the candidate;
+4. an invalid `ValidationResult` preserves its stable issues in `DrawSessionSnapshot.rejection`;
+5. a thrown validator becomes `DRAW_COMPLETION_VALIDATION_FAILED`;
+6. rejection is non-terminal and never mutates Store, History or PlotJSON.
+
+The MapLibre adapter uses Registry validation as the source of truth, then performs full generation as a final renderability check. Unexpected generation failures become `DRAW_CANDIDATE_GENERATION_FAILED`.
+
+## 5. Shared guarantees
 
 1. `ready` and `drawing` are non-terminal;
 2. `completed` and `cancelled` are terminal;
@@ -63,9 +94,11 @@ Sessions do not know symbol geometry. The adapter materializes candidates with D
 8. completion returns authored semantic controls, not transient draft controls or polygon vertices;
 9. sessions do not create Store history entries;
 10. parameters, style and metadata remain serializable;
-11. Escape cancels a non-completed session.
+11. Escape cancels a non-completed session;
+12. a rejected fixed-count final point remains visible and replaceable;
+13. pointer movement, point removal, cancellation and successful completion clear stale rejection details.
 
-## 5. TwoPointDrawSession
+## 6. TwoPointDrawSession
 
 ```text
 ready
@@ -73,11 +106,12 @@ ready
 
 drawing
   ├─ pointerMove(end) → drawing + draft
-  ├─ click(end)       → completed
-  ├─ doubleClick(end) → completed
-  ├─ Enter            → completed using preview end
+  ├─ click(valid end) → completed
+  ├─ click(invalid end) → drawing + draft + rejection
+  ├─ doubleClick(end) → completion attempt
+  ├─ Enter → completion attempt using preview end
   ├─ Backspace/Delete → ready
-  └─ Escape           → cancelled
+  └─ Escape → cancelled
 ```
 
 Current users:
@@ -89,21 +123,22 @@ arrow.fine.tailed
 arrow.assault-direction
 ```
 
-## 6. MultiPointDrawSession
+## 7. MultiPointDrawSession
 
 ```text
 ready
   └─ click(point 1) → drawing
 
 drawing
-  ├─ click(point n)      → append committed semantic point
-  ├─ pointerMove(cursor) → preview candidate
-  ├─ Definition draft   → optional transient complete draft
-  ├─ Enter               → complete actual valid candidate
-  ├─ doubleClick(point)  → complete actual valid candidate
-  ├─ Backspace/Delete    → remove one committed point
-  ├─ maximum reached     → optional automatic completion
-  └─ Escape              → cancelled
+  ├─ click(point n) → append committed semantic point
+  ├─ pointerMove(cursor) → preview candidate and clear stale rejection
+  ├─ Definition draft → optional transient complete draft
+  ├─ Enter → complete actual valid candidate
+  ├─ doubleClick(point) → complete actual valid candidate
+  ├─ maximum valid → automatic completion
+  ├─ maximum invalid → drawing + visible candidate + rejection
+  ├─ Backspace/Delete → remove one committed point
+  └─ Escape → cancelled
 ```
 
 Normal candidate rule:
@@ -130,6 +165,7 @@ arrow.curved
 arrow.attack
 arrow.attack.tailed
 arrow.double
+arrow.pincer
 ```
 
 Semantic controls:
@@ -148,25 +184,30 @@ n-1     = exact objective/tip
 arrow.double
 0 + 1   = exact unordered tail-edge pair
 2 + 3   = exact unordered objective pair
+
+arrow.pincer
+0 + 1   = outer tails
+2 + 3   = canonical objective pair
+4       = exact shared inner junction
 ```
 
-The tailed attack variant does not add notch roots or notch tip to the session. Those are derived vertices generated from parameters and `AttackArrowFrame`.
+For `arrow.double`, the Definition reflects the first objective across the forward axis through the tail midpoint after the third click. This temporary fourth objective exists only in the draft. Moving the pointer replaces it with the actual fourth-point candidate.
 
-For `arrow.double`, the Definition reflects the first objective across the forward axis through the tail midpoint after the third click. This temporary fourth objective is computed in local metres and exists only in the draft snapshot. Moving the pointer replaces it with the real fourth-point candidate; clicking that candidate completes the symbol with four authored controls.
+For `arrow.pincer`, four committed controls plus the fifth pointer candidate form the first full draft. An invalid fifth click remains in the active session as a replaceable candidate and carries the Registry issue that explains why completion failed.
 
-## 7. Enter, double-click and point removal
+## 8. Enter, double-click and point removal
 
 Enter completes the current actual candidate. It never commits a Definition-derived transient control set.
 
 Double-click uses an immutable candidate copy and de-duplicates the final point because browsers usually emit click events before `dblclick`.
 
-Backspace/Delete removes one uncommitted semantic point at a time. This is local drawing-state undo and does not touch `CommandHistory`.
+Backspace/Delete removes one uncommitted semantic point at a time. This is local drawing-state undo and does not touch `CommandHistory`. Removing a point also clears stale completion rejection state.
 
 For fixed-four `arrow.double`, pressing Enter after only three authored clicks leaves the session in `drawing` state even if a transient mirrored draft is visible.
 
-## 8. Definition-driven session selection
+## 9. Definition-driven session selection
 
-`MapLibrePlotInteraction.startDraw()` reads the Definition control schema.
+`MapLibrePlotInteraction.startDraw()` reads the Definition control schema:
 
 ```text
 minPoints = 2 and maxPoints = 2
@@ -176,13 +217,14 @@ otherwise
 → MultiPointDrawSession
 ```
 
-The adapter also passes the optional Definition draft-control derivation callback into the generic multipoint session. It does not hard-code symbol identifiers.
+The adapter passes optional Definition draft-control derivation into the generic multipoint session. It does not hard-code symbol identifiers.
 
-## 9. MapLibre event adapter
+## 10. MapLibre event adapter
 
 ```text
 click      → DrawSession.click / plot selection
 mousemove  → DrawSession.pointerMove / handle preview
+             and clear stale completion rejection
 dblclick   → DrawSession.doubleClick
 mousedown  → start semantic handle drag
 mouseup    → commit one ReplacePlotCommand
@@ -190,18 +232,20 @@ style.load → restore sources, layers and visual state
 keydown    → session or selection keyboard action
 ```
 
-During active multi-point drawing:
+During active drawing:
 
 - events are converted to WGS84 Positions;
 - double-click default behavior is prevented and propagation stopped;
 - MapLibre double-click zoom is disabled and its previous state remembered;
 - cancel and destroy restore zoom immediately;
 - completion defers restoration until the current native `dblclick` event ends;
-- an invalid transient draft is cleared without cancelling or completing the session.
+- invalid transient geometry preserves the last valid full draft or shows a semantic guide;
+- `MapLibrePlotInteraction.drawRejection` exposes the most recent structured completion rejection;
+- successful completion, cancellation, a new draw session or pointer movement clears `drawRejection`.
 
-This prevents MapLibre's later default handler from observing an already re-enabled state and executing a 2× camera zoom, while also preventing a temporary invalid geometry from breaking continued drawing.
+`drawRejection` describes a completion attempt. It is not a continuous validator for every temporary pointer draft.
 
-## 10. Source separation
+## 11. Source separation
 
 ### `plotlibre-committed`
 
@@ -209,7 +253,7 @@ Persistent plots derived from Store features.
 
 ### `plotlibre-draft`
 
-The active drawing preview or handle-drag preview. It is never exported. It may contain Definition-derived transient controls that are absent from canonical feature state.
+The active drawing preview or handle-drag preview. It is never exported. It may contain Definition-derived transient controls or a rejected fixed-count candidate that is absent from canonical Store state.
 
 ### `plotlibre-handles`
 
@@ -217,13 +261,15 @@ Semantic control points for the selected committed object. Generated curve sampl
 
 `querySourceFeatures()` may return tile duplicates. Handle tests compare unique `plotId + handleIndex` identities.
 
-## 11. Completion transaction
+## 12. Completion transaction
 
 ```text
-session completed using authored candidate
-→ PlotFeatureInput
+completion attempt using authored candidate
 → merge Definition defaults
 → Registry validation
+→ invalid: snapshot rejection + active session, no mutation
+→ valid: full Registry generation
+→ PlotFeatureInput completed
 → CreatePlotCommand
 → PlotStore
 → committed renderer
@@ -233,7 +279,30 @@ session completed using authored candidate
 
 For topology-sensitive Definitions, Registry validation includes complete geometry renderability before Store mutation.
 
-## 12. Handle-drag transaction
+## 13. Pincer rejection feedback
+
+`arrow.pincer` reports stable issue codes for actionable failures, including:
+
+```text
+PINCER_CONTROL_POINTS_NOT_DISTINCT
+PINCER_FORWARD_DIRECTION_UNDEFINED
+PINCER_TAILS_SAME_SIDE
+PINCER_JUNCTION_OUTSIDE_ZONE
+PINCER_JUNCTION_TOO_FAR_LATERALLY
+PINCER_TAIL_SPAN_TOO_SHORT
+PINCER_TAIL_SPAN_TOO_LONG
+PINCER_ARM_TOO_SHORT
+PINCER_OBJECTIVE_NOT_AHEAD
+PINCER_ARM_PAIRING_CROSSES
+PINCER_TAIL_FRAME_INVALID
+PINCER_JUNCTION_TOPOLOGY_INVALID
+PINCER_SELF_INTERSECTION
+PINCER_PARAMETERS_INVALID
+```
+
+The Playground translates these codes into Chinese adjustment guidance. It does not reimplement geometry checks. Unknown codes fall back to the Registry issue message.
+
+## 14. Handle-drag transaction
 
 ```text
 mousedown semantic handle
@@ -254,18 +323,10 @@ Guarantees:
 - invalid previews are ignored and the last valid preview remains active;
 - one valid drag produces one undo step;
 - Escape restores the original feature without a command;
-- every curved, attack-family or double-arrow authored control is editable;
+- every authored control remains editable;
 - moving a control regenerates the full geometry from semantic state.
 
-### Renderability validation and partial-commit prevention
-
-If geometry failure is first discovered by a synchronous Store render listener, Store may already contain the replacement while `CommandHistory.execute()` has not yet pushed the command.
-
-Therefore topology-sensitive Definitions perform generation-equivalent checks before command execution. They return symbol-specific validation issues for non-generatable candidates, preventing Store mutation and History inconsistency.
-
-Transient drawing drafts are materialized and validated before rendering. A failure clears the draft Source but leaves committed drawing points and session status unchanged.
-
-## 13. Selection, cursor and keyboard
+## 15. Selection, cursor and keyboard
 
 Clicking committed fill or line layers selects the semantic object. Clicking empty space clears selection.
 
@@ -278,35 +339,30 @@ empty      idle
 
 The map canvas is keyboard-focusable.
 
-## 14. Style lifecycle
+## 16. Style lifecycle
 
 Calling `map.setStyle()` removes application-added sources and layers. PlotLibre restores sources, layers, committed Store features, an active valid draft and selected semantic handles. Renderer initialization is idempotent.
 
-## 15. Current limitations
+## 17. Current limitations
 
 - no snapping or angle constraints;
 - no touch-specific completion gesture;
 - no committed control-point insertion/removal;
 - no box or lasso selection;
 - no parameter handles for width, head, neck, body bulge, tension or notch;
-- invalid previews are ignored but detailed issues are not yet shown in the Playground;
+- detailed rejection is currently surfaced for completion attempts, not every temporary invalid pointer position;
 - hit testing does not yet use a separate expanded hit-area layer;
 - Core Store listener exceptions do not yet have general transaction rollback;
-- Definition-derived transient drafts currently support one complete replacement control set rather than multiple alternatives.
+- Definition-derived transient drafts support one complete replacement control set rather than multiple alternatives.
 
-## 16. Next extension: `arrow.pincer` semantic design
+## 18. Next extension
 
-The interaction foundation can support another compound symbol only after its canonical semantic design is frozen.
+Before adding another compound symbol, finish pincer robustness work:
 
-Before implementation define:
+1. asymmetric and off-center fixtures;
+2. junction admissibility boundary fixtures;
+3. high-latitude and antimeridian cases;
+4. live Pages verification of rejection guidance;
+5. migration/API review.
 
-1. every authored control and its role;
-2. ordered versus unordered control groups;
-3. fixed or variable completion mode;
-4. whether an incomplete state benefits from a Definition-derived transient draft;
-5. exact handles versus derived branch/body/head points;
-6. one coherent topology rather than persisted component arrows;
-7. input-order invariance and failure policies;
-8. PlotJSON representation and migration boundaries.
-
-No `arrow.pincer` identifier checks should be added to the interaction package or MapLibre adapter.
+A future complex symbol must begin with an independent semantic design and must not be implemented as an alias or default-only variant of an existing arrow.

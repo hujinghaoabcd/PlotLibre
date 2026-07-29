@@ -1,72 +1,70 @@
-# PlotLibre Development Handover — Milestone 006C Pincer Objective-Order Hotfix Finalization
+# PlotLibre Development Handover — Milestone 006D Pincer Rejection Feedback
 
-日期：2026-07-29  
+日期：2026-07-30  
 仓库：`hujinghaoabcd/PlotLibre`  
-实施 PR：`#23 Fix pincer fifth-click failure for natural objective order`  
-实施 merge SHA：`79e503d5080481cc459e7395b1e8c3983c6945f7`  
-Workspace：`0.0.14`  
+分支：`agent/pincer-rejection-feedback`  
+PR：`#25 Add actionable pincer completion feedback`  
+Workspace：`0.0.15`  
 Pincer Definition：`1.1.0`  
-状态：PR #23 已 squash merge；`main` 与 merge SHA identical；等待线上 Pages 最终核对
+状态：实现与开发契约完成；127 Node / 18 Chromium 全绿；无 review threads；等待 Ready、合并和 Pages 核对
 
 ## Current state
 
-用户报告的自然轮廓点序第五点击失败已修复：
+真正无效的第五点现在不再只显示通用绘制提示。完整链路为：
 
 ```text
-左外尾 → 右外尾 → 右目标 → 左目标 → 内侧汇合点
+Registry ValidationResult
+→ DrawSessionSnapshot.rejection
+→ MapLibrePlotInteraction.drawRejection
+→ Playground actionable Chinese guidance
 ```
 
-公共 Definition 会先尝试直接 A/B 配对；直接无效、交换两个目标后有效时，只交换控制点 2、3 并保存 canonical roles。任何坐标都不会被添加、删除、移动、镜像或 clamp。
+重要状态约束：
 
 ```text
-controlPoints[0] = outer tail A
-controlPoints[1] = outer tail B
-controlPoints[2] = objective A
-controlPoints[3] = objective B
-controlPoints[4] = shared inner junction
+rejected candidate stays outside Store/History/PlotJSON
+session remains active
+candidate remains visible and replaceable
+pointer movement clears stale reason
+valid retry completes normally
 ```
 
-实施状态：
-
-```text
-PR #23: merged
-merge SHA: 79e503d5080481cc459e7395b1e8c3983c6945f7
-compare merge SHA...main: identical
-workspace: 0.0.14
-pincer Definition: 1.1.0
-```
+钳形箭头继续使用五个 canonical controls，Definition 保持 `1.1.0`；本里程碑只扩展 validation diagnostics 和 interaction feedback，不改变几何、控制点顺序或 PlotJSON 数据模型。
 
 权威记录：
 
 ```text
-docs/handover/2026-07-29-milestone-006c-pincer-objective-order-hotfix.md
-docs/handover/2026-07-29-milestone-006c-pincer-objective-order-finalization.md
+docs/handover/2026-07-30-milestone-006d-pincer-rejection-feedback.md
+PR #25
 ```
 
 ## Completed in this milestone
 
-- 复现用户线上第五点击失败；
-- 确认根因是 objective positional pairing，而不是第五点事件丢失；
-- 新增 permutation-only Definition canonicalization；
-- Registry、create、replace 和 import 使用 canonical roles；
-- strict pure geometry 和拓扑校验保持不变；
-- pincer 升至 `1.1.0`；
-- workspace/demo 升至 `0.0.14`；
-- 新增自然轮廓点序 Node 与 Chromium 回归；
-- 新基线为 124 Node / 17 Chromium；
-- PR #23 全绿、无 review threads、已 squash merge；
-- `main` 与 merge SHA identical；
-- Pages workflow 的 main/path 触发条件覆盖本次 Playground、packages 和 package.json 变更。
+- `validateCompletion` 支持 `boolean | ValidationResult`；
+- 新增 `DrawSessionRejection` 与 snapshot rejection；
+- 两点和多点 session 都支持详细拒绝状态；
+- MapLibre adapter 暴露 `drawRejection`；
+- Registry validation issues 成为 completion feedback 权威来源；
+- pincer 新增稳定细分 issue codes；
+- Playground 将 issue code 翻译为具体中文调整建议；
+- pointer move、退点、取消和成功完成会清除旧拒绝；
+- workspace/demo 升至 `0.0.15`；
+- 新增 structured rejection、legacy boolean fallback 与 retry recovery Node 测试；
+- 新增 pincer duplicate-control 与 out-of-zone code 测试；
+- 新增 Chromium 无效第五点 → 具体原因 → 移动清除 → 有效重试场景；
+- 更新 README、interaction model 和 development contract；
+- 新基线为 127 Node / 18 Chromium；
+- PR #25 当前无 unresolved review threads。
 
 ## Validation
 
 ```text
-Implementation CI: 30465128769
-Docs-inclusive CI: 30465663153
+Initial implementation CI: 30470057074
+Final docs-inclusive CI: 30470638589
 Node 20.19: success
 Node 22: success
-Node tests: 124 passed / 0 failed
-Chromium tests: 17 passed / 0 failed
+Node tests: 127 passed / 0 failed
+Chromium tests: 18 passed / 0 failed
 Typecheck/tests/build: success
 Handover contract: success
 Unresolved review threads: 0
@@ -74,24 +72,26 @@ Unresolved review threads: 0
 
 ## Next tasks
 
-1. 在线核对 badge 显示 `v0.0.14 demo`；
-2. 在线分别测试左右两种目标点击顺序；
-3. 浏览器仍显示旧版时强制刷新；
-4. 增加真正无效第五点的具体错误原因提示；
-5. 增加 asymmetric/off-center/junction-boundary fixtures；
-6. 增加 antimeridian/high-latitude cases；
-7. 补 Definition 1.0.0 → 1.1.0 迁移说明；
-8. 暂不开发下一个复杂符号。
+1. 将 PR #25 标记 Ready；
+2. squash merge 到 `main`；
+3. 验证 merge SHA 与 `main` identical；
+4. 创建 006D finalization handover；
+5. 核对 Pages `v0.0.15 demo` 与中文第五点错误提示；
+6. 下一阶段增加 asymmetric/off-center/junction-boundary fixtures；
+7. 随后增加 antimeridian/high-latitude cases；
+8. 补 interaction diagnostics API 迁移说明；
+9. 暂不开发下一个复杂符号。
 
 ## Risks and decisions
 
-- canonicalization 只能 exact permutation；
-- direct 和 swapped 都无效时仍严格拒绝；
-- Store/PlotJSON 保存 canonical roles；
-- pure geometry 保持 strict positional API；
-- junction 不移动、不替换；
-- GitHub Pages 部署完成需要独立线上核对；
-- 真正无效的最后点仍缺少具体 UI 原因；
+- rejection 是非终止诊断状态，不得进入持久化数据；
+- Playground 不复制几何判断，只翻译 Registry issue code；
+- legacy boolean validator 只有 generic fallback issue；
+- pincer issue classifier 与项目自有 geometry message 同步受测试约束；
+- `drawRejection` 只表示最近一次 completion attempt；
+- pointer movement 清除旧原因；
+- 不放宽 junction、自相交、pair-crossing 或 simple-ring 校验；
+- Definition 仍为 `1.1.0`，workspace 为 `0.0.15`；
 - packages 仍为 `UNLICENSED`。
 
-Continuation：先核对 live Playground 的 `v0.0.14 demo` 和两种点序。若仍失败，保存五点坐标和 status text 并添加 exact regression fixture，禁止删除拓扑检查或把 pincer 改成 double alias。
+Continuation：PR #25 已通过完整 CI。下一步直接 Ready、检查 head 未移动后 squash merge，验证 main compare，然后创建单独 immutable finalization handover。线上应显示 `v0.0.15 demo`；选择钳形箭头并点击无效第五点时应显示具体中文原因，移动鼠标后原因应清除。

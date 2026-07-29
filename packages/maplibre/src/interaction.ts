@@ -7,11 +7,13 @@ import {
   type PlotStore,
   type PlotStyle,
   type Position,
+  type ValidationResult,
 } from "@plotlibre/core";
 import {
   MultiPointDrawSession,
   TwoPointDrawSession,
   type DrawSession,
+  type DrawSessionRejection,
   type DrawSessionSnapshot,
 } from "@plotlibre/interaction";
 import { MapLibrePlotRenderer } from "./renderer.js";
@@ -60,6 +62,7 @@ export class MapLibrePlotInteraction {
   readonly #unsubscribeStore: () => void;
   #session: DrawSession | undefined;
   #draftFeature: PlotFeature | undefined;
+  #drawRejection: DrawSessionRejection | undefined;
   #selectedId: string | undefined;
   #drag: ControlPointDrag | undefined;
   #doubleClickZoomWasEnabled: boolean | undefined;
@@ -257,6 +260,7 @@ export class MapLibrePlotInteraction {
     this.cancelDraw();
     this.#cancelDrag();
     this.select(undefined);
+    this.#drawRejection = undefined;
 
     const id = options.id ?? this.#idFactory();
     const sessionOptions = {
@@ -272,8 +276,8 @@ export class MapLibrePlotInteraction {
         ...(options.style ?? {}),
       },
       metadata: { ...(options.metadata ?? {}) },
-      validateCompletion: (candidate: PlotFeatureInput): boolean =>
-        this.#isRenderableInput(candidate),
+      validateCompletion: (candidate: PlotFeatureInput): ValidationResult =>
+        this.#validateRenderableInput(candidate),
     };
 
     this.#session =
@@ -298,6 +302,7 @@ export class MapLibrePlotInteraction {
     this.#session.cancel();
     this.#session = undefined;
     this.#draftFeature = undefined;
+    this.#drawRejection = undefined;
     this.#renderer.clearDraft();
     this.#restoreDoubleClickZoom();
     this.#setCursor("");
@@ -324,6 +329,10 @@ export class MapLibrePlotInteraction {
     return this.#session !== undefined;
   }
 
+  public get drawRejection(): DrawSessionRejection | undefined {
+    return this.#drawRejection;
+  }
+
   public destroy(): void {
     this.cancelDraw();
     this.#cancelDrag();
@@ -344,6 +353,8 @@ export class MapLibrePlotInteraction {
     snapshot: DrawSessionSnapshot,
     options: ApplyDrawSnapshotOptions = {},
   ): void {
+    this.#drawRejection = snapshot.rejection;
+
     if (snapshot.draft) {
       try {
         const draft = this.#materialize(snapshot.draft);
@@ -367,6 +378,7 @@ export class MapLibrePlotInteraction {
       const created = this.#callbacks.create(snapshot.completed);
       this.#session = undefined;
       this.#draftFeature = undefined;
+      this.#drawRejection = undefined;
       this.#renderer.clearDraft();
       if (options.deferDoubleClickZoomRestore === true) {
         this.#scheduleDoubleClickZoomRestore();
@@ -381,6 +393,7 @@ export class MapLibrePlotInteraction {
     if (snapshot.status === "cancelled") {
       this.#session = undefined;
       this.#draftFeature = undefined;
+      this.#drawRejection = undefined;
       this.#renderer.clearDraft();
       if (options.deferDoubleClickZoomRestore === true) {
         this.#scheduleDoubleClickZoomRestore();
@@ -391,18 +404,39 @@ export class MapLibrePlotInteraction {
     }
   }
 
-  #isRenderableInput(input: PlotFeatureInput): boolean {
+  #validateRenderableInput(input: PlotFeatureInput): ValidationResult {
     try {
-      this.#materialize(input);
-      return true;
-    } catch {
-      return false;
+      const feature = this.#createMaterializedFeature(input);
+      const validation = this.#registry.validate(feature);
+      if (!validation.valid) return validation;
+      this.#registry.generate(feature);
+      return validation;
+    } catch (error) {
+      return {
+        valid: false,
+        issues: [
+          {
+            code: "DRAW_CANDIDATE_GENERATION_FAILED",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Draw candidate generation failed.",
+            severity: "error",
+          },
+        ],
+      };
     }
   }
 
   #materialize(input: PlotFeatureInput): PlotFeature {
+    const feature = this.#createMaterializedFeature(input);
+    this.#registry.generate(feature);
+    return feature;
+  }
+
+  #createMaterializedFeature(input: PlotFeatureInput): PlotFeature {
     const definition = this.#registry.get(input.plotType);
-    const feature = createPlotFeature({
+    return createPlotFeature({
       ...input,
       definitionVersion: input.definitionVersion ?? definition.version,
       parameters: {
@@ -414,8 +448,6 @@ export class MapLibrePlotInteraction {
         ...(input.style ?? {}),
       },
     });
-    this.#registry.generate(feature);
-    return feature;
   }
 
   #updateDrag(position: Position): void {
