@@ -1,187 +1,183 @@
-# PlotLibre Development Handover — Milestone 005E Finalization
+# PlotLibre Development Handover — Milestone 005F Finalization
 
 日期：2026-07-29  
 仓库：`hujinghaoabcd/PlotLibre`  
 目标分支：`main`  
-开发分支：`agent/curved-arrow-vertical-slice`  
-PR：`#11 Add curved arrow vertical slice`  
-最终分支提交：`610605ad0bbea7be90ed469487590fb32d470169`  
-Workspace：`0.0.9`
+开发分支：`agent/attack-arrow-vertical-slice`  
+PR：`#12 Add attack arrow vertical slice`  
+Workspace：`0.0.10`
 
 ## Current state
 
-Milestone 005E 已完成全部代码、几何修复、浏览器集成、对外文档、不可变详细交接和最终同步验证。
+Milestone 005F 已完成 `arrow.attack` 的完整代码、几何、交互、Playground、浏览器验证、算法记录和不可变详细交接。
 
-当前状态：**PR #11 可以标记 Ready 并合并。**
-
-详细实现记录：
+详细记录：
 
 ```text
-docs/handover/2026-07-29-milestone-005e-curved-arrow.md
+docs/handover/2026-07-29-milestone-005f-attack-arrow.md
 ```
 
-最终权威 CI：
+最终权威同步状态：
 
 ```text
-Run ID: 30398656193
-validate Node 20.19: success
-validate Node 22: success
-Node tests: 65 passed
-Playwright: 13 passed
+Head before final handover sync: c3d229ef0507b56dd51c6225c396aedc309ce547
+Run ID: 30413156622
+Node 20.19: success
+Node 22: success
+Node tests: 78 passed
+Chromium: 12 passed
 Pages build: success
 handover contract: success
 ```
+
+PR #12 在最终文档同步 CI 再次全绿后即可标记 Ready 并合并。
 
 ## Completed in this milestone
 
 ### Public symbol
 
 ```text
-arrow.curved
+arrow.attack
+```
+
+语义控制点：
+
+```text
+0 + 1   = exact tail edges
+2..n-2  = attack-spine controls
+n-1     = exact objective/tip
 ```
 
 已完成：
 
-- 3–64 个语义控制点；
-- tail、path controls、exact tip 语义；
-- Catmull–Rom/Hermite centerline；
-- cumulative arc-length width model；
-- variable-width tapered shaft；
+- 独立于 `arrow.curved` 的攻击箭头语义；
+- exact semantic tail width；
+- reusable `AttackArrowFrame`；
+- Catmull–Rom/Hermite spine；
+- broad body + body bulge + neck narrowing；
 - terminal-tangent head；
-- exact semantic tip restoration；
-- closed/finite/CCW/simple-ring validation；
+- exact tail vertices and exact tip；
+- finite/closed/CCW/simple-ring validation；
 - explicit self-intersection rejection；
-- 56-coordinate golden fixture；
 - PlotDefinition、Registry、RenderBundle 和 PlotJSON；
-- clean-room algorithm record。
+- clean-room provenance。
 
-### Multi-point MapLibre interaction
+### Interaction and transaction safety
 
 已完成：
 
-- Definition-driven Session selection；
-- `dblclick → DrawSession.doubleClick()`；
-- double-click default suppression；
-- zoom disable/restore；
-- third-candidate draft；
-- Enter、Escape、Backspace/Delete；
+- Definition-driven `MultiPointDrawSession`；
+- tail-edge/spine draft；
+- double-click/Enter completion；
+- Backspace/Delete/Escape；
 - all semantic handles；
-- interior handle drag；
-- one ReplacePlotCommand；
-- undo restore。
+- tail/spine drag；
+- one valid drag = one `ReplacePlotCommand`；
+- undo restore；
+- invalid geometry preview rejected before Store mutation；
+- Definition-level renderability validation；
+- deferred double-click zoom restoration，防止完成时相机 2× 跳变。
 
 ### Playground
 
 已完成：
 
-- 第五个 selector option；
-- 五类南京示例；
-- 多点操作说明；
-- 曲线箭头实际绘制和渲染；
-- 中间控制点真实拖动；
-- Worker 与 Pages 回归。
+- 第六个 selector option；
+- 六类南京示例；
+- 攻击箭头四点真实绘制；
+- committed Source 和 actual rendered-feature 检查；
+- tail-edge edit/history/undo 浏览器回归；
+- Worker 和 `/PlotLibre/` Pages build 回归。
 
 ### Real issues fixed
 
-1. head trim 与 neck center 同时存在导致短反向折线和自交；
-2. 过紧 S 形路径应明确拒绝而非静默输出；
-3. E2E 初始轨迹过紧，无法生成合法 draft；
-4. readonly PlotLibre Position 与 MapLibre mutable tuple 类型边界；
-5. `querySourceFeatures()` tile duplicate 导致 raw handle count 假失败。
-
-### Documentation
-
-已同步：
-
-```text
-README.md
-AGENTS.md
-docs/INTERACTION_MODEL.md
-docs/PLAYGROUND.md
-docs/DEVELOPMENT_PLAN.md
-docs/algorithms/arrow-curved.md
-docs/handover/2026-07-29-milestone-005e-curved-arrow.md
-docs/handover/2026-07-29-milestone-005e-curved-arrow-final.md
-docs/handover/LATEST.md
-```
+1. 测试尾缘与进攻方向近平行，正确几何验证拒绝 draft；
+2. `dblclick` 事件栈内过早恢复 zoom 导致地图默认处理器缩放；
+3. 尾缘拖动可生成自交 Polygon；
+4. 仅轻量验证会让无效 preview 在渲染阶段才失败；
+5. Store 更新后 listener 抛错可能导致 History 未入栈；
+6. 完整 Definition 几何预检将失败前移到语义写入之前。
 
 ## Validation
 
-完整绿色运行：
+最终代码与文档同步前的权威绿色运行：
 
 ```text
-30398030416  first complete green code/browser run
-30398656193  final documentation and handover synchronization
+30413156622
 ```
 
-最终矩阵：
+矩阵：
 
 - Node.js 20.19：success；
 - Node.js 22：success；
 - TypeScript/workspace：success；
-- 65 Node tests：success；
-- Playground typecheck：success；
-- `/PlotLibre/` build：success；
+- 78 Node tests：success；
+- Playground typecheck/build：success；
 - handover contract：success；
-- 13 Chromium tests：success；
-- Worker entry/shared：success；
-- five-symbol committed/rendered Source：success；
-- curved draft/double-click/zoom：success；
-- interior semantic handle edit/undo：success。
+- 12 Chromium tests：success；
+- six-symbol committed/rendered Source：success；
+- attack draft/double-click/camera stability：success；
+- tail semantic handle edit/history/undo：success。
 
 ## Architectural decisions
 
-1. 曲线控制点是 canonical semantic source，采样点与 Polygon 顶点是派生数据。
-2. width/head placement 基于累计弧长和末端切向。
-3. 自交输出严格拒绝，不移除 topology safety。
-4. Session 类型来自 Definition point constraints，不来自 symbol ID。
-5. 多点绘制期间管理 double-click zoom 生命周期。
-6. 每个 semantic path control 都可编辑。
-7. MapLibre Source 查询结果按 semantic identity 去重，而非 raw Feature count。
+1. 攻击箭头的前两个控制点是精确尾缘，距离定义尾宽。
+2. 采样点、offset 顶点和 Polygon 顶点均为派生数据。
+3. `AttackArrowFrame` 是平尾与燕尾攻击箭头的共享边界。
+4. topology-sensitive Definition 必须验证完整可生成性。
+5. invalid previews 不得进入 Store 或 History。
+6. double-click zoom 只在原生事件结束后恢复。
+7. 不放宽 simple-ring 或 tail-cross-direction 验证来迁就测试。
 
 ## Known limitations
 
-- 第三个候选点前没有可见 centerline guide；
-- UI 尚未显示详细 self-intersection validation message；
-- 已提交 Feature 暂不支持插入或删除控制点；
-- 无 touch-specific completion；
-- 无 snapping/constraints；
-- local projection 不适合超大跨国箭头；
-- 无 tension/width/head parameter handles；
-- 浏览器矩阵目前只有 Chromium。
+- 最小点数前无独立 centerline guide；
+- UI 尚未显示详细 validation issue；
+- 已提交图形暂不支持插入/删除 spine controls；
+- 无 touch completion、snapping 或 constraints；
+- 无参数 handles；
+- 浏览器矩阵仅 Chromium；
+- Core Store listener exception 的通用事务回滚尚未重构。
 
 ## Next tasks
 
-1. 将 PR #11 标记 Ready；
-2. 合并 PR #11 到 `main`；
-3. 验证 GitHub Pages 五符号部署；
-4. 从最新 `main` 创建新分支；
-5. 开始 Milestone 005F `arrow.attack`；
-6. 先写 clean-room provenance 和独立结构设计；
-7. 不并行实现 tailed attack、double、pincer、route 或 corridor。
+1. 等待最终文档同步 CI 全绿；
+2. 将 PR #12 标记 Ready；
+3. 合并 PR #12 到 `main`；
+4. 验证 `main` CI 和 GitHub Pages 六符号部署；
+5. 从最新 `main` 创建 Milestone 005G 分支；
+6. 实现 `arrow.attack.tailed`；
+7. 复用 `AttackArrowFrame`，只新增独立燕尾 closing strategy；
+8. 完成参数、golden、Definition、PlotJSON、Playground、Chromium 和交接；
+9. 不并行开发 double、pincer、route 或 corridor。
 
 ## Risks and decisions
 
-### Attack-arrow component sharing
+### Tailed attack structure
 
-`arrow.attack` 可以复用 curve sampling、offset、head components 和 MultiPointDrawSession，但不能成为 `arrow.curved` 的参数别名。若抽取共享 multi-point frame，必须保持 `arrow.curved` 的 golden contract 不变。
+`arrow.attack.tailed` 必须保留两个精确尾缘控制点，并在共享 frame 上增加 inward swallowtail notch。它不能是平尾攻击箭头的默认参数别名，也不能复制整个 generator。
 
-### Self-intersection UX
+### Topology
 
-Geometry 保持严格拒绝。下一阶段可改善可见错误反馈，但不能用 UI 容错掩盖无效 Polygon。
+燕尾 notch 可能与 body 自交。必须限制 notch 参数并继续执行 simple-ring validation。
 
-### Public deployment
+### Transaction scope
 
-合并会触发 Pages 重建。只有部署完成并实际访问后，才应宣布 `0.0.9` Playground 已公开更新。
+005G 不主动进行大规模 Store/History 重构；符号通过 Definition renderability validation 保证写入前有效。通用事务原子性另设独立阶段评估。
+
+### Deployment
+
+只有 `main` Pages workflow 成功且在线页面实际出现 `arrow.attack` 后，才宣布六符号部署完成。
 
 ## Continuation instructions
 
-新的开发者或对话应：
+后续开发者或对话应：
 
 1. 阅读 `AGENTS.md`；
-2. 阅读 `docs/algorithms/arrow-curved.md`；
-3. 阅读详细 Milestone 005E 交接；
-4. 确认 PR #11 合并和 Pages 状态；
-5. 从最新 `main` 开始 attack arrow；
-6. 保留全部 65 Node 和 13 Chromium 回归；
-7. 完成后追加新的不可变 handover 并更新 `LATEST.md`。
+2. 阅读 `docs/algorithms/arrow-attack.md`；
+3. 阅读 005F 详细交接；
+4. 确认 PR #12、主线 CI 和 Pages；
+5. 从最新 `main` 开始 005G；
+6. 保留 78 Node 和 12 Chromium 回归；
+7. 使用 `AttackArrowFrame`，禁止复制平尾 generator；
+8. 完成后新增 005G 不可变 handover 并更新本文件。
