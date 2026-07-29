@@ -108,7 +108,7 @@ arrow.pincer
 
 The two objective clicks may arrive in either left/right order. The Definition first tests the direct positional pairing; when it is invalid but swapping controls 2 and 3 is renderable, it persists the swapped permutation as the explicit A/B pairing. The pure geometry API remains strict and positional. Four-control double-arrow data cannot be relabeled as pincer data.
 
-## 6. Interaction rules
+## 6. Interaction and rejection rules
 
 - Exact two-point Definitions use `TwoPointDrawSession`.
 - Definitions requiring three or more points use `MultiPointDrawSession`.
@@ -116,9 +116,16 @@ The two objective clicks may arrive in either left/right order. The Definition f
 - Fixed-count symbols use maximum-point completion; variable-count symbols use explicit completion.
 - Pointer drafts may use committed controls plus the live pointer candidate.
 - Derived draft controls are rendering-only and cannot complete or persist a plot.
-- A session becomes terminal only after full Registry generation/renderability preflight.
+- A session becomes terminal only after full Registry validation and generation preflight.
+- `validateCompletion` may return legacy `boolean` or a full Core `ValidationResult`.
+- Invalid `ValidationResult` issues must be retained as `DrawSessionSnapshot.rejection`.
+- Rejection is non-terminal and must never enter Store, History or PlotJSON.
 - Rejected completion remains active so the final candidate can be replaced.
 - Rejected fixed-count candidates must not trap the session at maximum points.
+- A rejected fixed-count candidate may remain visible together with its structured rejection reason.
+- Pointer movement, Backspace/Delete, cancellation, a new session and successful completion clear stale rejection state.
+- `MapLibrePlotInteraction.drawRejection` exposes only the most recent completion rejection; it is not continuous validation for every pointer draft.
+- Registry issues are the source of truth; Playground must translate stable issue codes rather than duplicate geometry logic.
 - Backspace/Delete removes one uncommitted multi-point control.
 - Drawing-state point removal is not Store history.
 - Invalid transient pointer geometry preserves the last valid draft or shows a semantic guide.
@@ -129,6 +136,7 @@ The two objective clicks may arrive in either left/right order. The Definition f
 - Pincer uses four committed controls plus the fifth pointer candidate for its first full draft.
 - Pincer must complete on a renderable fifth click for both objective click orders.
 - Invalid pincer junction/topology candidates remain active and visible; canonicalization must not make genuinely invalid geometry valid by moving controls.
+- Stable pincer rejection codes must remain covered by tests and actionable Playground guidance.
 
 ## 7. Testing requirements
 
@@ -173,6 +181,16 @@ Canonicalization tests additionally require:
 - Store and PlotJSON persist canonical roles;
 - browser coverage for the user-reported click order.
 
+Structured rejection tests additionally require:
+
+- detailed `ValidationResult` issues survive into the session snapshot;
+- legacy boolean rejection receives a stable generic fallback issue;
+- rejected candidates remain outside Store, History and PlotJSON;
+- the candidate remains visible and replaceable;
+- pointer movement clears stale rejection;
+- a valid retry completes normally;
+- browser status text provides an actionable explanation derived from the stable issue code.
+
 Pincer tests additionally prove:
 
 - exact five controls and exact junction;
@@ -183,13 +201,14 @@ Pincer tests additionally prove:
 - moving the junction changes both arms while preserving objectives;
 - one coherent no-hole simple Polygon;
 - four-control relabel rejection;
+- stable validation issue codes for representative invalid fifth points;
 - `PincerArrowFrame` remains independent of `DoubleArrowFrame`.
 
 Current minimum regression baseline:
 
 ```text
-124 Node tests
-17 Chromium tests
+127 Node tests
+18 Chromium tests
 9 public Arrow types
 ```
 
@@ -203,6 +222,8 @@ Current minimum regression baseline:
 - Every public symbol gets selector, sample and browser coverage in the same slice.
 - Fixed-count symbols clearly state automatic maximum-point completion.
 - Pincer instructions state that its two objectives may be clicked in either order.
+- A genuinely invalid pincer fifth point must show a specific adjustment reason while keeping the session active.
+- Moving the pointer after a rejection must remove the stale error instruction.
 - Pages deploys only from `main`.
 
 ## 9. Documentation and handover
@@ -231,17 +252,28 @@ Prefer one complete high-quality vertical slice to many incomplete symbols. Do n
 
 ## 11. Current priority
 
-Active hotfix:
+Active quality-hardening slice:
 
 ```text
-branch: fix/pincer-natural-objective-order
-PR: #23 Fix pincer fifth-click failure for natural objective order
-workspace: 0.0.14
+branch: agent/pincer-rejection-feedback
+PR: #25 Add actionable pincer completion feedback
+workspace: 0.0.15
 pincer Definition: 1.1.0
-Node baseline: 124
-Chromium baseline: 17
+Node baseline: 127
+Chromium baseline: 18
 ```
 
-The user-visible defect was a fifth-click rejection when targets were clicked around the perimeter rather than in same-side A/B order. The approved fix canonicalizes only the objective permutation when necessary and renderable. It does not loosen geometry, clamp the junction or alias double-arrow behavior.
+The approved behavior is:
 
-After this hotfix reaches `main` and Pages, verify the live site and then continue pincer robustness work: asymmetric fixtures, junction-boundary calibration, high-latitude/antimeridian cases and clearer invalid-candidate feedback. Do not begin another complex symbol until this feedback loop is complete.
+1. Registry `ValidationResult` is the authority for completion rejection;
+2. session snapshots preserve structured issues without becoming terminal;
+3. rejected final candidates remain visible and replaceable;
+4. rejected candidates never mutate Store, History or PlotJSON;
+5. MapLibre exposes the latest reason through `drawRejection`;
+6. Playground translates stable pincer issue codes into actionable Chinese instructions;
+7. pointer movement clears stale feedback and a valid retry completes normally;
+8. no geometry, canonical-control or PlotJSON semantics are changed;
+9. topology checks remain strict;
+10. `arrow.pincer` stays Definition 1.1.0 while the workspace advances to 0.0.15.
+
+After PR #25 reaches `main` and Pages, continue pincer robustness work: asymmetric/off-center fixtures, junction-boundary calibration, high-latitude/antimeridian cases and API/migration review. Do not begin another complex symbol until this feedback loop is complete.
