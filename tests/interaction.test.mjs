@@ -150,7 +150,7 @@ test("multipoint session removes one point at a time and can be cancelled", () =
   assert.deepEqual(session.keyDown("Escape"), { status: "cancelled" });
 });
 
-test("multipoint session validates limits and can auto-complete at maximum", () => {
+test("multipoint session validates limits and can derive a non-persistent fixed-four draft", () => {
   assert.throws(
     () =>
       new MultiPointDrawSession({
@@ -173,16 +173,45 @@ test("multipoint session validates limits and can auto-complete at maximum", () 
 
   const session = new MultiPointDrawSession({
     id: "curve-fixed",
-    plotType: "arrow.curved",
-    minimumPoints: 3,
+    plotType: "arrow.double",
+    minimumPoints: 4,
     maximumPoints: 4,
+    deriveDraftControlPoints(points) {
+      return points.length === 3 ? [...points, [3, -1]] : undefined;
+    },
   });
   session.click([0, 0]);
-  session.click([1, 1]);
-  session.click([2, 0]);
+  session.click([1, 0]);
+  const immediate = session.click([2, 1]);
+  assert.equal(immediate.status, "drawing");
+  assert.deepEqual(immediate.draft?.controlPoints, [
+    [0, 0],
+    [1, 0],
+    [2, 1],
+    [3, -1],
+  ]);
+
+  const enter = session.keyDown("Enter");
+  assert.equal(enter.status, "drawing");
+  assert.equal(enter.completed, undefined);
+  assert.deepEqual(enter.draft?.controlPoints, immediate.draft?.controlPoints);
+
+  const pointer = session.pointerMove([3, 1]);
+  assert.deepEqual(pointer.draft?.controlPoints, [
+    [0, 0],
+    [1, 0],
+    [2, 1],
+    [3, 1],
+  ]);
+
   const completed = session.click([3, 1]);
   assert.equal(completed.status, "completed");
-  assert.equal(completed.completed?.controlPoints.length, 4);
+  assert.deepEqual(completed.completed?.controlPoints, [
+    [0, 0],
+    [1, 0],
+    [2, 1],
+    [3, 1],
+  ]);
 });
 
 test("multipoint terminal sessions ignore later input", () => {
