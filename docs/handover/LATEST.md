@@ -9,19 +9,20 @@ Workspace：`0.0.11`
 
 ## Current state
 
-Milestone 005G 已完成 `arrow.attack.tailed` 的代码、几何、Definition、PlotJSON、七符号 Playground、浏览器验证、算法记录和不可变详细交接。
+Milestone 005G 已完成 `arrow.attack.tailed` 的代码、几何、Definition、PlotJSON、七符号 Playground、浏览器验证、算法记录和公开文档。
 
-详细记录：
+不可变记录：
 
 ```text
 docs/handover/2026-07-29-milestone-005g-tailed-attack-arrow.md
+docs/handover/2026-07-29-milestone-005g-finalization.md
 ```
 
-第一轮完整权威状态：
+包含全部功能与公开文档的最终权威状态：
 
 ```text
-Head: f9c7418d8588ea30ba3521af7558dbda1c07b624
-Run ID: 30419114264
+Head: 7feecce2e40daa6751e4b2e3612e9043b33ee043
+Run ID: 30419781349
 Node 20.19: success
 Node 22: success
 Node tests: 90 passed
@@ -30,7 +31,7 @@ Chromium: 12 passed
 handover contract: success
 ```
 
-最终文档同步提交需要再次运行同一矩阵。PR #13 当前为 Draft、mergeable。
+当前提交只封存该验收状态，不修改功能代码。封存提交的 metadata-only CI 全绿后，PR #13 即可 Ready 并合并。
 
 ## Completed in this milestone
 
@@ -114,10 +115,11 @@ docs/algorithms/arrow-attack-tailed.md
 
 ## Validation
 
-第一轮权威矩阵：
+最终全内容权威矩阵：
 
 ```text
-Run ID: 30419114264
+Run ID: 30419781349
+Head: 7feecce2e40daa6751e4b2e3612e9043b33ee043
 Node 20.19: success
 Node 22: success
 TypeScript/workspace: success
@@ -129,7 +131,7 @@ seven-symbol committed/rendered Source: success
 tailed attack draw/camera/edit/history/undo: success
 ```
 
-最终文档同步 CI 全绿后才可 Ready 和合并。
+当前状态封存提交仅新增 handover 元数据；它的 CI 用于确认仓库契约仍然完整。
 
 ## Architectural decisions
 
@@ -158,12 +160,12 @@ tailed attack draw/camera/edit/history/undo: success
 
 ## Next tasks
 
-1. 等待最终文档同步 CI 全绿；
+1. 等待状态封存提交的 CI 全绿；
 2. 更新 PR #13 最终说明；
 3. 检查 review threads；
 4. 将 PR #13 标记 Ready；
 5. squash merge 到 `main`；
-6. 验证 main CI；
+6. 验证 main 状态；
 7. 验证 GitHub Pages 在线页面包含七种符号；
 8. 从最新 `main` 创建 Milestone 005H 分支；
 9. 先完成 `arrow.double` canonical semantic design；
@@ -198,8 +200,8 @@ tailed attack draw/camera/edit/history/undo: success
 1. 阅读 `AGENTS.md`；
 2. 阅读 `docs/algorithms/arrow-attack.md`；
 3. 阅读 `docs/algorithms/arrow-attack-tailed.md`；
-4. 阅读 005G 详细交接；
-5. 确认 PR #13、最终 CI、main CI 和 Pages；
+4. 阅读两份 005G 不可变交接；
+5. 确认 PR #13、最终 CI、main 和 Pages 状态；
 6. 从最新 `main` 开始 005H；
 7. 保留 90 Node 和 12 Chromium 回归；
 8. 先写双箭头语义设计和 clean-room 记录；
