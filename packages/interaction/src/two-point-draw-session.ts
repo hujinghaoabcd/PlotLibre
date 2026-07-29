@@ -53,10 +53,8 @@ export class TwoPointDrawSession implements DrawSession {
       return this.snapshot();
     }
 
-    this.#completed = this.#createFeature([this.#start, point]);
-    this.#status = "completed";
     this.#cursor = point;
-    return this.snapshot();
+    return this.#tryComplete([this.#start, point]);
   }
 
   public doubleClick(position: Position): DrawSessionSnapshot {
@@ -90,8 +88,7 @@ export class TwoPointDrawSession implements DrawSession {
     }
 
     if (key === "Enter" && this.#start && this.#cursor) {
-      this.#completed = this.#createFeature([this.#start, this.#cursor]);
-      this.#status = "completed";
+      return this.#tryComplete([this.#start, this.#cursor]);
     }
 
     return this.snapshot();
@@ -111,6 +108,28 @@ export class TwoPointDrawSession implements DrawSession {
       return undefined;
     }
     return this.#createFeature([this.#start, this.#cursor]);
+  }
+
+  #tryComplete(controlPoints: readonly Position[]): DrawSessionSnapshot {
+    const candidate = this.#createFeature(controlPoints);
+    if (!this.#canComplete(candidate)) {
+      this.#status = "drawing";
+      return this.snapshot();
+    }
+
+    this.#completed = candidate;
+    this.#status = "completed";
+    return this.snapshot();
+  }
+
+  #canComplete(candidate: PlotFeatureInput): boolean {
+    const validate = this.#options.validateCompletion;
+    if (!validate) return true;
+    try {
+      return validate(candidate);
+    } catch {
+      return false;
+    }
   }
 
   #createFeature(controlPoints: readonly Position[]): PlotFeatureInput {
