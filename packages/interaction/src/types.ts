@@ -34,6 +34,14 @@ export interface DrawSessionFeatureOptions {
   readonly parameters?: Readonly<Record<string, JsonValue>>;
   readonly style?: PlotStyle;
   readonly metadata?: Readonly<Record<string, JsonValue>>;
+  /**
+   * Performs a full renderability preflight before a candidate becomes terminal.
+   * Returning false, or throwing, keeps the session active so the user can move
+   * or replace the rejected final point.
+   */
+  readonly validateCompletion?:
+    | ((candidate: PlotFeatureInput) => boolean)
+    | undefined;
 }
 
 export type TwoPointDrawSessionOptions = DrawSessionFeatureOptions;
