@@ -20,18 +20,19 @@ arrow.attack
 arrow.attack.tailed
 arrow.double
 arrow.pincer
+arrow.squad-combat
 ```
 
-The Playground supports two-point, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; semantic-guide fallback; maximum-point or explicit completion; structured completion-rejection feedback; semantic control-point editing; undo/redo; style editing; nine Nanjing samples; and PlotJSON import/export.
+The Playground supports exact two-point, variable two-point-path, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; semantic-guide fallback; maximum-point or explicit completion; structured completion-rejection feedback; semantic control-point editing; undo/redo; style editing; ten-symbol samples; and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.15
+workspace version: 0.0.16
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
-Node tests:        127
-Chromium tests:    18
+Node tests:        135
+Chromium tests:    19
 ```
 
 Implemented foundations:
@@ -39,6 +40,7 @@ Implemented foundations:
 - engine-independent `PlotDefinition`, Registry, Store and CommandHistory;
 - PlotJSON 1.0 semantic serialization;
 - `TwoPointDrawSession` and reusable `MultiPointDrawSession`;
+- schema-driven variable paths with a two-control minimum;
 - optional Definition-driven transient draft controls;
 - optional Definition-level canonical control-role ordering that may only permute authored coordinates;
 - full renderability preflight before interactive completion, create, replace or import mutates Store;
@@ -50,8 +52,20 @@ Implemented foundations:
 - fixed-maximum-point auto-completion for four- and five-control symbols;
 - semantic handle edit, history and undo;
 - local-metre projection and strict finite/closed/simple topology validation;
-- deterministic golden fixtures and actual-rendered-feature Chromium tests;
-- browser visibility coverage for all nine public Arrow types.
+- deterministic geometry fixtures and actual-rendered-feature Chromium tests;
+- browser visibility coverage for all ten public Arrow types.
+
+## Squad combat arrow
+
+`arrow.squad-combat` Definition version `1.0.0` stores a centre action path:
+
+```text
+0      tail centre
+1..n-2 optional path controls
+n-1    exact objective/tip
+```
+
+The two temporary tail edges are derived symmetrically in local metres from the path direction and length. They are rendering inputs only and never enter Store, handles, History or PlotJSON. A tail-centre and objective pair creates a straight form; additional authored controls curve the action path. This is a semantic distinction from `arrow.attack`, whose two tail edges are explicit user controls.
 
 ## Pincer arrow
 
@@ -67,9 +81,7 @@ Implemented foundations:
 
 Users may click the two objectives in either left/right order. When the clicked order would cross the two authored arms but swapping the two objective controls produces a valid pincer, the public Definition stores that valid permutation as the explicit A/B pairing. No coordinate is inserted, removed, moved or mirrored. The pure geometry API remains strict and positional, and invalid junction or topology cases remain fail-closed.
 
-When a fifth point is rejected, the session remains active and exposes stable validation issues. The Playground translates those issue codes into actionable guidance, such as moving a junction back into the admissible longitudinal zone or toward the space between the two arms. Moving the pointer clears the stale reason and allows an immediate retry; rejected candidates never enter Store, History or PlotJSON.
-
-`arrow.pincer` is not an alias or renamed implementation of `arrow.double`.
+When a fifth point is rejected, the session remains active and exposes stable validation issues. The Playground translates those issue codes into actionable guidance. Moving the pointer clears the stale reason and allows an immediate retry; rejected candidates never enter Store, History or PlotJSON.
 
 ## Why semantic plotting
 
