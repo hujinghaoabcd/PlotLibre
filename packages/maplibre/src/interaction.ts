@@ -351,10 +351,12 @@ export class MapLibrePlotInteraction {
         this.#renderer.renderDraft(draft, this.#registry);
       } catch {
         // Pointer candidates can briefly create coincident, self-intersecting,
-        // or otherwise non-renderable geometry. Preserve the last valid draft
-        // instead of making the whole symbol blink out while the session stays
-        // active. If no valid draft has existed yet, the source remains empty.
-        if (!this.#draftFeature) this.#renderer.clearDraft();
+        // or otherwise non-renderable geometry. Preserve the last valid full
+        // draft when one exists. Before the first valid polygon, show the
+        // semantic control path and points so drawing never appears blank.
+        if (!this.#draftFeature) {
+          this.#renderer.renderDraftGuide(snapshot.draft);
+        }
       }
     } else if (snapshot.status === "ready" || snapshot.status === "drawing") {
       this.#draftFeature = undefined;
