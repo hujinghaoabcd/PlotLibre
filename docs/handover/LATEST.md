@@ -1,208 +1,285 @@
-# PlotLibre Development Handover — Milestone 005G Finalization
+# PlotLibre Development Handover — Milestone 005H Double Arrow Semantic Design
 
 日期：2026-07-29  
 仓库：`hujinghaoabcd/PlotLibre`  
 目标分支：`main`  
-开发分支：`agent/tailed-attack-arrow-vertical-slice`  
-PR：`#13 Add tailed attack arrow vertical slice`  
-Workspace：`0.0.11`
+开发分支：`agent/double-arrow-semantic-design`  
+Workspace：`0.0.11`  
+状态：design-only; `arrow.double` 尚未成为公开符号
 
 ## Current state
 
-Milestone 005G 已完成 `arrow.attack.tailed` 的代码、几何、Definition、PlotJSON、七符号 Playground、浏览器验证、算法记录和公开文档。
-
-不可变记录：
+Milestone 005G 已通过 PR #13 squash 合并到 `main`：
 
 ```text
-docs/handover/2026-07-29-milestone-005g-tailed-attack-arrow.md
-docs/handover/2026-07-29-milestone-005g-finalization.md
+main commit: 74611fe8dd39f5c2ad927ab2e9aeb56a9dadf304
 ```
 
-包含全部功能与公开文档的最终权威状态：
+005H 当前只完成 `arrow.double` canonical semantic design。没有新增 runtime code、public type、Definition、PlotJSON feature、Playground selector 或测试数量变化。
+
+设计与不可变交接：
 
 ```text
-Head: 7feecce2e40daa6751e4b2e3612e9043b33ee043
-Run ID: 30419781349
-Node 20.19: success
-Node 22: success
-Node tests: 90 passed
-Chromium: 12 passed
-/PlotLibre/ build: success
-handover contract: success
+docs/design/arrow-double-semantic-design.md
+docs/handover/2026-07-29-milestone-005h-double-arrow-semantic-design.md
 ```
-
-当前提交只封存该验收状态，不修改功能代码。封存提交的 metadata-only CI 全绿后，PR #13 即可 Ready 并合并。
 
 ## Completed in this milestone
 
-### Public symbol
+### Clean-room behavior research
+
+研究指定公开 revision：
 
 ```text
-arrow.attack.tailed
+sakitam-fdd/ol-plot
+c919e60b4edeaeca53c08f9552f793b2ae9537f0
+packages/ol-plot/src/geometry/Arrow/DoubleArrow.ts
 ```
 
-语义控制点与 `arrow.attack` 相同：
+只记录公开行为：独立 DoubleArrow Polygon、正常交互最多四点、三点临时对称状态、四点两个显式目标、恢复数据可带 connection control、左右由几何关系确定。
+
+未复制参考公式、常量、helper layout、点序列、类结构或代码。
+
+### Approved four-control contract
+
+Version 1.0：
 
 ```text
-0 + 1   = exact tail edges
-2..n-2  = attack-spine controls
-n-1     = exact objective/tip
+controlPoints[0] = tail edge A
+controlPoints[1] = tail edge B
+controlPoints[2] = objective A
+controlPoints[3] = objective B
 ```
 
-notch roots 和 notch tip 是派生几何，不进入 PlotJSON，也不生成 handles。
-
-### Shared frame and independent strategy
-
-已完成：
-
-- reuse `AttackArrowFrame`；
-- preserve flat attack body/head golden coordinates；
-- independent inward swallowtail closing strategy；
-- exact semantic tail edges and objective；
-- tail-input-order invariance；
-- no flat generator duplication。
-
-### Parameters
+Control schema：
 
 ```text
-tailNotchDepthRatio = 0.75
-tailNotchWidthRatio = 0.65
+minPoints = 4
+maxPoints = 4
+completeOnDoubleClick = false
+allowPointInsertion = false
+allowPointRemoval = false
 ```
 
-已完成独立参数隔离、范围验证、neck-distance/neck-plane guards 和 PlotJSON round trip。
-
-### Topology and transaction safety
-
-已完成：
-
-- finite/closed/CCW/simple-ring validation；
-- self-intersection rejection；
-- `INVALID_TAILED_ATTACK_ARROW_GEOMETRY`；
-- Definition-level complete renderability validation；
-- invalid previews rejected before Store mutation；
-- one valid drag = one `ReplacePlotCommand`；
-- undo restore；
-- camera-stable deferred double-click zoom restoration。
-
-### Playground
-
-已完成：
-
-- seventh selector option；
-- seven Nanjing samples；
-- flat and tailed attack real drawing；
-- actual committed Source/rendered-feature checks；
-- notch defaults；
-- tailed tail-edge edit/history/undo；
-- Worker and `/PlotLibre/` build regression。
-
-### Tests
+绘制：
 
 ```text
-Node tests: 90 passed
-Chromium: 12 passed
+click tail A
+→ click tail B
+→ click objective A
+→ fourth pointer candidate shows draft
+→ click objective B auto-completes
 ```
 
-新增覆盖：关系型 shared golden、exact tails/tip、input order、notch parameter isolation、topology、Definition validation、PlotJSON、real draw/render/camera/edit/history/undo。
+### Explicit semantic decisions
 
-### Clean-room record
+- no persisted three-point mirrored objective；
+- no fifth connection control in PlotJSON 1.0；
+- branch center derived from `branchPositionRatio`；
+- tail pair unordered；
+- objective pair unordered；
+- swapping either pair must not change geometry；
+- authored order still round-trips；
+- all four controls are exact handles；
+- branch/head/body/bridge/ring vertices are derived。
+
+### Compound-symbol identity
+
+`arrow.double` 必须是一个 connected simple Polygon：
 
 ```text
-docs/algorithms/arrow-attack-tailed.md
+shared tail/base
++ shared branching body
++ two exact objectives
++ two derived heads
++ shared inner bridge
 ```
 
-仅参考公开行为和术语，未复制参考源码、常量、helper layout、参数名、类结构或公式。
+禁止两个完整箭头数组、两个独立 PlotFeature group 或两个 attack-arrow Polygon union。
+
+### Proposed frame
+
+```text
+DoubleArrowFrame
+├─ local projection
+├─ exact tail pair
+├─ exact objective pair
+├─ canonical left/right resolution
+├─ tail center and width
+├─ objective midpoint and separation
+├─ primary direction
+├─ derived branch center
+├─ coupled wing centerlines
+├─ two head frames
+└─ shared inner bridge frame
+```
+
+### Branch and parameter design
+
+```text
+T = midpoint(tail pair)
+O = midpoint(objective pair)
+B = lerp(T, O, branchPositionRatio)
+```
+
+Target branch range：
+
+```text
+0.15 <= branchPositionRatio <= 0.70
+```
+
+Proposed parameter families：
+
+```text
+branchPositionRatio
+headLengthRatio
+maximumHeadLengthTailRatio
+headHalfWidthTailRatio
+neckHalfWidthTailRatio
+bodyBulgeRatio
+innerBridgeRatio
+tension
+segmentsPerSpan
+miterLimit
+minimumTailWidthMeters
+maximumTailWidthMeters
+```
+
+数值 defaults 由 PlotLibre golden fixture 校准。
+
+### Validation policy
+
+拟定 issue：
+
+```text
+INVALID_DOUBLE_ARROW_GEOMETRY
+```
+
+必须拒绝 invalid count、coincident pairs、zero direction、pair-axis degeneracy、objective behind tail、short wing、invalid branch、head overlap、crossed wings、bridge crossing、non-finite 和 self-intersecting ring。
+
+### Test and public API plan
+
+Target API：
+
+```text
+DOUBLE_ARROW_TYPE = "arrow.double"
+DoubleArrowParameters
+ResolvedDoubleArrowParameters
+DEFAULT_DOUBLE_ARROW_PARAMETERS
+resolveDoubleArrowParameters()
+buildDoubleArrowFrame()
+buildDoubleArrowRing()
+doubleArrowDefinition
+```
+
+Target version/workspace：
+
+```text
+Definition 1.0.0
+Workspace 0.0.12
+```
+
+测试计划包括 deterministic golden、exact tails/tips、三种 pair-swap invariance、parameter isolation、topology、PlotJSON、fixed-four auto-completion、第八个 selector/sample、actual rendered feature、objective drag/history/undo。
+
+### Contract and roadmap
+
+已更新：
+
+```text
+AGENTS.md
+docs/DEVELOPMENT_PLAN.md
+```
 
 ## Validation
 
-最终全内容权威矩阵：
+本阶段只有 Markdown 设计变更。
+
+必须保持现有基线：
 
 ```text
-Run ID: 30419781349
-Head: 7feecce2e40daa6751e4b2e3612e9043b33ee043
-Node 20.19: success
-Node 22: success
-TypeScript/workspace: success
-90 Node tests: success
-Playground typecheck/build: success
-handover contract: success
-12 Chromium tests: success
-seven-symbol committed/rendered Source: success
-tailed attack draw/camera/edit/history/undo: success
+90 Node tests
+12 Chromium tests
+Node 20.19
+Node 22
+/PlotLibre/ build
+handover contract
 ```
 
-当前状态封存提交仅新增 handover 元数据；它的 CI 用于确认仓库契约仍然完整。
+设计 Draft PR 全绿后再进入实现。
 
 ## Architectural decisions
 
-1. 平尾和燕尾攻击箭头共享 canonical control model。
-2. `AttackArrowFrame` 是共享 body/head 边界。
-3. 燕尾变体只拥有 closing strategy 和 notch parameters。
-4. notch vertices 是派生数据，不是 semantic handles。
-5. 关系型 golden 证明 shared body/head 逐坐标不变。
-6. notch depth 和 opening width 是独立参数。
-7. notch 必须保持在 neck 后方。
-8. topology-sensitive Definition 在命令执行前验证完整可生成性。
-9. MapLibre interaction 保持 Definition-driven，无 symbol ID 特判。
-10. 不放宽 simple-ring policy 迁就极端参数。
+1. exactly four explicit controls；
+2. fourth click auto-completes；
+3. no persisted three-point mirror；
+4. no fifth branch control in PlotJSON 1.0；
+5. branch is parameter-derived；
+6. tail/objective pairs are unordered；
+7. pair swapping is geometry-invariant；
+8. one connected simple Polygon；
+9. no union of complete arrows；
+10. all four controls exact and editable；
+11. all construction vertices derived；
+12. pure `DoubleArrowFrame` before generator；
+13. complete renderability validation before Store mutation；
+14. interaction remains Definition-driven。
 
 ## Known limitations
 
-- notch 参数无 UI controls 或 parameter handles；
-- UI 尚未显示详细 validation issue；
-- committed spine controls 暂不支持插入/删除；
-- 无 touch completion、snapping 或 constraints；
-- local projection 不适合超大跨国符号；
-- browser matrix 仅 Chromium；
-- Core Store-listener exception 无通用事务回滚；
-- PR #13 合并后才能验证线上七符号 Pages；
-- 当前执行环境 DNS 无法直接访问 GitHub Pages。
+- no double-arrow geometry yet；
+- no numerical defaults/golden fixture yet；
+- no public type/Definition/PlotJSON implementation yet；
+- no eighth Playground option or browser rendering yet；
+- public Pages remains seven symbols；
+- live Pages cannot be directly verified in the current DNS-restricted execution environment。
 
 ## Next tasks
 
-1. 等待状态封存提交的 CI 全绿；
-2. 更新 PR #13 最终说明；
-3. 检查 review threads；
-4. 将 PR #13 标记 Ready；
-5. squash merge 到 `main`；
-6. 验证 main 状态；
-7. 验证 GitHub Pages 在线页面包含七种符号；
-8. 从最新 `main` 创建 Milestone 005H 分支；
-9. 先完成 `arrow.double` canonical semantic design；
-10. 不并行实现 pincer、route、corridor 或 squad-combat。
+1. open design Draft PR；
+2. run existing full CI baseline；
+3. merge approved design；
+4. create implementation branch；
+5. add clean-room algorithm record；
+6. implement `DoubleArrowFrame`；
+7. implement coupled wings、two heads、shared bridge and one ring；
+8. add golden/topology tests；
+9. add Definition/Registry/PlotJSON；
+10. bump workspace to `0.0.12`；
+11. add eighth Playground selector/sample and Chromium tests；
+12. add separate 005H implementation handover；
+13. do not implement pincer、route、corridor or squad-combat in parallel。
 
 ## Risks and decisions
 
-### Double arrow semantic risk
+### External data migration
 
-`arrow.double` 不能是两个普通箭头组成的数组。它必须是共享 branch/body 的单一 semantic object。
+PlotLibre intentionally rejects persisted 3-point mirror and 5-point connection states in version 1.0. Importing external DoubleArrow data may require a future explicit adapter.
 
-### Canonical controls unresolved
+### Derived branch
 
-开始 005H 编码前必须明确共享尾部、左右 objectives、中心连接/分叉控制、handedness、最小点数和 completion rule。
+Branch editability initially belongs to a parameter/future parameter handle. Adding a fifth control later requires a versioned migration.
 
 ### Topology
 
-双头、共享 body 和中心连接可能形成多个自交区域。必须先制定 topology policy，再实现 generator。
+Two heads and one shared bridge create multiple crossing modes. Generation-equivalent Definition validation is mandatory.
 
-### Scope control
+### Interaction
 
-005H 只实现 `arrow.double`，不并行添加其他复杂箭头。
+Fixed-four completion must use existing `MultiPointDrawSession`; no `arrow.double` condition may be added to interaction or MapLibre code.
 
 ### Deployment
 
-只有 PR #13 合并、Pages workflow 成功且在线页面实际出现 `arrow.attack.tailed` 后，才能宣布七符号公开部署完成。
+Design completion does not change public symbol count. Do not announce eight-symbol Pages until implementation merges and online content is verified.
 
 ## Continuation instructions
 
 后续开发者或对话应：
 
 1. 阅读 `AGENTS.md`；
-2. 阅读 `docs/algorithms/arrow-attack.md`；
-3. 阅读 `docs/algorithms/arrow-attack-tailed.md`；
-4. 阅读两份 005G 不可变交接；
-5. 确认 PR #13、最终 CI、main 和 Pages 状态；
-6. 从最新 `main` 开始 005H；
-7. 保留 90 Node 和 12 Chromium 回归；
-8. 先写双箭头语义设计和 clean-room 记录；
-9. 完成后新增 005H immutable handover 并更新本文件。
+2. 阅读 `docs/design/arrow-double-semantic-design.md`；
+3. 阅读 005H design handover；
+4. 确认 design PR 和 CI；
+5. 不修改四控制点契约，除非新增明确 migration proposal；
+6. 从 pure `DoubleArrowFrame` 开始实现；
+7. 保留 90 Node 和 12 Chromium 基线；
+8. 完成实现后新增独立 005H implementation handover 并更新本文件。
