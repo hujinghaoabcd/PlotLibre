@@ -47,6 +47,7 @@ Rules:
 - Self-intersection checks must not be removed merely to make a difficult path render.
 - For topology-sensitive symbols, `PlotDefinition.validate()` must cover complete renderability before Store mutation.
 - A variant golden test should prove unchanged shared geometry rather than only snapshot the final polygon.
+- A compound symbol must be one coherent semantic geometry, not an array of independently persisted simpler symbols.
 
 ## 4. Clean-room and licensing
 
@@ -72,7 +73,7 @@ Never copy proprietary Mapbox code. Current project packages remain `UNLICENSED`
 - Framework wrappers remain optional.
 - Definition defaults are part of the visual/data contract.
 - Every semantic path control must survive PlotJSON round trip.
-- Derived centerline samples, offset vertices, notch vertices and polygon vertices must not be serialized as semantic controls.
+- Derived centerline samples, offset vertices, notch vertices, branch points and polygon vertices must not be serialized as semantic controls.
 
 Current public Arrow identifiers:
 
@@ -86,13 +87,16 @@ arrow.attack
 arrow.attack.tailed
 ```
 
+`arrow.double` is designed but is not public until the complete 005H vertical slice passes validation and is merged.
+
 ## 6. Interaction rules
 
 - Exact two-point definitions use `TwoPointDrawSession`.
 - Definitions requiring three or more points use `MultiPointDrawSession`.
 - Session choice is derived from `PlotDefinition.controlSchema`, not hard-coded symbol IDs.
+- Fixed-count multi-point symbols use `completeAtMaximum`; variable-count symbols use explicit completion.
 - Draft output is allowed only after minimum semantic validity is reached.
-- Enter and double-click completion must preserve all semantic controls.
+- Enter and double-click completion must preserve all semantic controls when enabled by the Definition.
 - Backspace/Delete removes one uncommitted multi-point control at a time.
 - Drawing-state point removal is not Store history.
 - MapLibre double-click zoom must stay disabled through the native `dblclick` event and be restored afterward.
@@ -100,7 +104,7 @@ arrow.attack.tailed
 - One completed handle drag produces one `ReplacePlotCommand`.
 - Invalid handle previews do not enter Store or History.
 - Any geometry that can fail during render must be rejected before command execution.
-- Derived notch/head/body vertices are never semantic handles.
+- Derived notch/head/body/branch vertices are never semantic handles.
 
 ## 7. Testing requirements
 
@@ -129,14 +133,15 @@ For MapLibre symbols, Store size is not sufficient. Tests must verify:
 
 New geometry requires numerical, degenerate, parameter-isolation and golden-fixture tests. Multi-point geometry must additionally test:
 
-- minimum point count;
+- exact control-count contract;
 - exact semantic tail/tip controls;
-- interior-control influence;
-- duplicate-control cleanup;
+- interior-control influence where applicable;
+- pair/input-order invariance where declared;
+- duplicate-control cleanup or rejection policy;
 - self-intersection policy;
 - full-path PlotJSON round trip;
-- double-click completion;
-- camera stability and zoom restoration;
+- declared completion mode: fixed maximum, double-click or Enter;
+- camera stability and zoom restoration when double-click is used;
 - semantic handle edit, history depth and undo;
 - invalid geometry rejection before Store mutation.
 
@@ -152,7 +157,7 @@ MapLibre `querySourceFeatures()` may return duplicate tile copies. Semantic hand
 - E2E cannot depend on remote tiles.
 - MapLibre 6 Worker and Shared modules remain aligned with the installed package.
 - Every public symbol gets a selector/catalog entry and browser test in the same slice.
-- Multi-point symbols require visible instructions for completion and point removal.
+- Multi-point symbols require visible instructions for their actual completion mode and point removal.
 - Pages deploys only from `main`.
 
 ## 9. Documentation and handover
@@ -187,7 +192,7 @@ The handover contract requires these exact headings:
 ## Risks and decisions
 ```
 
-Never delete earlier handovers.
+Never delete or rewrite earlier immutable handovers. A later finalization state must be recorded in a new handover file.
 
 ## 10. Scope control
 
@@ -195,28 +200,40 @@ One complete high-quality vertical slice is preferred to many incomplete symbols
 
 ## 11. Current priority
 
-Milestone 005G completed `arrow.attack.tailed` with:
+Milestone 005G completed and merged `arrow.attack.tailed` with shared `AttackArrowFrame`, independent swallowtail closing, complete validation, PlotJSON, seven-symbol Playground, 90 Node tests and 12 Chromium scenarios.
 
-- the same exact two-edge tail and spine semantics as `arrow.attack`;
-- shared `AttackArrowFrame` body/head construction;
-- independent inward swallowtail closing strategy;
-- explicit notch depth and opening-width parameters;
-- relational golden proof that flat attack body/head coordinates are unchanged;
-- complete renderability validation before Store mutation;
-- PlotJSON, seven-symbol Playground and real Chromium coverage;
-- one valid tail drag = one undoable replace command.
+Milestone 005H semantic design for `arrow.double` is approved in:
 
-The next priority is Milestone 005H: `arrow.double`.
+```text
+docs/design/arrow-double-semantic-design.md
+```
 
-Required design work before implementation:
+Binding version-1.0 decisions:
 
-1. define a canonical semantic model for two heads and the shared branching body;
-2. prove it is not two independent arrows stored as one object;
-3. identify the minimum useful control count and completion rule;
-4. isolate reusable branch/head primitives before writing the public generator;
-5. define symmetry, handedness and crossing/topology policies;
-6. keep derived branch intersections and polygon vertices out of PlotJSON;
-7. add only `arrow.double` in this slice;
-8. complete Definition, PlotJSON, Playground, Chromium and handover together.
+1. exactly four explicit semantic controls;
+2. controls 0/1 are an unordered pair of exact tail edges;
+3. controls 2/3 are an unordered pair of exact objective tips;
+4. `minPoints = 4` and `maxPoints = 4`;
+5. the fourth click auto-completes through `completeAtMaximum`;
+6. no persisted three-point mirrored objective;
+7. no fifth branch control in PlotJSON 1.0;
+8. branch center is derived from `branchPositionRatio`;
+9. pair swapping must not change generated geometry;
+10. all four controls are handles; branch/head/body vertices are derived;
+11. the result is one closed simple Polygon with a shared body and two heads;
+12. it must not be implemented as two complete arrows or a union of two arrow Polygons;
+13. introduce a pure `DoubleArrowFrame` before the public ring generator;
+14. complete Definition, PlotJSON, eight-symbol Playground, Chromium and handover in the same slice.
+
+Next implementation order:
+
+1. clean-room algorithm record;
+2. `DoubleArrowFrame`;
+3. coupled wing centerlines and two heads;
+4. shared inner bridge and one ring;
+5. topology and golden tests;
+6. Definition/Registry/PlotJSON;
+7. Playground and Chromium;
+8. public docs and immutable handover.
 
 Do not implement pincer, route, corridor, squad-combat or other complex arrows in parallel.

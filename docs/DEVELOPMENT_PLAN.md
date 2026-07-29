@@ -20,7 +20,8 @@
 | 005D | `MultiPointDrawSession` 与统一 `doubleClick()` 协议 | 已完成并合并 |
 | 005E | `arrow.curved` 与 MapLibre 多点绘制/编辑 | 已完成并合并 |
 | 005F | `arrow.attack`、`AttackArrowFrame`、完整几何预检、相机稳定修复 | 已完成并合并 |
-| 005G | `arrow.attack.tailed`、共享攻击 frame、独立燕尾闭合 | 已完成，等待 PR #13 合并 |
+| 005G | `arrow.attack.tailed`、共享攻击 frame、独立燕尾闭合 | 已完成并合并 |
+| 005H-D | `arrow.double` canonical semantic design | 已完成，等待设计 PR 合并 |
 
 当前 workspace：
 
@@ -40,98 +41,22 @@ arrow.attack
 arrow.attack.tailed
 ```
 
+`arrow.double` 仅完成设计，尚未成为公开 built-in symbol。
+
 ## Milestone 005G：`arrow.attack.tailed`
 
-状态：**代码、测试、Playground 和第一轮权威 CI 已完成**。
+状态：**已完成并通过 PR #13 合并到 `main`**。
 
-### 语义模型
-
-与 `arrow.attack` 完全一致：
+主线合并提交：
 
 ```text
-controlPoints[0]       = exact tail edge A
-controlPoints[1]       = exact tail edge B
-controlPoints[2..n-2]  = attack-spine controls
-controlPoints[n-1]     = exact objective/tip
-minimum points         = 3
-maximum points         = 64
+74611fe8dd39f5c2ad927ab2e9aeb56a9dadf304
 ```
 
-燕尾根点和内凹点是派生几何，不进入 PlotJSON，也不是语义 handles。
-
-### 独立结构
+最终验证：
 
 ```text
-AttackArrowFrame
-+ shared body/head golden geometry
-+ independent inward swallowtail closing strategy
-```
-
-新增参数：
-
-```text
-tailNotchDepthRatio = notch depth / full semantic tail width
-tailNotchWidthRatio = notch opening / full semantic tail width
-```
-
-默认值：
-
-```text
-0.75
-0.65
-```
-
-### 已完成几何
-
-- `TailedAttackArrowParameters`；
-- `ResolvedTailedAttackArrowParameters`；
-- `DEFAULT_TAILED_ATTACK_ARROW_PARAMETERS`；
-- `resolveTailedAttackArrowParameters()`；
-- `buildTailedAttackArrowRing()`；
-- exact semantic tail edges and tip；
-- tail-input-order independence；
-- independent depth and opening-width parameters；
-- neck-distance and neck-plane guards；
-- finite/closed/CCW/simple-ring validation；
-- explicit self-intersection rejection；
-- complete Definition-level renderability validation。
-
-### 关系型 golden
-
-测试不是单独复制一份完整 Polygon 快照，而是证明：
-
-```text
-tailed body/head coordinates
-= flat attack golden coordinates
-```
-
-燕尾 ring 只增加三个独立 notch vertices，并保持平尾攻击箭头 body/head 的逐坐标结果不变。
-
-### 已完成 Definition 与数据
-
-- `TAILED_ATTACK_ARROW_TYPE = "arrow.attack.tailed"`；
-- `tailedAttackArrowDefinition` version `1.0.0`；
-- built-in catalog；
-- fill/outline/hit-area；
-- full semantic-path PlotJSON；
-- notch parameter round trip；
-- workspace `0.0.11`。
-
-### 已完成 Playground
-
-- 第七个 selector option；
-- 第七个南京示例；
-- 燕尾攻击箭头说明；
-- 平尾/燕尾攻击箭头真实四点绘制；
-- camera stability and zoom restoration；
-- actual committed Source/rendered-feature checks；
-- tail handle drag、revision、History 和 undo；
-- Worker 与 `/PlotLibre/` build 回归。
-
-### 第一轮权威验证
-
-```text
-Run ID: 30419114264
+Run ID: 30420076111
 Node 20.19: success
 Node 22: success
 Node tests: 90 passed
@@ -140,41 +65,155 @@ Pages build: success
 handover contract: success
 ```
 
-### 算法记录
+已完成：
+
+- `arrow.attack.tailed`；
+- shared `AttackArrowFrame`；
+- independent inward swallowtail closing；
+- notch depth/width parameters；
+- relational golden preserving flat body/head；
+- complete renderability validation；
+- PlotJSON；
+- seven-symbol Playground；
+- real MapLibre draw/render/edit/history/undo；
+- clean-room algorithm record；
+- immutable implementation and finalization handovers。
+
+## Milestone 005H Design：`arrow.double`
+
+状态：**canonical semantic design approved; geometry not yet implemented**。
+
+设计文档：
 
 ```text
-docs/algorithms/arrow-attack-tailed.md
+docs/design/arrow-double-semantic-design.md
 ```
 
-实现为 clean-room：仅参考公开行为和术语，不复制参考源码、常量、helper layout 或公式。
+### Public behavior research
 
-## 下一步：Milestone 005H `arrow.double`
+在指定公开 revision 中观察到：
 
-双箭头不能实现为“两个独立箭头组成一个数组”。开始编码前必须先完成语义设计。
+- DoubleArrow 是独立 Polygon 类型；
+- 正常交互最多 4 点并固定完成；
+- 3 点状态可临时推导另一目标；
+- 4 点状态显式包含两个目标；
+- 恢复数据可以包含额外连接点；
+- 左右分配由几何关系决定。
 
-### 待解决语义问题
+PlotLibre 只采用行为信息，不复制参考公式、常量、helper layout 或类结构。
 
-1. 哪些控制点定义共享尾部或连接体；
-2. 哪些控制点定义左、右箭头目标；
-3. 是否显式保存中心连接/转折控制点；
-4. 如何定义左右 handedness 与输入顺序无关性；
-5. 如何保证两个头部、分叉 body 和中心连接不自交；
-6. 最少控制点和 double-click completion 规则；
-7. 哪些 branch/intersection 点属于派生几何。
+### Approved canonical controls
 
-### 实施顺序
+Version 1.0 固定四个显式语义控制点：
 
-1. 公开行为与数学语义研究；
-2. clean-room provenance；
-3. canonical control schema；
-4. 独立 branch/head frame 或 primitives；
-5. topology policy；
-6. deterministic golden fixture；
-7. Definition 和 PlotJSON；
-8. MultiPoint interaction；
-9. 第八个 Playground selector/sample；
-10. Chromium draw/render/edit/undo；
-11. README、路线图、算法文档和不可变交接；
+```text
+controlPoints[0] = tail edge A
+controlPoints[1] = tail edge B
+controlPoints[2] = objective A
+controlPoints[3] = objective B
+```
+
+控制 schema：
+
+```text
+minPoints = 4
+maxPoints = 4
+completeOnDoubleClick = false
+```
+
+绘制流程：
+
+```text
+click tail A
+→ click tail B
+→ click objective A
+→ pointer candidate shows complete draft
+→ click objective B auto-completes
+```
+
+### Deliberate semantic decisions
+
+- 不持久化 3 点镜像 objective；
+- 不在 PlotJSON 1.0 增加第 5 个 connection control；
+- branch center 由 `branchPositionRatio` 派生；
+- tail pair 和 objective pair 都是无序对；
+- 交换任一对输入不改变几何；
+- 四个控制点全部是 handles；
+- branch、head、body、bridge 和 Polygon vertices 全部派生；
+- 输出是一个 connected simple Polygon；
+- 禁止把两个完整箭头 union 或存成数组。
+
+### Proposed frame
+
+```text
+DoubleArrowFrame
+├─ local projection
+├─ exact tail pair
+├─ exact objective pair
+├─ canonical left/right resolution
+├─ tail center and width
+├─ objective midpoint and separation
+├─ primary direction
+├─ derived branch center
+├─ coupled left/right wing centerlines
+├─ two head frames
+└─ shared inner bridge frame
+```
+
+### Proposed parameter families
+
+```text
+branchPositionRatio
+headLengthRatio
+maximumHeadLengthTailRatio
+headHalfWidthTailRatio
+neckHalfWidthTailRatio
+bodyBulgeRatio
+innerBridgeRatio
+tension
+segmentsPerSpan
+miterLimit
+minimumTailWidthMeters
+maximumTailWidthMeters
+```
+
+数值默认值由 PlotLibre golden fixture 校准，不复制参考实现。
+
+### Topology policy
+
+必须拒绝：
+
+- invalid control count；
+- coincident tail or objective pair；
+- zero primary direction；
+- tail/objective pair nearly parallel to primary direction；
+- objective behind tail；
+- wing too short for head；
+- invalid branch position；
+- head overlap；
+- crossed wings；
+- inner bridge crossing outer boundary；
+- non-finite or self-intersecting ring。
+
+拟定 issue code：
+
+```text
+INVALID_DOUBLE_ARROW_GEOMETRY
+```
+
+## 005H Implementation order
+
+1. 新增 clean-room algorithm record；
+2. 实现 pure `DoubleArrowFrame`；
+3. 实现 coupled wing centerlines；
+4. 生成两个 exact-tip heads；
+5. 实现 shared inner bridge 和单一 ring；
+6. 增加 deterministic golden、pair-swap 和 topology tests；
+7. 增加 Definition/Registry/PlotJSON；
+8. workspace 升级到 `0.0.12`；
+9. 增加第八个 Playground selector/sample；
+10. Chromium 验证 fixed-four-point auto-completion、render、edit、history、undo；
+11. 更新 README、路线图、算法文档和不可变交接；
 12. 合并后验证 Pages 八符号部署。
 
 在 005H 完成前，不实现 pincer、route、corridor、squad-combat 或其他复杂箭头。
