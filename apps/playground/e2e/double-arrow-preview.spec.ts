@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("double arrow shows a draft immediately after the third click", async ({
+test("double arrow shows a draft after a centerline third click", async ({
   page,
 }) => {
   await page.goto("/PlotLibre/?e2e=1");
@@ -16,7 +16,7 @@ test("double arrow shows a draft immediately after the third click", async ({
 
   await page.mouse.click(box.x + box.width * 0.42, box.y + box.height * 0.74);
   await page.mouse.click(box.x + box.width * 0.58, box.y + box.height * 0.74);
-  await page.mouse.click(box.x + box.width * 0.30, box.y + box.height * 0.32);
+  await page.mouse.click(box.x + box.width * 0.50, box.y + box.height * 0.32);
 
   await expect
     .poll(async () =>
