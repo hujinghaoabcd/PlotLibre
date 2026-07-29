@@ -10,7 +10,7 @@ import type {
 
 /**
  * Engine-independent click-to-append session for symbols whose semantic model
- * uses a variable or fixed sequence of two or more control points.
+ * uses a variable or fixed sequence of control points.
  *
  * Draft output is emitted only when the committed points plus pointer preview
  * satisfy minimumPoints, or when the Definition supplies a complete transient
@@ -30,9 +30,13 @@ export class MultiPointDrawSession implements DrawSession {
 
   public constructor(options: MultiPointDrawSessionOptions) {
     validateFeatureOptions(options);
-    if (!Number.isInteger(options.minimumPoints) || options.minimumPoints < 2) {
+    const minimumAllowed = options.allowTwoPointMinimum === true ? 2 : 3;
+    if (
+      !Number.isInteger(options.minimumPoints) ||
+      options.minimumPoints < minimumAllowed
+    ) {
       throw new RangeError(
-        "MultiPointDrawSession minimumPoints must be an integer >= 2.",
+        `MultiPointDrawSession minimumPoints must be an integer >= ${minimumAllowed}.`,
       );
     }
     if (
