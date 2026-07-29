@@ -10,7 +10,7 @@ export const playgroundTemplate = `
       </a>
       <div class="header-links">
         <a href="https://github.com/hujinghaoabcd/PlotLibre" target="_blank" rel="noreferrer">GitHub</a>
-        <span class="version-badge">v0.0.12 demo</span>
+        <span class="version-badge">v0.0.13 demo</span>
       </div>
     </header>
 
@@ -25,6 +25,7 @@ export const playgroundTemplate = `
         <option value="arrow.attack">攻击箭头</option>
         <option value="arrow.attack.tailed">燕尾攻击箭头</option>
         <option value="arrow.double">双箭头</option>
+        <option value="arrow.pincer">钳形箭头</option>
       </select>
       <button id="draw-button" data-testid="draw-button" class="primary" type="button">开始绘制</button>
       <button id="cancel-button" data-testid="cancel-button" type="button">取消绘制</button>
@@ -100,6 +101,7 @@ export const playgroundTemplate = `
             <li>攻击箭头：前两个点定义左右尾缘，后续点定义进攻骨架和目标。</li>
             <li>燕尾攻击箭头保留相同控制点语义，仅使用独立内凹燕尾闭合。</li>
             <li>双箭头：前两点为尾缘，后两点为两个目标；第四次点击自动完成。</li>
+            <li>钳形箭头：两个外尾、两个配对目标和一个内侧汇合点；第五次点击自动完成。</li>
             <li>可变多点箭头双击最后一点或按 Enter 完成；Backspace/Delete 逐点回退。</li>
             <li>完成后可拖动任一圆形语义控制点重新编辑。</li>
           </ol>
