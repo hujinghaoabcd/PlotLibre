@@ -46,6 +46,7 @@ Rules:
 - Multi-point arrow geometry must preserve semantic controls separately from curve samples and polygon vertices.
 - Self-intersection checks must not be removed merely to make a difficult path render.
 - For topology-sensitive symbols, `PlotDefinition.validate()` must cover complete renderability before Store mutation.
+- A variant golden test should prove unchanged shared geometry rather than only snapshot the final polygon.
 
 ## 4. Clean-room and licensing
 
@@ -71,7 +72,7 @@ Never copy proprietary Mapbox code. Current project packages remain `UNLICENSED`
 - Framework wrappers remain optional.
 - Definition defaults are part of the visual/data contract.
 - Every semantic path control must survive PlotJSON round trip.
-- Derived centerline samples, offset vertices and polygon vertices must not be serialized as semantic controls.
+- Derived centerline samples, offset vertices, notch vertices and polygon vertices must not be serialized as semantic controls.
 
 Current public Arrow identifiers:
 
@@ -82,6 +83,7 @@ arrow.fine.tailed
 arrow.assault-direction
 arrow.curved
 arrow.attack
+arrow.attack.tailed
 ```
 
 ## 6. Interaction rules
@@ -98,6 +100,7 @@ arrow.attack
 - One completed handle drag produces one `ReplacePlotCommand`.
 - Invalid handle previews do not enter Store or History.
 - Any geometry that can fail during render must be rejected before command execution.
+- Derived notch/head/body vertices are never semantic handles.
 
 ## 7. Testing requirements
 
@@ -136,6 +139,8 @@ New geometry requires numerical, degenerate, parameter-isolation and golden-fixt
 - camera stability and zoom restoration;
 - semantic handle edit, history depth and undo;
 - invalid geometry rejection before Store mutation.
+
+Variant tests must additionally show that changing the variant-specific parameter does not silently change shared body/head geometry.
 
 MapLibre `querySourceFeatures()` may return duplicate tile copies. Semantic handle counts must be validated by unique `plotId + handleIndex`, not raw Feature count.
 
@@ -190,26 +195,28 @@ One complete high-quality vertical slice is preferred to many incomplete symbols
 
 ## 11. Current priority
 
-Milestone 005F completed `arrow.attack` with:
+Milestone 005G completed `arrow.attack.tailed` with:
 
-- exact two-edge tail semantics;
-- reusable `AttackArrowFrame`;
-- broad attack body and neck/head transition;
-- complete renderability validation;
-- multi-point drawing and semantic handle editing;
-- deferred double-click zoom restoration;
-- real Chromium rendering, history and undo validation.
+- the same exact two-edge tail and spine semantics as `arrow.attack`;
+- shared `AttackArrowFrame` body/head construction;
+- independent inward swallowtail closing strategy;
+- explicit notch depth and opening-width parameters;
+- relational golden proof that flat attack body/head coordinates are unchanged;
+- complete renderability validation before Store mutation;
+- PlotJSON, seven-symbol Playground and real Chromium coverage;
+- one valid tail drag = one undoable replace command.
 
-The next priority is Milestone 005G: `arrow.attack.tailed`.
+The next priority is Milestone 005H: `arrow.double`.
 
-Required design:
+Required design work before implementation:
 
-1. preserve the same semantic tail-edge and spine controls;
-2. reuse `AttackArrowFrame` rather than copy `buildAttackArrowRing()`;
-3. add an independent inward swallowtail closing strategy;
-4. define explicit notch depth/width parameters and validation;
-5. preserve flat-tail attack golden behavior;
-6. add only `arrow.attack.tailed` in this slice;
-7. complete Definition, PlotJSON, Playground, Chromium and handover together.
+1. define a canonical semantic model for two heads and the shared branching body;
+2. prove it is not two independent arrows stored as one object;
+3. identify the minimum useful control count and completion rule;
+4. isolate reusable branch/head primitives before writing the public generator;
+5. define symmetry, handedness and crossing/topology policies;
+6. keep derived branch intersections and polygon vertices out of PlotJSON;
+7. add only `arrow.double` in this slice;
+8. complete Definition, PlotJSON, Playground, Chromium and handover together.
 
-Do not implement double, pincer, route, corridor or other complex arrows in parallel.
+Do not implement pincer, route, corridor, squad-combat or other complex arrows in parallel.
