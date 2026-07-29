@@ -2,34 +2,32 @@
 
 ## 总体策略
 
-采用“单符号完整纵向切片”：每个阶段同时完成语义数据、纯几何、Definition、PlotJSON、交互、Playground、真实浏览器测试、算法文档和交接文件。
+采用“单符号完整纵向切片”：每个阶段同时完成语义数据、纯几何、Definition、PlotJSON、交互、Playground、真实浏览器测试、算法文档和交接文件。禁止并行堆叠多个缺乏测试和语义边界的箭头类型。
 
-禁止在一个阶段并行堆叠多个缺乏测试和语义边界的箭头类型。
-
-## 已完成里程碑
+## 里程碑状态
 
 | 里程碑 | 主要成果 | 状态 |
 |---|---|---|
-| 001 | Workspace、Core、Registry、Store、History、PlotJSON、`arrow.straight` | 已完成 |
-| 002 | `TwoPointDrawSession`、draft、handles、选择、拖动、undo/redo | 已完成 |
-| 003 | Vite Playground、MapLibre 6、Pages、Worker 打包、真实渲染测试 | 已完成 |
-| 004 | Vector、Polyline、Curve、Offset、Ring、Geodesic、Arrow components | 已完成 |
+| 001–004 | Workspace、Core、交互、Playground、Geometry foundations | 已完成 |
 | 005A | `arrow.fine` | 已完成并合并 |
 | 005B | `arrow.fine.tailed`、共享 `FineArrowFrame` | 已完成并合并 |
 | 005C | `arrow.assault-direction` | 已完成并合并 |
-| 005D | `MultiPointDrawSession` 与统一 `doubleClick()` 协议 | 已完成并合并 |
-| 005E | `arrow.curved` 与 MapLibre 多点绘制/编辑 | 已完成并合并 |
-| 005F | `arrow.attack`、`AttackArrowFrame`、完整几何预检、相机稳定修复 | 已完成并合并 |
-| 005G | `arrow.attack.tailed`、共享攻击 frame、独立燕尾闭合 | 已完成并合并 |
-| 005H-D | `arrow.double` canonical semantic design | 已完成，等待设计 PR 合并 |
+| 005D | `MultiPointDrawSession` | 已完成并合并 |
+| 005E | `arrow.curved` | 已完成并合并 |
+| 005F | `arrow.attack`、`AttackArrowFrame`、完整几何预检 | 已完成并合并 |
+| 005G | `arrow.attack.tailed` | 已完成并合并 |
+| 005H-D | `arrow.double` canonical semantic design | PR #14 已合并 |
+| 005H-I | `arrow.double` 完整纵向切片 | PR #15 Draft，等待最终 CI |
 
-当前 workspace：
+当前实现分支：
 
 ```text
-0.0.11
+branch:            agent/double-arrow-vertical-slice
+workspace version: 0.0.12
+built-in symbols:  8
 ```
 
-当前公开箭头：
+当前分支公开箭头：
 
 ```text
 arrow.straight
@@ -39,49 +37,10 @@ arrow.assault-direction
 arrow.curved
 arrow.attack
 arrow.attack.tailed
+arrow.double
 ```
 
-`arrow.double` 仅完成设计，尚未成为公开 built-in symbol。
-
-## Milestone 005G：`arrow.attack.tailed`
-
-状态：**已完成并通过 PR #13 合并到 `main`**。
-
-主线合并提交：
-
-```text
-74611fe8dd39f5c2ad927ab2e9aeb56a9dadf304
-```
-
-最终验证：
-
-```text
-Run ID: 30420076111
-Node 20.19: success
-Node 22: success
-Node tests: 90 passed
-Chromium: 12 passed
-Pages build: success
-handover contract: success
-```
-
-已完成：
-
-- `arrow.attack.tailed`；
-- shared `AttackArrowFrame`；
-- independent inward swallowtail closing；
-- notch depth/width parameters；
-- relational golden preserving flat body/head；
-- complete renderability validation；
-- PlotJSON；
-- seven-symbol Playground；
-- real MapLibre draw/render/edit/history/undo；
-- clean-room algorithm record；
-- immutable implementation and finalization handovers。
-
-## Milestone 005H Design：`arrow.double`
-
-状态：**canonical semantic design approved; geometry not yet implemented**。
+## Milestone 005H：`arrow.double`
 
 设计文档：
 
@@ -89,22 +48,13 @@ handover contract: success
 docs/design/arrow-double-semantic-design.md
 ```
 
-### Public behavior research
+算法记录：
 
-在指定公开 revision 中观察到：
+```text
+docs/algorithms/arrow-double.md
+```
 
-- DoubleArrow 是独立 Polygon 类型；
-- 正常交互最多 4 点并固定完成；
-- 3 点状态可临时推导另一目标；
-- 4 点状态显式包含两个目标；
-- 恢复数据可以包含额外连接点；
-- 左右分配由几何关系决定。
-
-PlotLibre 只采用行为信息，不复制参考公式、常量、helper layout 或类结构。
-
-### Approved canonical controls
-
-Version 1.0 固定四个显式语义控制点：
+### 固定语义控制点
 
 ```text
 controlPoints[0] = tail edge A
@@ -113,54 +63,35 @@ controlPoints[2] = objective A
 controlPoints[3] = objective B
 ```
 
-控制 schema：
-
 ```text
 minPoints = 4
 maxPoints = 4
 completeOnDoubleClick = false
 ```
 
-绘制流程：
+绘制时，第四次点击自动完成。tail pair 与 objective pair 均为无序对；交换任一对输入不改变派生几何。branch center 由参数派生，不作为第五个控制点持久化。
 
-```text
-click tail A
-→ click tail B
-→ click objective A
-→ pointer candidate shows complete draft
-→ click objective B auto-completes
-```
+### 已实现
 
-### Deliberate semantic decisions
+- pure `DoubleArrowFrame` 与局部米制投影；
+- exact two tail edges and two objective tips；
+- canonical left/right pair resolution；
+- derived branch center；
+- coupled left/right Catmull–Rom wing centerlines；
+- two reusable exact-tip arrow heads；
+- shared concave inner bridge；
+- one connected Polygon ring；
+- head neck-plane boundary trimming；
+- closed/counterclockwise/simple-ring policy；
+- Definition/Registry/PlotJSON；
+- `INVALID_DOUBLE_ARROW_GEOMETRY` 完整生成预检；
+- fixed-four MapLibre preview/auto-completion；
+- four semantic handles、edit、history、undo；
+- 第八个 Playground selector/sample；
+- Node 与 Chromium 覆盖；
+- deterministic golden、pair-swap 和 topology tests。
 
-- 不持久化 3 点镜像 objective；
-- 不在 PlotJSON 1.0 增加第 5 个 connection control；
-- branch center 由 `branchPositionRatio` 派生；
-- tail pair 和 objective pair 都是无序对；
-- 交换任一对输入不改变几何；
-- 四个控制点全部是 handles；
-- branch、head、body、bridge 和 Polygon vertices 全部派生；
-- 输出是一个 connected simple Polygon；
-- 禁止把两个完整箭头 union 或存成数组。
-
-### Proposed frame
-
-```text
-DoubleArrowFrame
-├─ local projection
-├─ exact tail pair
-├─ exact objective pair
-├─ canonical left/right resolution
-├─ tail center and width
-├─ objective midpoint and separation
-├─ primary direction
-├─ derived branch center
-├─ coupled left/right wing centerlines
-├─ two head frames
-└─ shared inner bridge frame
-```
-
-### Proposed parameter families
+### 参数族
 
 ```text
 branchPositionRatio
@@ -177,52 +108,38 @@ minimumTailWidthMeters
 maximumTailWidthMeters
 ```
 
-数值默认值由 PlotLibre golden fixture 校准，不复制参考实现。
+### 必须拒绝
 
-### Topology policy
+- control count 不为四；
+- coincident tail/objective pair；
+- pair 不跨越 primary direction；
+- objective separation 不能容纳两个头部；
+- 任一 objective 位于派生前向尾部平面之后；
+- invalid branch/bridge/head parameters；
+- head/shaft、wing 或 bridge 交叉；
+- non-finite、degenerate 或 self-intersecting ring。
 
-必须拒绝：
+### 合并前验收
 
-- invalid control count；
-- coincident tail or objective pair；
-- zero primary direction；
-- tail/objective pair nearly parallel to primary direction；
-- objective behind tail；
-- wing too short for head；
-- invalid branch position；
-- head overlap；
-- crossed wings；
-- inner bridge crossing outer boundary；
-- non-finite or self-intersecting ring。
+1. Node 20.19 success；
+2. Node 22 success；
+3. all Node tests success；
+4. Playground typecheck/build success；
+5. Chromium success；
+6. handover contract success；
+7. PR 从 Draft 切换 Ready；
+8. 合并后 Pages 八符号部署 success。
 
-拟定 issue code：
-
-```text
-INVALID_DOUBLE_ARROW_GEOMETRY
-```
-
-## 005H Implementation order
-
-1. 新增 clean-room algorithm record；
-2. 实现 pure `DoubleArrowFrame`；
-3. 实现 coupled wing centerlines；
-4. 生成两个 exact-tip heads；
-5. 实现 shared inner bridge 和单一 ring；
-6. 增加 deterministic golden、pair-swap 和 topology tests；
-7. 增加 Definition/Registry/PlotJSON；
-8. workspace 升级到 `0.0.12`；
-9. 增加第八个 Playground selector/sample；
-10. Chromium 验证 fixed-four-point auto-completion、render、edit、history、undo；
-11. 更新 README、路线图、算法文档和不可变交接；
-12. 合并后验证 Pages 八符号部署。
-
-在 005H 完成前，不实现 pincer、route、corridor、squad-combat 或其他复杂箭头。
+005H 合并前不实现 pincer、route、corridor、squad-combat 或其他复杂箭头。
 
 ## 后续里程碑
 
-### Milestone 006：复杂箭头后续切片
+### Milestone 006A：`arrow.pincer` 语义设计
 
-- `arrow.pincer`；
+必须先独立冻结 pincer 的控制点、connection policy、orientation、frame、parameters、topology 和验收，不直接复制或重命名 `arrow.double`。
+
+### Milestone 006B：后续复杂箭头
+
 - squad combat；
 - route；
 - corridor；
