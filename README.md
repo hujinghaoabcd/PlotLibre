@@ -18,16 +18,19 @@ arrow.assault-direction
 arrow.curved
 arrow.attack
 arrow.attack.tailed
+arrow.double
 ```
 
-The Playground supports two-point and multi-point drawing, live preview, double-click/Enter completion, semantic control-point editing, undo/redo, style editing, seven mixed Nanjing samples, and PlotJSON import/export.
+The Playground supports two-point, variable multi-point and fixed-four-point drawing; live preview; double-click/Enter or maximum-point completion; semantic control-point editing; undo/redo; style editing; eight Nanjing samples; and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.11
+workspace version: 0.0.12
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
+Node tests:        101
+Chromium tests:    13
 ```
 
 Implemented foundations:
@@ -37,16 +40,17 @@ Implemented foundations:
 - `TwoPointDrawSession` and reusable `MultiPointDrawSession`;
 - MapLibre committed, draft and semantic-handle Sources/Layers;
 - click, pointer preview, double-click, Enter, Escape and point-removal interaction;
-- deferred double-click zoom restoration after multi-point completion, preventing camera jumps;
+- fixed-maximum-point auto-completion for four-control symbols;
+- deferred double-click zoom restoration after variable multi-point completion;
 - explicit MapLibre 6 Worker and shared-module packaging;
 - local bootstrap style and optional non-blocking raster basemap;
 - vector, polyline, curve, offset, ring and geodesic primitives;
 - antimeridian and coordinate-mode policies;
 - deterministic golden fixtures, degenerate-input tests and Chromium actual-rendered-feature tests;
-- Definition-level complete renderability validation for topology-sensitive attack arrows;
-- reusable `FineArrowFrame` and `AttackArrowFrame` variant boundaries.
+- Definition-level complete renderability validation for topology-sensitive symbols;
+- reusable `FineArrowFrame`, `AttackArrowFrame` and pure `DoubleArrowFrame` boundaries.
 
-The next single-symbol vertical slice is `arrow.double`.
+The next planned single-symbol work starts with the independent semantic design of `arrow.pincer`; it must not be implemented as an alias of `arrow.double`.
 
 ## Why semantic plotting
 
@@ -88,149 +92,96 @@ const ring = buildStraightArrowRing(
 );
 ```
 
-### `arrow.fine`
+### `arrow.fine` and `arrow.fine.tailed`
 
-Narrow tapered direction arrow with an independent parameter contract.
+Narrow tapered arrows with independent parameter contracts. The tailed variant reuses `FineArrowFrame` and changes only the tail closure.
 
-```ts
-import { buildFineArrowRing } from "@plotlibre/geometry";
+See:
 
-const ring = buildFineArrowRing(
-  [118.78, 32.04],
-  [118.86, 32.10],
-  { tailWidthRatio: 0.055 },
-);
-```
-
-See [`docs/algorithms/arrow-fine.md`](docs/algorithms/arrow-fine.md).
-
-### `arrow.fine.tailed`
-
-Fine arrow with a centered inward swallowtail notch. It reuses an internal fine-arrow frame instead of copying the base generator.
-
-```ts
-import { buildTailedFineArrowRing } from "@plotlibre/geometry";
-
-const ring = buildTailedFineArrowRing(
-  [118.78, 32.04],
-  [118.86, 32.10],
-  { tailNotchRatio: 0.9 },
-);
-```
-
-See [`docs/algorithms/arrow-fine-tailed.md`](docs/algorithms/arrow-fine-tailed.md).
+- [`docs/algorithms/arrow-fine.md`](docs/algorithms/arrow-fine.md)
+- [`docs/algorithms/arrow-fine-tailed.md`](docs/algorithms/arrow-fine-tailed.md)
 
 ### `arrow.assault-direction`
 
-Broad assault-direction arrow with a nearly constant-width shaft, explicit neck inset, pronounced shoulders and an angle-defined triangular head.
+Broad two-point assault-direction arrow with an explicit neck and pronounced shoulders.
 
-```ts
-import { buildAssaultDirectionRing } from "@plotlibre/geometry";
-
-const ring = buildAssaultDirectionRing(
-  [118.78, 32.04],
-  [118.86, 32.10],
-  {
-    bodyWidthRatio: 0.18,
-    headAngleDegrees: 42,
-  },
-);
-```
-
-This is a separate geometry model, not a fine-arrow alias. See [`docs/algorithms/arrow-assault-direction.md`](docs/algorithms/arrow-assault-direction.md).
+See [`docs/algorithms/arrow-assault-direction.md`](docs/algorithms/arrow-assault-direction.md).
 
 ### `arrow.curved`
 
-Semantic path controls are interpolated through a Catmull–Rom/Hermite centreline; the shaft tapers by cumulative arc length and the head follows the terminal tangent.
+Semantic path controls are interpolated through a Catmull–Rom/Hermite centreline; shaft width follows cumulative arc length and the head follows the terminal tangent.
 
 ```ts
 import { buildCurvedArrowRing } from "@plotlibre/geometry";
 
-const ring = buildCurvedArrowRing(
-  [
-    [118.72, 32.02],
-    [118.75, 32.05],
-    [118.78, 32.10],
-    [118.82, 32.14],
-  ],
-  {
-    tension: 0.15,
-    tailWidthRatio: 0.065,
-  },
-);
-```
-
-Properties:
-
-- minimum three and maximum 64 semantic controls;
-- every semantic control remains editable;
-- double-click or Enter completes drawing;
-- Backspace/Delete removes one uncommitted point;
-- exact final control point is preserved as the tip;
-- self-intersecting derived rings are rejected explicitly.
-
-See [`docs/algorithms/arrow-curved.md`](docs/algorithms/arrow-curved.md).
-
-### `arrow.attack`
-
-A structurally distinct multi-point attack arrow. The first two controls define the exact tail edges and their distance defines semantic tail width. Remaining controls define the attack spine and exact objective.
-
-```ts
-import { buildAttackArrowRing } from "@plotlibre/geometry";
-
-const ring = buildAttackArrowRing([
-  [118.745, 32.035], // tail edge A
-  [118.755, 32.025], // tail edge B
-  [118.79, 32.075],  // attack-spine control
-  [118.85, 32.12],   // exact objective/tip
+const ring = buildCurvedArrowRing([
+  [118.72, 32.02],
+  [118.75, 32.05],
+  [118.78, 32.10],
+  [118.82, 32.14],
 ]);
 ```
 
-Properties:
+See [`docs/algorithms/arrow-curved.md`](docs/algorithms/arrow-curved.md).
 
-- minimum three and maximum 64 semantic controls;
-- first two controls are preserved as exact tail vertices;
-- tail-input order does not change the derived polygon;
-- tail width drives body and head scale;
-- the body can bulge before narrowing into the neck;
-- every tail/spine control is editable and undoable;
-- full geometry generation is part of Definition validation;
-- invalid or self-intersecting edits are rejected before Store mutation.
+### `arrow.attack` and `arrow.attack.tailed`
 
-See [`docs/algorithms/arrow-attack.md`](docs/algorithms/arrow-attack.md).
-
-### `arrow.attack.tailed`
-
-A swallowtail attack variant that preserves the complete `arrow.attack` semantic model and reuses `AttackArrowFrame`. Only the tail-closing strategy is different.
+The first two controls define exact tail edges; remaining controls define the attack spine and exact objective. Both variants share `AttackArrowFrame`, while the tailed variant has its own inward notch closure.
 
 ```ts
-import { buildTailedAttackArrowRing } from "@plotlibre/geometry";
+import {
+  buildAttackArrowRing,
+  buildTailedAttackArrowRing,
+} from "@plotlibre/geometry";
 
-const ring = buildTailedAttackArrowRing(
-  [
-    [118.745, 32.035],
-    [118.755, 32.025],
-    [118.79, 32.075],
-    [118.85, 32.12],
-  ],
-  {
-    tailNotchDepthRatio: 0.75,
-    tailNotchWidthRatio: 0.65,
-  },
-);
+const controls = [
+  [118.745, 32.035],
+  [118.755, 32.025],
+  [118.79, 32.075],
+  [118.85, 32.12],
+] as const;
+
+const flat = buildAttackArrowRing(controls);
+const tailed = buildTailedAttackArrowRing(controls);
 ```
 
-Properties:
+See:
 
-- the two tail-edge controls and objective remain exact;
-- notch roots and notch tip are derived, not semantic handles;
-- flat and tailed variants share identical body/head golden coordinates;
-- notch depth and opening width are independent parameters;
-- the notch must remain behind the neck;
-- self-intersecting notch/body combinations are rejected before Store mutation;
-- the full semantic path and notch parameters round-trip through PlotJSON.
+- [`docs/algorithms/arrow-attack.md`](docs/algorithms/arrow-attack.md)
+- [`docs/algorithms/arrow-attack-tailed.md`](docs/algorithms/arrow-attack-tailed.md)
 
-See [`docs/algorithms/arrow-attack-tailed.md`](docs/algorithms/arrow-attack-tailed.md).
+### `arrow.double`
+
+A dedicated four-control compound arrow with one shared tail body, two explicit objectives and one connected simple Polygon.
+
+```ts
+import { buildDoubleArrowRing } from "@plotlibre/geometry";
+
+const ring = buildDoubleArrowRing([
+  [118.785, 32.045], // tail edge A
+  [118.797, 32.045], // tail edge B
+  [118.768, 32.095], // objective A
+  [118.818, 32.095], // objective B
+]);
+```
+
+Canonical behavior:
+
+- exactly four authored controls;
+- tail and objective pairs are unordered;
+- swapping either pair preserves geometry;
+- fourth click auto-completes drawing;
+- all four controls remain semantic handles;
+- branch center, wing curves, heads and inner bridge are derived;
+- both tail edges and both objective tips remain exact;
+- output is one finite, closed, counterclockwise, simple Polygon;
+- invalid or self-intersecting edits are rejected before Store mutation;
+- PlotJSON stores four controls and parameters, never a derived fifth branch control.
+
+See:
+
+- [`docs/design/arrow-double-semantic-design.md`](docs/design/arrow-double-semantic-design.md)
+- [`docs/algorithms/arrow-double.md`](docs/algorithms/arrow-double.md)
 
 ## MapLibre usage
 
@@ -239,7 +190,7 @@ import { Map, setWorkerUrl } from "maplibre-gl";
 import { PlotLibre } from "@plotlibre/maplibre";
 import {
   builtInSymbols,
-  TAILED_ATTACK_ARROW_TYPE,
+  DOUBLE_ARROW_TYPE,
 } from "@plotlibre/symbols";
 
 setWorkerUrl("/PlotLibre/assets/maplibre-gl-worker.mjs");
@@ -253,48 +204,46 @@ const map = new Map({
 
 map.on("load", () => {
   const plot = new PlotLibre(map, { definitions: builtInSymbols });
-  plot.draw(TAILED_ATTACK_ARROW_TYPE);
+  plot.draw(DOUBLE_ARROW_TYPE);
 });
 ```
 
-For either attack-arrow variant:
+Double-arrow drawing flow:
 
-1. click the first tail edge;
-2. click the second tail edge across the initial attack direction;
-3. click one or more spine controls;
-4. double-click the final objective or press Enter;
-5. drag any tail or spine handle to reshape it;
-6. call `plot.undo()` to undo the complete handle drag in one step.
-
-During double-click completion PlotLibre keeps MapLibre double-click zoom disabled until the browser event finishes, then restores the previous zoom-handler state without moving the camera.
+1. click tail edge A;
+2. click tail edge B;
+3. click objective A;
+4. move the pointer to preview the complete compound arrow;
+5. click objective B to auto-complete;
+6. drag any of the four handles to reshape it;
+7. call `plot.undo()` to undo a complete handle drag in one step.
 
 ## PlotJSON example
 
 ```json
 {
-  "id": "tailed-attack-direction-1",
-  "plotType": "arrow.attack.tailed",
+  "id": "double-direction-1",
+  "plotType": "arrow.double",
   "definitionVersion": "1.0.0",
   "controlPoints": [
-    [118.745, 32.035],
-    [118.755, 32.025],
-    [118.79, 32.075],
-    [118.85, 32.12]
+    [118.785, 32.045],
+    [118.797, 32.045],
+    [118.768, 32.095],
+    [118.818, 32.095]
   ],
   "parameters": {
+    "branchPositionRatio": 0.42,
     "headLengthRatio": 0.22,
-    "maximumHeadLengthTailRatio": 2.4,
-    "headHalfWidthTailRatio": 0.95,
-    "neckHalfWidthTailRatio": 0.32,
-    "bodyBulgeRatio": 1.08,
-    "bodyBulgePosition": 0.35,
-    "tension": 0.12,
-    "segmentsPerSpan": 16,
+    "maximumHeadLengthTailRatio": 2.2,
+    "headHalfWidthTailRatio": 0.58,
+    "neckHalfWidthTailRatio": 0.18,
+    "bodyBulgeRatio": 1.05,
+    "innerBridgeRatio": 0.55,
+    "tension": 0.18,
+    "segmentsPerSpan": 12,
     "miterLimit": 3,
     "minimumTailWidthMeters": 1,
-    "maximumTailWidthMeters": 100000,
-    "tailNotchDepthRatio": 0.75,
-    "tailNotchWidthRatio": 0.65
+    "maximumTailWidthMeters": 100000
   },
   "style": {},
   "metadata": {},
@@ -325,9 +274,8 @@ npm run playground:e2e
 - [Architecture](docs/ARCHITECTURE.md)
 - [Interaction model](docs/INTERACTION_MODEL.md)
 - [Geometry foundation](docs/GEOMETRY_FOUNDATION.md)
-- [Curved arrow algorithm](docs/algorithms/arrow-curved.md)
-- [Attack arrow algorithm](docs/algorithms/arrow-attack.md)
-- [Tailed attack arrow algorithm](docs/algorithms/arrow-attack-tailed.md)
+- [Double-arrow semantic design](docs/design/arrow-double-semantic-design.md)
+- [Double-arrow algorithm](docs/algorithms/arrow-double.md)
 - [MapLibre Worker packaging](docs/MAPLIBRE_WORKER_PACKAGING.md)
 - [Playground](docs/PLAYGROUND.md)
 - [PlotJSON](docs/PLOTJSON_SPEC.md)
