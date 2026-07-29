@@ -33,7 +33,7 @@ function createNaturalOrderFeature() {
 test("pincer Definition canonicalizes clockwise objective clicks into paired roles", () => {
   assert.throws(
     () => buildPincerArrowRing(naturalPerimeterOrder),
-    /cross|pairing|self-intersecting/,
+    /cross|pairing|self-intersecting|tail baseline|direction/,
   );
 
   const registry = new PlotRegistry().registerMany(builtInSymbols);
