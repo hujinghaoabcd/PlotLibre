@@ -213,22 +213,18 @@ One complete high-quality vertical slice is preferred to many incomplete symbols
 
 ## 11. Current priority
 
-Milestone 005H implements `arrow.double` as one connected compound geometry with:
+Milestone 005H `arrow.double` has been merged to `main` as one connected compound geometry.
 
-1. exactly four explicit semantic controls;
-2. unordered exact tail pair at indices 0/1;
-3. unordered exact objective pair at indices 2/3;
-4. `minPoints = 4`, `maxPoints = 4`;
-5. fourth-click `completeAtMaximum` completion;
-6. no persisted three-point mirror;
-7. no fifth branch control in PlotJSON 1.0;
-8. branch center derived from `branchPositionRatio`;
-9. pair-swap geometry invariance;
-10. all four controls as handles;
-11. one shared body, two wings, two heads and one inner bridge;
-12. one finite, closed, counterclockwise simple Polygon;
-13. strict full-generation Definition validation;
-14. eighth Playground selector/sample and actual browser render coverage.
+Authoritative merge state:
+
+```text
+PR #15: merged
+merge SHA: 7c155869598d913b9b5b0281e3e7282c5cf61fbc
+workspace: 0.0.12
+public Arrow definitions: 8
+Node tests: 101
+Chromium tests: 13
+```
 
 Authoritative records:
 
@@ -236,24 +232,25 @@ Authoritative records:
 docs/design/arrow-double-semantic-design.md
 docs/algorithms/arrow-double.md
 docs/handover/2026-07-29-milestone-005h-double-arrow-implementation.md
+docs/handover/2026-07-29-milestone-005h-double-arrow-finalization.md
 ```
 
-Current branch/PR:
+Immediate operational order:
 
-```text
-agent/double-arrow-vertical-slice
-PR #15
-workspace 0.0.12
-101 Node tests
-13 Chromium tests
-```
+1. confirm the `main` push run for `Deploy Playground to GitHub Pages`;
+2. verify the public Playground shows eight selector options and renders `arrow.double`;
+3. merge the finalization documentation branch;
+4. close Milestone 005H completely.
 
-Immediate order:
+The next development priority is an independent canonical semantic design for `arrow.pincer`. Before any implementation, the design must freeze:
 
-1. keep PR #15 latest CI green;
-2. mark Ready and merge;
-3. validate main and Pages eight-symbol deployment;
-4. write a new immutable 005H Finalization handover;
-5. only then begin an independent `arrow.pincer` canonical semantic design.
+1. authored control count and role of every control;
+2. whether any control groups are ordered or unordered;
+3. completion mode and minimum/maximum point policy;
+4. exact semantic handles versus derived branch/body/head vertices;
+5. one coherent compound topology rather than persisted component arrows;
+6. pair/input-order invariance claims;
+7. PlotJSON 1.0 representation and migration boundaries;
+8. failure policy for coincident, crossing and self-intersecting configurations.
 
-Do not implement pincer, route, corridor, squad-combat or other complex arrows in parallel or as aliases of `arrow.double`.
+Do not implement `arrow.pincer` until its semantic design is reviewed. Do not implement pincer, route, corridor, squad-combat or other complex arrows in parallel or as aliases/default variants of `arrow.double`.
