@@ -3,6 +3,8 @@ export * from "./assault-direction.js";
 export * from "./attack-arrow.js";
 export * from "./curved-arrow.js";
 export * from "./curves.js";
+export * from "./double-arrow-frame.js";
+export * from "./double-arrow.js";
 export * from "./fine-arrow.js";
 export * from "./geodesic.js";
 export * from "./local-projection.js";
