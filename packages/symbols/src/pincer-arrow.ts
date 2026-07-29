@@ -5,6 +5,7 @@ import type {
   PolygonGeometry,
   Position,
   RenderBundle,
+  ValidationIssue,
 } from "@plotlibre/core";
 import {
   buildPincerArrowRing,
@@ -60,16 +61,7 @@ export const pincerArrowDefinition: PlotDefinition = {
     } catch (error) {
       return {
         valid: false,
-        issues: [
-          {
-            code: "INVALID_PINCER_ARROW_GEOMETRY",
-            message:
-              error instanceof Error
-                ? error.message
-                : "Pincer arrow geometry is invalid.",
-            severity: "error",
-          },
-        ],
+        issues: [classifyPincerValidationError(error)],
       };
     }
   },
@@ -162,6 +154,32 @@ function canBuildPincer(
   } catch {
     return false;
   }
+}
+
+function classifyPincerValidationError(error: unknown): ValidationIssue {
+  const message =
+    error instanceof Error ? error.message : "Pincer arrow geometry is invalid.";
+  const rules: readonly (readonly [substring: string, code: string])[] = [
+    ["requires exactly five control points", "PINCER_CONTROL_COUNT_INVALID"],
+    ["must be distinct", "PINCER_CONTROL_POINTS_NOT_DISTINCT"],
+    ["must define a forward direction", "PINCER_FORWARD_DIRECTION_UNDEFINED"],
+    ["outer tails must lie on opposite sides", "PINCER_TAILS_SAME_SIDE"],
+    ["junction must remain in the admissible", "PINCER_JUNCTION_OUTSIDE_ZONE"],
+    ["junction is too far laterally", "PINCER_JUNCTION_TOO_FAR_LATERALLY"],
+    ["tail span must be at least", "PINCER_TAIL_SPAN_TOO_SHORT"],
+    ["tail span must not exceed", "PINCER_TAIL_SPAN_TOO_LONG"],
+    ["arm is too short", "PINCER_ARM_TOO_SHORT"],
+    ["objective must remain ahead", "PINCER_OBJECTIVE_NOT_AHEAD"],
+    ["paired arm centerlines cross", "PINCER_ARM_PAIRING_CROSSES"],
+    ["tail baseline does not span", "PINCER_TAIL_FRAME_INVALID"],
+    ["authored inner junction exactly once", "PINCER_JUNCTION_TOPOLOGY_INVALID"],
+    ["self-intersecting ring", "PINCER_SELF_INTERSECTION"],
+    ["parameter", "PINCER_PARAMETERS_INVALID"],
+  ];
+  const code =
+    rules.find(([substring]) => message.includes(substring))?.[1] ??
+    "INVALID_PINCER_ARROW_GEOMETRY";
+  return { code, message, severity: "error" };
 }
 
 function readParameters(
