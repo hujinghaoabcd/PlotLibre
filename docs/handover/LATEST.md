@@ -47,18 +47,6 @@ candidate
 15 Chromium tests
 ```
 
-权威功能 CI：
-
-```text
-Run ID: 30456378912
-Node 20.19: success
-Node 22: success
-Node tests: 107 passed
-Playground typecheck/build: success
-handover contract: success
-Chromium: 15 passed
-```
-
 不可变记录：
 
 ```text
@@ -95,6 +83,32 @@ tests/interaction.test.mjs
 tests/render-reliability.test.mjs
 apps/playground/e2e/arrow-visibility-matrix.spec.ts
 ```
+
+## Validation
+
+权威全功能 CI：
+
+```text
+Run ID: 30456378912
+Node 20.19: success
+Node 22: success
+Node tests: 107 passed, 0 failed
+Playground typecheck/build: success
+handover contract: success
+Chromium: 15 passed
+```
+
+功能日志确认：
+
+```text
+1..107
+# pass 107
+# fail 0
+
+15 passed
+```
+
+当前 documentation-inclusive CI 仅因上一版 `LATEST.md` 缺少精确 `## Validation` 标题失败；该标题已在本版本补齐。
 
 ## Next tasks
 
