@@ -40,8 +40,8 @@ Rules:
 - Validate coincident, collinear, antimeridian, high-latitude and non-finite inputs.
 - Rings must be finite, closed and topologically validated where parameters may cause self-intersection.
 - Parameters must be explicit, versioned, validated and serializable.
-- Shared primitives must remain pure and worker-ready.
-- Related variants must share components, frames or strategies; copying complete generators is prohibited.
+- Shared primitives and frames must remain pure and worker-ready.
+- Related symbols must share components, frames or strategies; copying complete generators is prohibited.
 - A public symbol needs a real semantic or structural distinction, not only new defaults.
 - Semantic controls must remain separate from curve samples and polygon vertices.
 - Self-intersection checks must not be removed merely to make a difficult path render.
@@ -49,7 +49,19 @@ Rules:
 - Compound symbols must declare their coupling topology and produce one coherent semantic geometry.
 - Shaft/head joins must not retain offset vertices beyond the head neck plane.
 
-## 4. Clean-room and licensing
+## 4. Related-symbol groups
+
+A development slice may contain two or three related symbols when all of the following are true:
+
+1. they share a meaningful mathematical foundation;
+2. the shared foundation is extracted as a pure geometry frame or component;
+3. every public identifier has independent semantic controls or closure structure;
+4. each Definition has independent validation and tests;
+5. the group completes Registry, PlotJSON, Playground, browser coverage and handover in one PR.
+
+Do not group unrelated symbols merely to increase symbol count. Do not create variants by changing only default parameters. A difficult coupled symbol may still be developed alone.
+
+## 5. Clean-room and licensing
 
 Reference libraries may be studied for observable behavior, terminology and documented mathematics.
 
@@ -64,14 +76,14 @@ Before code reuse:
 
 Never copy proprietary Mapbox code. Current packages remain `UNLICENSED` until the owner selects a license.
 
-## 5. API, canonical controls and PlotJSON
+## 6. API, canonical controls and PlotJSON
 
 - Public types use stable dotted identifiers.
 - Public state must be serializable unless documented otherwise.
 - Breaking changes require migration notes and a PlotJSON migration plan.
 - Definition defaults are part of the visual/data contract.
 - Every authored semantic control must survive PlotJSON round trip.
-- Derived centerline, offset, notch, branch, bridge, shoulder, tail edge and polygon vertices must not be serialized as controls.
+- Derived centerline, sample, offset, width, notch, branch, bridge, shoulder, tail edge, neck, head and polygon vertices must not be serialized as controls.
 - Definition-derived draft controls and semantic guides are transient and never enter Store, History, handles or PlotJSON.
 - A Definition may provide `canonicalizeControlPoints` to reorder authored coordinates into stable positional roles.
 - Canonicalization must be deterministic and may only permute the exact input coordinates.
@@ -93,23 +105,13 @@ arrow.attack.tailed
 arrow.double
 arrow.pincer
 arrow.squad-combat
+arrow.route
+arrow.corridor
 ```
 
-`arrow.double` version 1.0 stores four authored controls. Its mirrored draft objective and derived branch/body vertices are not canonical PlotJSON.
+### Squad combat
 
-`arrow.pincer` Definition version 1.1 stores exactly five canonical controls:
-
-```text
-0 outer tail A
-1 outer tail B
-2 objective A
-3 objective B
-4 shared inner junction
-```
-
-The two objective clicks may arrive in either left/right order. The Definition first tests the direct positional pairing; when it is invalid but swapping controls 2 and 3 is renderable, it persists the swapped permutation as the explicit A/B pairing. The pure geometry API remains strict and positional.
-
-`arrow.squad-combat` Definition version 1.0 stores a center action path:
+`arrow.squad-combat@1.0.0` stores a centre action path:
 
 ```text
 0      tail centre
@@ -117,9 +119,35 @@ The two objective clicks may arrive in either left/right order. The Definition f
 n-1    exact objective/tip
 ```
 
-Its two tail edges and tail width are derived in local metres. Derived tails never enter Store, handles, History or PlotJSON. `arrow.squad-combat` is distinct from `arrow.attack`, whose two tail edges are authored controls.
+Its two tail edges and tail width are derived in local metres. Derived tails never enter Store, handles, History or PlotJSON. It is distinct from `arrow.attack`, whose two tail edges are authored controls.
 
-## 6. Interaction and rejection rules
+### Route
+
+`arrow.route@1.0.0` stores a directed centre path:
+
+```text
+0      route origin
+1..n-2 optional path controls
+n-1    exact objective/tip
+```
+
+The constant-width shaft, neck plane and arrow head are derived. The final authored coordinate must remain the exact rendered tip.
+
+### Corridor
+
+`arrow.corridor@1.0.0` stores an undirected centre path:
+
+```text
+0      endpoint A
+1..n-2 optional path controls
+n-1    endpoint B
+```
+
+The output is a constant-width ribbon with flat end caps and no arrow head. It must not be implemented as a route arrow with a hidden, zero-width or degenerate head.
+
+Route and corridor may share `PathRibbonFrame`, but their public closure structures remain independent.
+
+## 7. Interaction and rejection rules
 
 - Exact two-point Definitions use `TwoPointDrawSession`.
 - Fixed or variable schemas that are not exact-two use `MultiPointDrawSession`.
@@ -130,25 +158,22 @@ Its two tail edges and tail width are derived in local metres. Derived tails nev
 - Derived draft controls are rendering-only and cannot complete or persist a plot.
 - A session becomes terminal only after full Registry validation and generation preflight.
 - `validateCompletion` may return legacy `boolean` or a full Core `ValidationResult`.
-- Invalid `ValidationResult` issues must be retained as `DrawSessionSnapshot.rejection`.
+- Invalid validation issues must be retained as `DrawSessionSnapshot.rejection`.
 - Rejection is non-terminal and must never enter Store, History or PlotJSON.
 - Rejected completion remains active so the final candidate can be replaced.
 - Rejected fixed-count candidates must not trap the session at maximum points.
 - Pointer movement, Backspace/Delete, cancellation, a new session and successful completion clear stale rejection state.
-- `MapLibrePlotInteraction.drawRejection` exposes only the most recent completion rejection.
-- Registry issues are the source of truth; Playground must translate stable issue codes rather than duplicate geometry logic.
+- Registry issues are the source of truth; Playground must not duplicate geometry logic.
 - Backspace/Delete removes one uncommitted multi-point control.
 - Drawing-state point removal is not Store history.
 - Invalid transient pointer geometry preserves the last valid draft or shows a semantic guide.
 - Create, replace and import must complete generation before Store mutation.
 - One completed handle drag produces one `ReplacePlotCommand`.
 - Invalid handle previews never enter Store or History.
-- Double-arrow must show a complete draft or guide immediately after the third click.
-- Pincer uses four committed controls plus the fifth pointer candidate for its first full draft.
-- Squad combat must show a full draft after one committed tail centre plus the live objective candidate.
-- Squad combat completes with double-click or Enter and preserves only authored centre-path controls.
+- Variable path symbols show a full draft after one committed start plus the live terminal candidate.
+- Squad combat, route and corridor complete with double-click or Enter and persist only authored centre-path controls.
 
-## 7. Testing requirements
+## 8. Testing requirements
 
 Required before merge:
 
@@ -171,53 +196,35 @@ For MapLibre symbols, tests must verify committed/draft Source data, correct `pl
 New geometry additionally requires:
 
 - exact semantic controls;
+- two-control minimum where declared;
 - interior-control influence where applicable;
 - duplicate-control policy;
 - finite/closed/winding/simple topology;
 - parameter isolation;
 - PlotJSON round trip;
 - completion mode;
-- handle edit/history/undo where the slice changes editing behavior;
 - invalid geometry rejection before Store mutation.
 
-Canonicalization tests additionally require:
+Path-ribbon group tests additionally prove:
 
-- output is an exact permutation of input controls;
-- idempotence;
-- no invented or moved coordinates;
-- raw and canonical generation behavior;
-- Store and PlotJSON persist canonical roles;
-- browser coverage for reported click order.
-
-Structured rejection tests additionally require:
-
-- detailed `ValidationResult` issues survive into the session snapshot;
-- legacy boolean rejection receives a stable generic fallback issue;
-- rejected candidates remain outside Store, History and PlotJSON;
-- pointer movement clears stale rejection;
-- a valid retry completes normally.
-
-Squad-combat tests additionally prove:
-
-- a two-control straight case is valid;
-- intermediate path controls affect derived geometry;
-- temporary tail edges are symmetric around the authored tail centre;
-- tail width responds to `tailWidthPathRatio`;
-- the exact objective/tip survives;
-- derived tail edges do not survive PlotJSON;
-- variable two-minimum multipoint drawing is schema-driven rather than symbol-hard-coded;
-- one coherent no-hole simple Polygon is produced;
-- actual browser draft and committed rendering are visible.
+- one shared width is derived from authored path length;
+- route preserves the exact terminal tip;
+- route shaft is trimmed at a derived neck plane;
+- corridor has flat end caps and no head;
+- both respond to an interior path control and width parameter;
+- both produce one coherent no-hole simple Polygon;
+- sampled centreline and offset vertices do not survive PlotJSON;
+- actual browser draft and committed rendering are visible for both.
 
 Current minimum regression baseline:
 
 ```text
-135 Node tests
-19 Chromium tests
-10 public Arrow types
+145 Node tests
+20 Chromium tests
+12 public Arrow types
 ```
 
-## 8. Playground and Pages
+## 9. Playground and Pages
 
 - GitHub Pages base is `/PlotLibre/`.
 - Production cannot require private API keys.
@@ -227,10 +234,12 @@ Current minimum regression baseline:
 - Every public symbol gets selector, sample and browser coverage in the same slice.
 - Fixed-count symbols clearly state automatic maximum-point completion.
 - Variable symbols clearly state double-click/Enter completion.
-- Production exposes squad combat by default; its E2E fixture uses `?e2e=1&squad=1` so the legacy nine-symbol suite remains stable while the ten-type matrix verifies the new public symbol.
+- Production exposes squad combat, route and corridor by default.
+- Extended E2E uses `?e2e=1&squad=1&paths=1`; legacy initial nine-symbol/sample tests remain stable.
+- Clicking Load Sample under the extended flag produces all twelve samples.
 - Pages deploys only from `main`.
 
-## 9. Documentation and handover
+## 10. Documentation and handover
 
 Every completed task must update `docs/handover/LATEST.md` and add an immutable handover:
 
@@ -250,34 +259,34 @@ The handover contract requires these exact headings:
 
 Never rewrite earlier immutable handovers.
 
-## 10. Scope control
+## 11. Scope control
 
-Prefer one complete vertical slice to many incomplete symbols. Do not develop multiple complex Arrow types in parallel. For routine new symbols, use one implementation PR unless a genuinely unresolved semantic design requires a separate design review.
+Prefer one complete related-symbol group to many incomplete symbols. Do not develop unrelated complex symbols in parallel. For routine groups, use one implementation PR unless a genuinely unresolved semantic design requires a separate design review.
 
-## 11. Current priority
+## 12. Current priority
 
-Active new-symbol slice:
+Active related-symbol group:
 
 ```text
-branch: agent/squad-combat-arrow
-PR: #27 Add squad combat arrow
-workspace: 0.0.16
-squad-combat Definition: 1.0.0
-expected Node baseline: 135
-expected Chromium baseline: 19
+branch: agent/route-corridor-symbol-group
+PR: #28 Add route and corridor symbol group
+workspace: 0.0.17
+Definitions: arrow.route@1.0.0, arrow.corridor@1.0.0
+expected Node baseline: 145
+expected Chromium baseline: 20
 ```
 
 Approved behavior:
 
-1. authored data is a centre action path;
-2. minimum two controls produce a straight form;
-3. optional intermediate controls shape the path;
-4. tail edges and width are derived, transient and symmetric;
-5. existing attack-arrow body/head construction may be reused after the independent derivation layer;
+1. both symbols persist authored centre paths;
+2. both allow a two-control straight form and optional intermediate controls;
+3. `PathRibbonFrame` is the shared pure geometry foundation;
+4. route is directed and preserves an exact terminal tip;
+5. corridor is undirected and uses flat end caps;
 6. strict simple-ring validation remains;
-7. Store and PlotJSON contain only authored center-path controls;
-8. no symbol-ID branch is added to the generic interaction engine;
-9. Playground exposes a tenth symbol and ten-symbol sample set;
-10. this work stays in one implementation PR.
+7. Store and PlotJSON contain only authored controls;
+8. no symbol-ID branch is added to interaction;
+9. Playground exposes twelve public symbols and a full twelve-sample action;
+10. this group stays in one implementation PR.
 
-After PR #27, continue directly to the next new symbol from the roadmap rather than returning to pincer hardening. The next planned complex arrow is `arrow.route`.
+After PR #28 merges, continue to the next related symbol group rather than returning to pincer hardening. The next planned group is multi-head path extensions, with exact identifiers frozen before implementation.
