@@ -42,6 +42,32 @@ export const attackArrowDefinition: PlotDefinition = {
   generate({ feature }) {
     return generateAttackArrow(feature);
   },
+  validate({ feature }) {
+    try {
+      buildAttackArrowRing(
+        feature.controlPoints,
+        readParameters({
+          ...attackArrowDefinition.defaultParameters,
+          ...feature.parameters,
+        }),
+      );
+      return { valid: true, issues: [] };
+    } catch (error) {
+      return {
+        valid: false,
+        issues: [
+          {
+            code: "INVALID_ATTACK_ARROW_GEOMETRY",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Attack arrow geometry is invalid.",
+            severity: "error",
+          },
+        ],
+      };
+    }
+  },
 };
 
 export function generateAttackArrow(feature: PlotFeature): RenderBundle {
