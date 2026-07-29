@@ -2,6 +2,7 @@ import type { PlotFeature, PlotStyle } from "@plotlibre/core";
 import type { PlotLibre } from "@plotlibre/maplibre";
 import {
   ASSAULT_DIRECTION_TYPE,
+  ATTACK_ARROW_TYPE,
   CURVED_ARROW_TYPE,
   FINE_ARROW_TYPE,
   STRAIGHT_ARROW_TYPE,
@@ -180,6 +181,22 @@ export class PlaygroundApp {
           lineWidth: 2,
         },
       },
+      {
+        id: "sample-attack-direction",
+        plotType: ATTACK_ARROW_TYPE,
+        controlPoints: [
+          [118.845, 32.095],
+          [118.857, 32.09],
+          [118.882, 32.118],
+          [118.915, 32.15],
+        ] as const,
+        style: {
+          fillColor: "#e4578c",
+          fillOpacity: 0.52,
+          lineColor: "#8f2853",
+          lineWidth: 2,
+        },
+      },
     ];
 
     for (const sample of samples) {
@@ -197,12 +214,12 @@ export class PlaygroundApp {
     this.#map.fitBounds(
       [
         [118.69, 31.99],
-        [118.92, 32.17],
+        [118.94, 32.18],
       ],
       { padding: 72, duration: 500 },
     );
     this.setStatus(
-      "已加载南京五类箭头示例。曲线箭头包含四个可拖动语义控制点。",
+      "已加载南京六类箭头示例。攻击箭头的前两个控制点是精确尾缘。",
       "ready",
     );
     this.refresh();
@@ -338,26 +355,41 @@ export class PlaygroundApp {
       this.#elements.symbolSelect.value;
   }
 
-  #isCurvedSelected(): boolean {
-    return this.#elements.symbolSelect.value === CURVED_ARROW_TYPE;
+  #selectedPlotType(): string {
+    return this.#elements.symbolSelect.value;
   }
 
   #selectionInstruction(): string {
-    return this.#isCurvedSelected()
-      ? "已选择曲线箭头。开始后连续点击路径点，双击最后一点或按 Enter 完成。"
-      : `已选择${this.#selectedSymbolLabel()}。点击“开始绘制”后确定箭尾和箭尖。`;
+    switch (this.#selectedPlotType()) {
+      case CURVED_ARROW_TYPE:
+        return "已选择曲线箭头。第一个点为尾部中心，后续点定义路径；双击或 Enter 完成。";
+      case ATTACK_ARROW_TYPE:
+        return "已选择攻击箭头。前两个点定义尾缘宽度，后续点定义进攻骨架和目标。";
+      default:
+        return `已选择${this.#selectedSymbolLabel()}。点击“开始绘制”后确定箭尾和箭尖。`;
+    }
   }
 
   #drawingInstruction(): string {
-    return this.#isCurvedSelected()
-      ? "正在绘制曲线箭头：连续点击路径点；第三个候选点开始预览，双击或 Enter 完成。"
-      : `正在绘制${this.#selectedSymbolLabel()}：请点击箭尾，再移动鼠标并点击箭尖。`;
+    switch (this.#selectedPlotType()) {
+      case CURVED_ARROW_TYPE:
+        return "正在绘制曲线箭头：点击尾部中心与路径点；第三个候选点开始预览，双击或 Enter 完成。";
+      case ATTACK_ARROW_TYPE:
+        return "正在绘制攻击箭头：先点击两个尾缘点，再点击进攻骨架；双击目标点或 Enter 完成。";
+      default:
+        return `正在绘制${this.#selectedSymbolLabel()}：请点击箭尾，再移动鼠标并点击箭尖。`;
+    }
   }
 
   #drawingProgressInstruction(): string {
-    return this.#isCurvedSelected()
-      ? "曲线箭头绘制中：继续点击路径点，双击最后一点或按 Enter 完成；Backspace 退点。"
-      : "绘制中：再次点击地图完成；Escape 取消。";
+    switch (this.#selectedPlotType()) {
+      case CURVED_ARROW_TYPE:
+        return "曲线箭头绘制中：继续点击路径点，双击最后一点或按 Enter 完成；Backspace 退点。";
+      case ATTACK_ARROW_TYPE:
+        return "攻击箭头绘制中：前两点是尾缘，继续点击骨架/目标；双击或 Enter 完成。";
+      default:
+        return "绘制中：再次点击地图完成；Escape 取消。";
+    }
   }
 
   #syncStyleInputs(feature: PlotFeature): void {

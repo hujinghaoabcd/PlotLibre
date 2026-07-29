@@ -188,7 +188,7 @@ test("interactive two-point drawing previews, completes and selects an arrow", (
   assert.equal(map.canvas.style.cursor, "grab");
 });
 
-test("interactive curved drawing previews and completes on double-click", () => {
+test("interactive curved drawing previews and completes on double-click", async () => {
   const { map, plot } = createPlot();
   plot.draw(CURVED_ARROW_TYPE, { id: "curved-1" });
 
@@ -200,6 +200,10 @@ test("interactive curved drawing previews and completes on double-click", () => 
   map.fire("mousemove", mouse(118.86, 32.07));
   assert.equal(map.getSource("plotlibre-draft").data.features.length, 2);
 
+  let defaultZoomTriggered = false;
+  map.on("dblclick", () => {
+    if (map.doubleClickZoomEnabled) defaultZoomTriggered = true;
+  });
   const completionEvent = mouse(118.86, 32.07);
   map.fire("dblclick", completionEvent);
 
@@ -217,6 +221,10 @@ test("interactive curved drawing previews and completes on double-click", () => 
   assert.equal(map.getSource("plotlibre-committed").data.features.length, 2);
   assert.equal(map.getSource("plotlibre-draft").data.features.length, 0);
   assert.equal(map.getSource("plotlibre-handles").data.features.length, 3);
+  assert.equal(map.doubleClickZoomEnabled, false);
+  assert.equal(defaultZoomTriggered, false);
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(map.doubleClickZoomEnabled, true);
 });
 

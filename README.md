@@ -16,6 +16,7 @@ arrow.fine
 arrow.fine.tailed
 arrow.assault-direction
 arrow.curved
+arrow.attack
 ```
 
 The Playground supports two-point and multi-point drawing, live preview, double-click/Enter completion, semantic control-point editing, undo/redo, style editing, mixed Nanjing samples, and PlotJSON import/export.
@@ -23,7 +24,7 @@ The Playground supports two-point and multi-point drawing, live preview, double-
 ## Current baseline
 
 ```text
-workspace version: 0.0.9
+workspace version: 0.0.10
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
 ```
@@ -35,14 +36,15 @@ Implemented foundations:
 - `TwoPointDrawSession` and reusable `MultiPointDrawSession`;
 - MapLibre committed, draft and semantic-handle Sources/Layers;
 - click, pointer preview, double-click, Enter, Escape and point-removal interaction;
-- automatic double-click zoom suppression/restoration during active multi-point drawing;
+- deferred double-click zoom restoration after multi-point completion, preventing camera jumps;
 - explicit MapLibre 6 Worker and shared-module packaging;
 - local bootstrap style and optional non-blocking raster basemap;
 - vector, polyline, curve, offset, ring and geodesic primitives;
 - antimeridian and coordinate-mode policies;
-- deterministic golden fixtures, degenerate-input tests and Chromium actual-rendered-feature tests.
+- deterministic golden fixtures, degenerate-input tests and Chromium actual-rendered-feature tests;
+- Definition-level renderability validation for topology-sensitive attack arrows.
 
-The next single-symbol vertical slice is `arrow.attack`.
+The next single-symbol vertical slice is `arrow.attack.tailed`.
 
 ## Why semantic plotting
 
@@ -137,7 +139,7 @@ This is a separate geometry model, not a fine-arrow alias. See [`docs/algorithms
 
 ### `arrow.curved`
 
-First multi-point Arrow definition. Semantic path controls are interpolated through a Catmull–Rom/Hermite centreline; the shaft tapers by cumulative arc length and the head follows the terminal tangent.
+Semantic path controls are interpolated through a Catmull–Rom/Hermite centreline; the shaft tapers by cumulative arc length and the head follows the terminal tangent.
 
 ```ts
 import { buildCurvedArrowRing } from "@plotlibre/geometry";
@@ -167,14 +169,43 @@ Properties:
 
 See [`docs/algorithms/arrow-curved.md`](docs/algorithms/arrow-curved.md).
 
+### `arrow.attack`
+
+A structurally distinct multi-point attack arrow. The first two controls define the exact tail edges and their distance defines semantic tail width. Remaining controls define the attack spine and exact objective.
+
+```ts
+import { buildAttackArrowRing } from "@plotlibre/geometry";
+
+const ring = buildAttackArrowRing([
+  [118.745, 32.035], // tail edge A
+  [118.755, 32.025], // tail edge B
+  [118.79, 32.075],  // attack-spine control
+  [118.85, 32.12],   // exact objective/tip
+]);
+```
+
+Properties:
+
+- minimum three and maximum 64 semantic controls;
+- first two controls are preserved as exact tail vertices;
+- tail-input order does not change the derived polygon;
+- tail width drives body and head scale;
+- the body can bulge before narrowing into the neck;
+- the terminal tangent controls head direction;
+- every tail/spine control is editable and undoable;
+- full geometry generation is part of Definition validation;
+- invalid or self-intersecting edits are rejected before Store mutation.
+
+See [`docs/algorithms/arrow-attack.md`](docs/algorithms/arrow-attack.md).
+
 ## MapLibre usage
 
 ```ts
 import { Map, setWorkerUrl } from "maplibre-gl";
 import { PlotLibre } from "@plotlibre/maplibre";
 import {
+  ATTACK_ARROW_TYPE,
   builtInSymbols,
-  CURVED_ARROW_TYPE,
 } from "@plotlibre/symbols";
 
 setWorkerUrl("/PlotLibre/assets/maplibre-gl-worker.mjs");
@@ -188,42 +219,46 @@ const map = new Map({
 
 map.on("load", () => {
   const plot = new PlotLibre(map, { definitions: builtInSymbols });
-  plot.draw(CURVED_ARROW_TYPE);
+  plot.draw(ATTACK_ARROW_TYPE);
 });
 ```
 
-For a curved arrow:
+For an attack arrow:
 
-1. click the tail;
-2. click one or more path controls;
-3. move the pointer to preview a valid candidate;
-4. double-click the final tip or press Enter;
-5. drag any semantic handle to reshape it;
+1. click the first tail edge;
+2. click the second tail edge across the initial attack direction;
+3. click one or more spine controls;
+4. double-click the final objective or press Enter;
+5. drag any tail or spine handle to reshape it;
 6. call `plot.undo()` to undo the complete handle drag in one step.
+
+During double-click completion PlotLibre keeps MapLibre double-click zoom disabled until the browser event finishes, then restores the previous zoom-handler state without moving the camera.
 
 ## PlotJSON example
 
 ```json
 {
-  "id": "curved-direction-1",
-  "plotType": "arrow.curved",
+  "id": "attack-direction-1",
+  "plotType": "arrow.attack",
   "definitionVersion": "1.0.0",
   "controlPoints": [
-    [118.72, 32.02],
-    [118.75, 32.05],
-    [118.78, 32.10],
-    [118.82, 32.14]
+    [118.745, 32.035],
+    [118.755, 32.025],
+    [118.79, 32.075],
+    [118.85, 32.12]
   ],
   "parameters": {
-    "tailWidthRatio": 0.065,
     "headLengthRatio": 0.22,
-    "headWidthRatio": 2.3,
-    "neckWidthRatio": 0.55,
-    "tension": 0.15,
+    "maximumHeadLengthTailRatio": 2.4,
+    "headHalfWidthTailRatio": 0.95,
+    "neckHalfWidthTailRatio": 0.32,
+    "bodyBulgeRatio": 1.08,
+    "bodyBulgePosition": 0.35,
+    "tension": 0.12,
     "segmentsPerSpan": 16,
     "miterLimit": 3,
-    "minimumWidthMeters": 1,
-    "maximumWidthMeters": 100000
+    "minimumTailWidthMeters": 1,
+    "maximumTailWidthMeters": 100000
   },
   "style": {},
   "metadata": {},
@@ -255,6 +290,7 @@ npm run playground:e2e
 - [Interaction model](docs/INTERACTION_MODEL.md)
 - [Geometry foundation](docs/GEOMETRY_FOUNDATION.md)
 - [Curved arrow algorithm](docs/algorithms/arrow-curved.md)
+- [Attack arrow algorithm](docs/algorithms/arrow-attack.md)
 - [MapLibre Worker packaging](docs/MAPLIBRE_WORKER_PACKAGING.md)
 - [Playground](docs/PLAYGROUND.md)
 - [PlotJSON](docs/PLOTJSON_SPEC.md)
