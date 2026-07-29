@@ -1,89 +1,97 @@
-# PlotLibre Development Handover — Milestone 006C Pincer Objective-Order Hotfix
+# PlotLibre Development Handover — Milestone 006C Pincer Objective-Order Hotfix Finalization
 
 日期：2026-07-29  
 仓库：`hujinghaoabcd/PlotLibre`  
-分支：`fix/pincer-natural-objective-order`  
-PR：`#23 Fix pincer fifth-click failure for natural objective order`  
+实施 PR：`#23 Fix pincer fifth-click failure for natural objective order`  
+实施 merge SHA：`79e503d5080481cc459e7395b1e8c3983c6945f7`  
 Workspace：`0.0.14`  
 Pincer Definition：`1.1.0`  
-状态：用户报告已复现并修复；124 Node / 17 Chromium 全绿；等待最终文档 CI、合并与 Pages 部署
+状态：PR #23 已 squash merge；`main` 与 merge SHA identical；等待线上 Pages 最终核对
 
 ## Current state
 
-线上失败点序：
+用户报告的自然轮廓点序第五点击失败已修复：
 
 ```text
 左外尾 → 右外尾 → 右目标 → 左目标 → 内侧汇合点
 ```
 
-旧版严格把目标 2、3 与尾点 0、1 按索引配对，导致自然轮廓顺序形成无效交叉配对。第五点击经过 renderability preflight 后被拒绝，因此 Store 不增加对象。
+公共 Definition 会先尝试直接 A/B 配对；直接无效、交换两个目标后有效时，只交换控制点 2、3 并保存 canonical roles。任何坐标都不会被添加、删除、移动、镜像或 clamp。
 
-修复后：
+```text
+controlPoints[0] = outer tail A
+controlPoints[1] = outer tail B
+controlPoints[2] = objective A
+controlPoints[3] = objective B
+controlPoints[4] = shared inner junction
+```
 
-- 用户可按任意左右顺序点击两个目标；
-- direct pairing 有效时保持原顺序；
-- direct pairing 无效但交换目标 2/3 后有效时，持久化交换后的 canonical A/B roles；
-- 两种配对都无效时仍 fail closed；
-- junction 和任何坐标都不会被移动、clamp 或合成；
-- pure geometry API 保持 strict positional semantics。
+实施状态：
+
+```text
+PR #23: merged
+merge SHA: 79e503d5080481cc459e7395b1e8c3983c6945f7
+compare merge SHA...main: identical
+workspace: 0.0.14
+pincer Definition: 1.1.0
+```
 
 权威记录：
 
 ```text
-docs/design/arrow-pincer-semantic-design.md
-docs/algorithms/arrow-pincer.md
-docs/handover/2026-07-29-milestone-006b-pincer-arrow-finalization.md
 docs/handover/2026-07-29-milestone-006c-pincer-objective-order-hotfix.md
+docs/handover/2026-07-29-milestone-006c-pincer-objective-order-finalization.md
 ```
 
 ## Completed in this milestone
 
-- 新增 Definition-level `canonicalizeControlPoints`；
-- 新增 Registry canonicalization 和 exact-permutation guard；
-- validate/generate/create/replace/import 使用 canonical controls；
-- 非法 canonicalizer 使用 `INVALID_CONTROL_POINT_CANONICALIZATION`；
-- pincer Definition 升至 `1.1.0`；
+- 复现用户线上第五点击失败；
+- 确认根因是 objective positional pairing，而不是第五点事件丢失；
+- 新增 permutation-only Definition canonicalization；
+- Registry、create、replace 和 import 使用 canonical roles；
+- strict pure geometry 和拓扑校验保持不变；
+- pincer 升至 `1.1.0`；
 - workspace/demo 升至 `0.0.14`；
-- 新增自然轮廓顺序 Node 回归；
-- 新增第五点 draft、completion、Store 和 actual rendering Chromium 回归；
-- Playground 文案明确两个目标左右顺序均可；
-- README 和 `AGENTS.md` 更新；
-- 新基线为 124 Node / 17 Chromium。
+- 新增自然轮廓点序 Node 与 Chromium 回归；
+- 新基线为 124 Node / 17 Chromium；
+- PR #23 全绿、无 review threads、已 squash merge；
+- `main` 与 merge SHA identical；
+- Pages workflow 的 main/path 触发条件覆盖本次 Playground、packages 和 package.json 变更。
 
 ## Validation
 
 ```text
-Run ID: 30465128769
+Implementation CI: 30465128769
+Docs-inclusive CI: 30465663153
 Node 20.19: success
 Node 22: success
-Typecheck/tests/build: success
-Handover contract: success
 Node tests: 124 passed / 0 failed
 Chromium tests: 17 passed / 0 failed
+Typecheck/tests/build: success
+Handover contract: success
+Unresolved review threads: 0
 ```
 
 ## Next tasks
 
-1. 完成 docs-inclusive CI；
-2. 更新并 Ready PR #23；
-3. 检查 unresolved review threads；
-4. squash merge 到 `main`；
-5. 确认 merge SHA 与 `main` identical；
-6. 核对 Pages deployment；
-7. 在线重测两种目标点击顺序；
-8. 记录 merge/deployment finalization；
-9. 增加真正无效第五点的具体 UI 原因；
-10. 继续 pincer asymmetric、junction-boundary、高纬度和跨日期变更线强化。
+1. 在线核对 badge 显示 `v0.0.14 demo`；
+2. 在线分别测试左右两种目标点击顺序；
+3. 浏览器仍显示旧版时强制刷新；
+4. 增加真正无效第五点的具体错误原因提示；
+5. 增加 asymmetric/off-center/junction-boundary fixtures；
+6. 增加 antimeridian/high-latitude cases；
+7. 补 Definition 1.0.0 → 1.1.0 迁移说明；
+8. 暂不开发下一个复杂符号。
 
 ## Risks and decisions
 
-- canonicalization 只能 permutation，不得修改坐标；
+- canonicalization 只能 exact permutation；
+- direct 和 swapped 都无效时仍严格拒绝；
 - Store/PlotJSON 保存 canonical roles；
-- 两种配对都有效时保留用户顺序；
-- 两种配对都无效时仍严格拒绝；
-- 不放宽 self-intersection、junction 或 simple-ring 校验；
-- Definition 版本升至 1.1.0 反映公共输入行为变化；
-- 当前真正无效的最后点仍缺少具体错误提示；
+- pure geometry 保持 strict positional API；
+- junction 不移动、不替换；
+- GitHub Pages 部署完成需要独立线上核对；
+- 真正无效的最后点仍缺少具体 UI 原因；
 - packages 仍为 `UNLICENSED`。
 
-Continuation：优先完成 PR #23 合并和线上验证。线上 badge 应显示 `v0.0.14 demo`，自然轮廓点序和同侧配对点序都应在第五点击后完成。若仍有失败，记录具体五点坐标并新增 fixture，禁止通过移动 junction 或删除拓扑检查修复。
+Continuation：先核对 live Playground 的 `v0.0.14 demo` 和两种点序。若仍失败，保存五点坐标和 status text 并添加 exact regression fixture，禁止删除拓扑检查或把 pincer 改成 double alias。
