@@ -18,152 +18,169 @@
 | 005B | `arrow.fine.tailed`、共享 `FineArrowFrame` | 已完成并合并 |
 | 005C | `arrow.assault-direction` | 已完成并合并 |
 | 005D | `MultiPointDrawSession` 与统一 `doubleClick()` 协议 | 已完成并合并 |
-| 005E | `arrow.curved` 与 MapLibre 多点绘制/编辑 | 实现和完整 CI 已完成，等待交接与合并 |
+| 005E | `arrow.curved` 与 MapLibre 多点绘制/编辑 | 已完成并合并 |
+| 005F | `arrow.attack`、`AttackArrowFrame`、完整几何预检、相机稳定修复 | 已完成，等待 PR #12 合并 |
 
-关键主线提交：
+当前 workspace：
 
 ```text
-06e392aaec42bd89ee4856244be49df7a9d934ba  geometry foundation
-c738d72b0ccf49f3487697791083ba0d15286a75  fine arrow
-994033a5d131e1221fc47cb19f96824d856d3c15  tailed fine arrow
-dbee8938e1a522d6cb6d9e78c9518b28d1eb04e9  assault direction
-89e87e879d1c766eac500796e8a53c88f20f8bbe  multipoint session foundation
+0.0.10
 ```
 
-## Milestone 005E：`arrow.curved`
+当前公开箭头：
 
-状态：**完整功能和 CI 已完成，等待最终交接和合并**。
+```text
+arrow.straight
+arrow.fine
+arrow.fine.tailed
+arrow.assault-direction
+arrow.curved
+arrow.attack
+```
+
+## Milestone 005F：`arrow.attack`
+
+状态：**完整功能、文档和权威 CI 已完成**。
 
 ### 语义模型
 
 ```text
-controlPoints[0]       = tail center
-controlPoints[1..n-2]  = path controls
-controlPoints[n-1]     = exact semantic tip
+controlPoints[0]       = exact tail edge A
+controlPoints[1]       = exact tail edge B
+controlPoints[2..n-2]  = attack-spine controls
+controlPoints[n-1]     = exact objective/tip
 minimum points         = 3
 maximum points         = 64
 ```
 
-派生曲线样点、offset 顶点和 Polygon 顶点不进入 PlotJSON，也不作为编辑 handles。
+与 `arrow.curved` 不同，攻击箭头的宽度来自两个精确尾缘控制点之间的距离，而不是单一 tail center 和路径长度。
 
 ### 已完成几何
 
-- `CurvedArrowParameters`；
-- `buildCurvedArrowRing()`；
-- local metre projection；
-- consecutive duplicate cleanup；
-- Catmull–Rom/Hermite centerline；
-- cumulative arc-length measurement；
-- variable-width tapered shaft；
-- terminal tangent aligned arrow head；
-- exact semantic tip restoration；
-- counterclockwise ring normalization；
-- closed/finite/simple ring validation；
-- self-intersection explicit rejection；
-- head/shaft junction reverse-bend fix；
-- deterministic 56-coordinate golden fixture。
+- `AttackArrowParameters`；
+- `DEFAULT_ATTACK_ARROW_PARAMETERS`；
+- `resolveAttackArrowParameters()`；
+- `AttackArrowFrame`；
+- `buildAttackArrowFrame()`；
+- `buildAttackArrowRing()`；
+- local metre projection around tail midpoint；
+- tail input-order independence；
+- exact semantic tail width；
+- Catmull–Rom/Hermite spine；
+- cumulative arc length；
+- broad body and configurable bulge；
+- neck narrowing；
+- terminal-tangent head；
+- exact tail vertices and tip；
+- finite/closed/CCW/simple-ring validation；
+- explicit self-intersection rejection；
+- deterministic golden fixture。
 
 ### 已完成交互
 
-- Definition 点数约束自动选择 `TwoPointDrawSession` 或 `MultiPointDrawSession`；
-- MapLibre `dblclick` → `DrawSession.doubleClick()`；
-- active drawing preventDefault/stopPropagation；
-- double-click zoom disable/restore；
-- Enter completion；
-- Escape cancel；
-- Backspace/Delete drawing-point removal；
-- 所有语义控制点 handles；
-- interior handle drag；
-- one drag = one ReplacePlotCommand；
-- undo 恢复中间路径控制点。
+- Definition-driven `MultiPointDrawSession`；
+- third-candidate valid draft；
+- double-click/Enter completion；
+- Escape and Backspace/Delete；
+- all tail/spine semantic handles；
+- one valid drag = one `ReplacePlotCommand`；
+- undo restore；
+- invalid preview rejected before Store mutation；
+- double-click zoom deferred restoration，防止完成时地图 2× 跳变。
 
 ### 已完成数据和符号
 
-- `CURVED_ARROW_TYPE = "arrow.curved"`；
-- `curvedArrowDefinition`；
+- `ATTACK_ARROW_TYPE = "arrow.attack"`；
+- `attackArrowDefinition` version `1.0.0`；
 - built-in catalog；
 - fill/outline/hit-area；
-- PlotJSON full-path round trip；
-- workspace `0.0.9`。
+- full semantic-path PlotJSON；
+- Definition-level renderability validation；
+- workspace `0.0.10`。
 
 ### 已完成 Playground
 
-- 第五个 selector option：曲线箭头；
-- 五类南京示例；
-- 四点曲线示例；
-- 多点操作提示；
-- double-click/Enter completion；
-- Backspace/Delete 退点说明；
-- semantic-handle editing；
-- actual Source/rendered-feature checks。
+- 第六个 selector option；
+- 六类南京示例；
+- 尾缘 A/B、spine、objective 操作说明；
+- 四点攻击箭头真实绘制；
+- actual committed Source/rendered-feature checks；
+- tail handle drag/history/undo；
+- Worker 与 Pages build 回归。
 
 ### 验证
 
-Node：
+最终权威同步运行：
 
 ```text
-65 tests passed
-0 failed
+Run ID: 30413156622
+Head: c3d229ef0507b56dd51c6225c396aedc309ce547
+Node 20.19: success
+Node 22: success
+Node tests: 78 passed
+Chromium: 12 passed
+Pages build: success
+handover contract: success
 ```
 
-完整绿色运行：
+真实 CI/trace 发现并修复：
 
-```text
-Run ID: 30398030416
-validate 20.19: success
-validate 22: success
-browser: success
-```
-
-真实 CI 发现并修复：
-
-1. head trim point 与 tangent neck 同时保留导致肩部反向短折和自交；
-2. 过紧 S 形路径应由 simple-ring policy 明确拒绝；
-3. E2E 初始轨迹本身过紧，无法产生合法 draft；
-4. MapLibre `querySourceFeatures()` 可返回分瓦片重复 Feature，handles 必须按语义 `handleIndex` 去重验证。
+1. 测试尾缘与初始进攻方向近平行；
+2. `dblclick` 中过早恢复 zoom 导致相机跳变；
+3. 尾缘编辑可产生自交 Polygon；
+4. 轻量 validate 不能保证完整可生成性；
+5. 渲染 listener 抛错可能造成 Store/History 部分提交；
+6. Definition-level 几何预检将失败前移到命令执行前。
 
 ### 算法记录
 
 ```text
-docs/algorithms/arrow-curved.md
+docs/algorithms/arrow-attack.md
 ```
 
-实现为 clean-room：仅参考公开多点曲线箭头行为，不复制参考库源码、类结构、参数或常量。
+实现为 clean-room：仅参考公开行为和术语，不复制参考源码、常量、helper layout 或公式。
 
-## 下一步：Milestone 005F `arrow.attack`
+## 下一步：Milestone 005G `arrow.attack.tailed`
 
-`arrow.attack` 将是第二个多点箭头，但不能简单复用 `arrow.curved` 的默认参数。
+### 目标语义
+
+沿用平尾攻击箭头控制点：
+
+```text
+0 + 1   = exact tail edges
+2..n-2  = attack-spine controls
+n-1     = exact objective/tip
+```
+
+燕尾仅改变尾部闭合策略，不能改变 canonical control model。
 
 ### 目标结构
 
 ```text
-multi-point centerline
-+ broad variable-width attack body
-+ explicit head/neck transition
-+ attack-specific tail strategy
+AttackArrowFrame
++ flat-tail-independent inward notch
++ explicit notch depth/width parameters
++ simple-ring/topology validation
 ```
 
 ### 实施顺序
 
-1. 研究公开攻击箭头行为和术语，完成 clean-room provenance；
-2. 明确控制点语义与最小/最大点数；
-3. 抽取可复用的 multi-point arrow body/frame；
-4. 保持 `arrow.curved` 既有 golden contract；
-5. 实现 attack-specific width/head/tail strategy；
-6. 增加 simple-ring、自交和退化策略；
-7. PlotDefinition 与 PlotJSON；
-8. MultiPointDrawSession 复用；
-9. Playground selector/sample；
-10. Chromium draw/edit/rendered-feature tests；
-11. 不可变交接。
+1. 记录公开燕尾攻击箭头行为和 clean-room provenance；
+2. 明确燕尾深度、宽度和方向语义；
+3. 在 `AttackArrowFrame` 上实现独立 closing strategy；
+4. 禁止复制 `buildAttackArrowRing()`；
+5. 保持 `arrow.attack` golden contract 完全不变；
+6. 增加参数边界、自交和退化测试；
+7. 新增 `arrow.attack.tailed` Definition；
+8. PlotJSON full semantic-path round trip；
+9. Playground 第七个 selector/sample；
+10. Chromium draw/render/edit/undo；
+11. 更新 README、文档和不可变交接；
+12. 合并后验证 Pages 七符号部署。
 
-在 `arrow.attack` 完成前，不实现 `arrow.attack.tailed`、double、pincer、route 或 corridor。
+在 005G 完成前，不实现 double、pincer、route、corridor 或其他复杂箭头。
 
 ## 后续里程碑
-
-### Milestone 005G：`arrow.attack.tailed`
-
-复用 attack body/frame，仅增加独立燕尾策略；必须证明与平尾 attack 的真实结构差异。
 
 ### Milestone 006：复杂箭头
 
