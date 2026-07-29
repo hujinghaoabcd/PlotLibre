@@ -72,18 +72,25 @@ export class MultiPointDrawSession implements DrawSession {
       return this.snapshot();
     }
 
-    this.#points = [...this.#points, point];
-    this.#cursor = undefined;
-    this.#status = "drawing";
-
+    const candidate = [...this.#points, point];
     if (
       this.#completeAtMaximum &&
       this.#maximumPoints !== undefined &&
-      this.#points.length === this.#maximumPoints
+      candidate.length === this.#maximumPoints
     ) {
-      return this.#complete([...this.#points]);
+      const completed = this.#tryComplete(candidate);
+      if (completed) return completed;
+
+      // Keep the rejected final point as a live pointer candidate instead of
+      // filling the fixed-count session and trapping it at maximumPoints.
+      this.#cursor = point;
+      this.#status = "drawing";
+      return this.snapshot();
     }
 
+    this.#points = candidate;
+    this.#cursor = undefined;
+    this.#status = "drawing";
     return this.snapshot();
   }
 
@@ -103,10 +110,20 @@ export class MultiPointDrawSession implements DrawSession {
 
     this.#cursor = undefined;
     if (candidate.length >= this.#minimumPoints) {
-      return this.#complete(candidate);
+      const completed = this.#tryComplete(candidate);
+      if (completed) return completed;
     }
 
-    this.#points = candidate.map(clonePosition);
+    if (
+      this.#maximumPoints !== undefined &&
+      candidate.length >= this.#maximumPoints &&
+      !(last && samePosition(last, point))
+    ) {
+      this.#points = candidate.slice(0, this.#maximumPoints - 1).map(clonePosition);
+      this.#cursor = point;
+    } else {
+      this.#points = candidate.map(clonePosition);
+    }
     this.#status = this.#points.length > 0 ? "drawing" : "ready";
     return this.snapshot();
   }
@@ -144,7 +161,8 @@ export class MultiPointDrawSession implements DrawSession {
     if (key === "Enter") {
       const candidate = this.#candidatePoints();
       if (candidate.length >= this.#minimumPoints) {
-        return this.#complete([...candidate]);
+        const completed = this.#tryComplete(candidate);
+        if (completed) return completed;
       }
     }
 
@@ -203,20 +221,35 @@ export class MultiPointDrawSession implements DrawSession {
       : [...this.#points, this.#cursor];
   }
 
-  #complete(points: readonly Position[]): DrawSessionSnapshot {
+  #tryComplete(points: readonly Position[]): DrawSessionSnapshot | undefined {
     const limited =
       this.#maximumPoints === undefined
         ? [...points]
         : points.slice(0, this.#maximumPoints);
     if (limited.length < this.#minimumPoints) {
-      return this.snapshot();
+      return undefined;
     }
 
-    this.#completed = this.#createFeature(limited);
+    const candidate = this.#createFeature(limited);
+    if (!this.#canComplete(candidate)) {
+      return undefined;
+    }
+
+    this.#completed = candidate;
     this.#points = limited.map(clonePosition);
     this.#cursor = undefined;
     this.#status = "completed";
     return this.snapshot();
+  }
+
+  #canComplete(candidate: PlotFeatureInput): boolean {
+    const validate = this.#options.validateCompletion;
+    if (!validate) return true;
+    try {
+      return validate(candidate);
+    } catch {
+      return false;
+    }
   }
 
   #createFeature(controlPoints: readonly Position[]): PlotFeatureInput {
