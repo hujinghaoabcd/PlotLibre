@@ -44,7 +44,7 @@ export const DEFAULT_SQUAD_COMBAT_PARAMETERS: ResolvedSquadCombatParameters = {
   miterLimit: 3,
   minimumTailWidthMeters: 1,
   maximumTailWidthMeters: 100_000,
-  tailWidthPathRatio: 0.1,
+  tailWidthPathRatio: 0.04,
 };
 
 export function resolveSquadCombatParameters(
@@ -57,10 +57,10 @@ export function resolveSquadCombatParameters(
   const attack = resolveAttackArrowParameters(merged);
   if (
     !Number.isFinite(merged.tailWidthPathRatio) ||
-    merged.tailWidthPathRatio < 0.02 ||
-    merged.tailWidthPathRatio > 0.3
+    merged.tailWidthPathRatio < 0.01 ||
+    merged.tailWidthPathRatio > 0.15
   ) {
-    throw new RangeError("tailWidthPathRatio must be between 0.02 and 0.3.");
+    throw new RangeError("tailWidthPathRatio must be between 0.01 and 0.15.");
   }
   return {
     ...attack,
