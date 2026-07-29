@@ -79,8 +79,8 @@ async function drawCurvedArrow(page: Page): Promise<void> {
 async function drawAttackArrow(page: Page): Promise<void> {
   const box = await canvasBox(page);
   await beginMultiPoint(page, "arrow.attack");
-  const tailA = { x: box.x + box.width * 0.31, y: box.y + box.height * 0.7 };
-  const tailB = { x: box.x + box.width * 0.37, y: box.y + box.height * 0.65 };
+  const tailA = { x: box.x + box.width * 0.30, y: box.y + box.height * 0.62 };
+  const tailB = { x: box.x + box.width * 0.38, y: box.y + box.height * 0.72 };
   const spine = { x: box.x + box.width * 0.55, y: box.y + box.height * 0.5 };
   const tip = { x: box.x + box.width * 0.76, y: box.y + box.height * 0.32 };
   await page.mouse.click(tailA.x, tailA.y);
