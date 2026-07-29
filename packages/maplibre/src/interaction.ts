@@ -46,6 +46,10 @@ interface ControlPointDrag {
   moved: boolean;
 }
 
+interface ApplyDrawSnapshotOptions {
+  readonly deferDoubleClickZoomRestore?: boolean;
+}
+
 export class MapLibrePlotInteraction {
   readonly #map: MapLibreMapLike;
   readonly #registry: PlotRegistry;
@@ -59,6 +63,7 @@ export class MapLibrePlotInteraction {
   #selectedId: string | undefined;
   #drag: ControlPointDrag | undefined;
   #doubleClickZoomWasEnabled: boolean | undefined;
+  #doubleClickZoomRestoreTimer: ReturnType<typeof setTimeout> | undefined;
   #suppressNextClick = false;
   #clickSuppressionTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -91,6 +96,7 @@ export class MapLibrePlotInteraction {
     this.#focusCanvas();
     this.#applyDrawSnapshot(
       this.#session.doubleClick(toPosition(mouseEvent)),
+      { deferDoubleClickZoomRestore: true },
     );
   };
 
@@ -331,7 +337,10 @@ export class MapLibrePlotInteraction {
     this.#renderer.clearHandles();
   }
 
-  #applyDrawSnapshot(snapshot: DrawSessionSnapshot): void {
+  #applyDrawSnapshot(
+    snapshot: DrawSessionSnapshot,
+    options: ApplyDrawSnapshotOptions = {},
+  ): void {
     if (snapshot.draft) {
       const draft = this.#materialize(snapshot.draft);
       this.#draftFeature = draft;
@@ -346,7 +355,11 @@ export class MapLibrePlotInteraction {
       this.#session = undefined;
       this.#draftFeature = undefined;
       this.#renderer.clearDraft();
-      this.#restoreDoubleClickZoom();
+      if (options.deferDoubleClickZoomRestore === true) {
+        this.#scheduleDoubleClickZoomRestore();
+      } else {
+        this.#restoreDoubleClickZoom();
+      }
       this.select(created.id);
       this.#setCursor("grab");
       return;
@@ -356,7 +369,11 @@ export class MapLibrePlotInteraction {
       this.#session = undefined;
       this.#draftFeature = undefined;
       this.#renderer.clearDraft();
-      this.#restoreDoubleClickZoom();
+      if (options.deferDoubleClickZoomRestore === true) {
+        this.#scheduleDoubleClickZoomRestore();
+      } else {
+        this.#restoreDoubleClickZoom();
+      }
       this.#setCursor("");
     }
   }
@@ -426,6 +443,7 @@ export class MapLibrePlotInteraction {
   }
 
   #disableDoubleClickZoom(): void {
+    this.#clearDoubleClickZoomRestoreTimer();
     if (this.#doubleClickZoomWasEnabled !== undefined) return;
     const zoom = this.#map.doubleClickZoom;
     if (!zoom) return;
@@ -434,12 +452,29 @@ export class MapLibrePlotInteraction {
     if (wasEnabled) zoom.disable();
   }
 
+  #scheduleDoubleClickZoomRestore(): void {
+    if (this.#doubleClickZoomWasEnabled === undefined) return;
+    this.#clearDoubleClickZoomRestoreTimer();
+    this.#doubleClickZoomRestoreTimer = setTimeout(() => {
+      this.#doubleClickZoomRestoreTimer = undefined;
+      if (!this.#session) this.#restoreDoubleClickZoom();
+    }, 0);
+  }
+
   #restoreDoubleClickZoom(): void {
+    this.#clearDoubleClickZoomRestoreTimer();
     if (this.#doubleClickZoomWasEnabled === undefined) return;
     if (this.#doubleClickZoomWasEnabled) {
       this.#map.doubleClickZoom?.enable();
     }
     this.#doubleClickZoomWasEnabled = undefined;
+  }
+
+  #clearDoubleClickZoomRestoreTimer(): void {
+    if (this.#doubleClickZoomRestoreTimer !== undefined) {
+      clearTimeout(this.#doubleClickZoomRestoreTimer);
+      this.#doubleClickZoomRestoreTimer = undefined;
+    }
   }
 
   #syncSelection(): void {
