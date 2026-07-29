@@ -30,7 +30,11 @@ export class MultiPointDrawSession implements DrawSession {
 
   public constructor(options: MultiPointDrawSessionOptions) {
     validateFeatureOptions(options);
-    const minimumAllowed = options.allowTwoPointMinimum === true ? 2 : 3;
+    const isVariableTwoPointPath =
+      options.minimumPoints === 2 &&
+      options.maximumPoints !== undefined &&
+      options.maximumPoints > 2;
+    const minimumAllowed = isVariableTwoPointPath ? 2 : 3;
     if (
       !Number.isInteger(options.minimumPoints) ||
       options.minimumPoints < minimumAllowed
