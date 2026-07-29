@@ -50,7 +50,9 @@ export interface MultiPointDrawSessionOptions extends DrawSessionFeatureOptions 
    * Produces a complete, transient draft control set from committed controls.
    * Derived controls are never used for completion or persisted state.
    */
-  readonly deriveDraftControlPoints?: (
-    controlPoints: readonly Position[],
-  ) => readonly Position[] | undefined;
+  readonly deriveDraftControlPoints?:
+    | ((
+        controlPoints: readonly Position[],
+      ) => readonly Position[] | undefined)
+    | undefined;
 }
