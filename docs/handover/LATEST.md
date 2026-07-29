@@ -6,7 +6,7 @@
 PR：`#28 Add route and corridor symbol group`  
 Workspace：`0.0.17`  
 Definitions：`arrow.route@1.0.0`、`arrow.corridor@1.0.0`  
-状态：十二个公共符号已完成；145 Node / 20 Chromium 全绿；等待最终文档 CI、Ready 和合并
+状态：十二个公共符号已完成；145 Node / 20 Chromium 及最终 docs-inclusive CI 全绿；等待 review-thread 检查、Ready 和合并
 
 ## Current state
 
@@ -57,29 +57,29 @@ PR #28
 ## Validation
 
 ```text
-Implementation CI:       30478662756
-Compatibility-fix CI:    30479120532
-Node 20.19:              success
-Node 22:                 success
-Node tests:              145 passed / 0 failed
-Chromium tests:          20 passed / 0 failed
-Typecheck/build:         success
-Playground build:        success
-Handover contract:       success
-Final docs-inclusive CI: pending
+Implementation CI:        30478662756
+Compatibility-fix CI:     30479120532
+Docs-inclusive CI:        30479502073
+Node 20.19:               success
+Node 22:                  success
+Node tests:               145 passed / 0 failed
+Chromium tests:           20 passed / 0 failed
+Typecheck/build:          success
+Playground build:         success
+Handover contract:        success
 ```
 
 ## Next tasks
 
-1. 完成最终 docs-inclusive CI；
-2. 检查 unresolved review threads；
-3. 更新 PR #28 最终说明；
-4. 标记 Ready；
-5. squash merge；
-6. 确认 merge SHA 与 `main` identical；
-7. 核对 Pages `v0.0.17 demo`；
-8. 下一组开发 multi-head path extensions；
-9. 实现前冻结公共标识符和控制点语义；
+1. 检查 unresolved review threads；
+2. 更新 PR #28 最终说明；
+3. 标记 Ready；
+4. squash merge；
+5. 确认 merge SHA 与 `main` identical；
+6. 核对 Pages `v0.0.17 demo`；
+7. 下一组开发 multi-head path extensions；
+8. 实现前冻结公共标识符和控制点语义；
+9. 每组限制在 2–3 个真实共享基础的符号；
 10. 不返回 pincer 细节加固。
 
 ## Risks and decisions
@@ -93,4 +93,4 @@ Final docs-inclusive CI: pending
 - 当前工具不能可靠直接确认 Pages 缓存；
 - packages 仍为 `UNLICENSED`。
 
-Continuation：等待本分支最终 CI。全绿后直接 Ready、检查 review threads、squash merge并 compare main。下一组进入 multi-head path extensions。
+Continuation：检查 PR #28 review threads，标记 Ready、squash merge并 compare main。下一组进入 multi-head path extensions。
