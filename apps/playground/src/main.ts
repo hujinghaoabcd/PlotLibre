@@ -8,6 +8,7 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { installDoubleArrowPlayground } from "./double-arrow-playground.js";
+import { installPincerArrowPlayground } from "./pincer-arrow-playground.js";
 import { PlaygroundApp } from "./playground-app.js";
 import "./styles.css";
 import "./symbol-controls.css";
@@ -84,6 +85,7 @@ map.once("load", () => {
   const app = new PlaygroundApp(map, plot, { e2e });
   app.start();
   installDoubleArrowPlayground(app, plot, map, { e2e });
+  installPincerArrowPlayground(app, plot, map, { e2e });
 
   window.__plotlibrePlayground = { map, plot, app };
 });
