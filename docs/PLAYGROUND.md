@@ -11,7 +11,7 @@ https://hujinghaoabcd.github.io/PlotLibre/
 ## 2. 技术基线
 
 ```text
-PlotLibre demo:       0.0.9
+PlotLibre demo:       0.0.10
 MapLibre GL JS:       6.0.0
 Vite:                 8.1.5
 Playwright:           1.61.1
@@ -29,6 +29,7 @@ arrow.fine               细箭头
 arrow.fine.tailed        燕尾细箭头
 arrow.assault-direction  突击方向
 arrow.curved             曲线箭头
+arrow.attack             攻击箭头
 ```
 
 ### 3.1 两点符号
@@ -40,15 +41,7 @@ arrow.curved             曲线箭头
 第二次点击 = tip / objective
 ```
 
-支持：
-
-- pointer move 预览；
-- 第二次点击或 Enter 完成；
-- Escape 取消；
-- Backspace/Delete 重置起点；
-- 两个语义 handles；
-- drag + one ReplacePlotCommand；
-- undo/redo。
+支持 pointer preview、点击/Enter 完成、Escape 取消、Backspace/Delete 重置、两个语义 handles、drag、undo/redo。
 
 ### 3.2 曲线箭头
 
@@ -68,12 +61,54 @@ arrow.curved             曲线箭头
 4. 双击最后一点或按 Enter 完成；
 5. Backspace/Delete 每次移除一个未提交点；
 6. Escape 取消；
-7. 完成后拖动任一语义 handle 改变曲线；
-8. 一次拖动只生成一次历史命令。
+7. 完成后拖动任一语义 handle；
+8. 一次合法拖动只生成一次历史命令。
 
-绘制期间 MapLibre double-click zoom 会暂时关闭，完成或取消后恢复。
+### 3.3 攻击箭头
 
-## 4. 南京示例
+`arrow.attack` 使用三至 64 个语义控制点：
+
+```text
+第一个点   = exact tail edge A
+第二个点   = exact tail edge B
+中间点     = attack-spine controls
+最后一个点 = exact objective/tip
+```
+
+尾缘 A/B 必须横跨初始进攻方向，二者距离定义语义尾宽。
+
+操作：
+
+1. 点击尾缘 A；
+2. 在初始进攻方向另一侧点击尾缘 B；
+3. 移动鼠标到第一个 spine candidate，产生首个合法 draft；
+4. 点击一个或多个 spine controls；
+5. 双击 objective 或按 Enter 完成；
+6. Backspace/Delete 每次移除一个未提交点；
+7. Escape 取消；
+8. 完成后拖动任一 tail/spine handle；
+9. 无效或自交 preview 保留最后一个合法状态，不进入 Store；
+10. 一次合法拖动只生成一次历史命令，undo 恢复原控制点。
+
+## 4. Double-click zoom 生命周期
+
+多点绘制期间 MapLibre double-click zoom 暂时关闭。
+
+完成时不能在同一个原生 `dblclick` 事件栈内立即重新启用，否则 MapLibre 默认处理器可能仍执行一次 2× 缩放，使刚绘制图形跳出视口。
+
+当前策略：
+
+```text
+dblclick completion
+→ preventDefault + stopPropagation
+→ create/select semantic feature
+→ current browser event ends
+→ restore previous double-click zoom state
+```
+
+Cancel 和 destroy 仍立即恢复原状态。Chromium 测试验证完成攻击箭头后相机不跳变。
+
+## 5. 南京示例
 
 生产页面自动加载：
 
@@ -83,11 +118,12 @@ arrow.curved             曲线箭头
 1 × arrow.fine.tailed
 1 × arrow.assault-direction
 1 × arrow.curved
+1 × arrow.attack
 ```
 
-曲线箭头示例使用四个语义控制点和独立青绿色样式。示例采用平滑单向弯曲路径，避免人为生成过紧自交曲线。
+曲线箭头使用四个语义控制点和独立青绿色样式。攻击箭头使用两个精确尾缘、一个中间 spine control 和一个 objective。
 
-## 5. 底图与启动
+## 6. 底图与启动
 
 在线资源不能阻塞标绘：
 
@@ -113,7 +149,7 @@ E2E 模式：
 
 两种模式都运行真实 PlotLibre 和 MapLibre Worker，只是不依赖远程瓦片。
 
-## 6. MapLibre 6 Worker
+## 7. MapLibre 6 Worker
 
 构建时从已安装的 `maplibre-gl` 复制：
 
@@ -130,7 +166,7 @@ setWorkerUrl(`${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`);
 
 详见 [`MAPLIBRE_WORKER_PACKAGING.md`](MAPLIBRE_WORKER_PACKAGING.md)。
 
-## 7. 本地运行
+## 8. 本地运行
 
 ```bash
 npm install
@@ -152,46 +188,39 @@ npx playwright install --with-deps chromium
 npm run playground:e2e
 ```
 
-## 8. Chromium 覆盖
+## 9. Chromium 覆盖
 
 Playwright 验证：
 
 - `/PlotLibre/` project path；
 - Worker entry/shared 为 JavaScript；
 - 无在线底图时立即启动；
-- selector 有五个 option；
-- 五类南京示例；
-- committed Source 包含五种 `plotType`；
+- selector 有六个 option；
+- 六类南京示例；
+- committed Source 包含六种 `plotType`；
 - fill/line Layers 可见；
 - `queryRenderedFeatures()` 返回真实图形；
 - 四种两点箭头绘制；
-- 曲线箭头三点 draft；
-- 曲线箭头 double-click completion；
-- double-click zoom disable/restore；
-- 曲线箭头参数和 derived ring；
+- 曲线箭头 draft/double-click/handle edit；
+- 攻击箭头 tail-edge draft、spine、double-click completion；
+- double-click completion 后相机稳定且 zoom 恢复；
+- 攻击箭头参数和 simple derived ring；
 - handles 按语义 `handleIndex` 去重验证；
-- 中间控制点 drag；
+- tail handle drag；
+- revision 和 History 增加；
 - one ReplacePlotCommand；
-- undo 恢复中间控制点；
-- style、delete 和 PlotJSON 无回归。
+- undo 恢复尾缘；
+- style、delete、PlotJSON 和 Worker 无回归。
 
-当前 Node 测试：
-
-```text
-65 passed
-0 failed
-```
-
-曲线箭头完整绿色运行：
+当前权威测试：
 
 ```text
-Run ID: 30398030416
-validate 20.19: success
-validate 22: success
-browser: success
+Node tests: 78 passed
+Chromium: 12 passed
+Run ID: 30413156622
 ```
 
-## 9. `querySourceFeatures()` 注意事项
+## 10. `querySourceFeatures()` 注意事项
 
 MapLibre 可以按瓦片返回同一 GeoJSON Feature 的多个副本。因此浏览器测试不能把原始返回数量直接解释为语义对象或 handles 数量。
 
@@ -206,18 +235,26 @@ filter by plotId
 
 Store 中的 `controlPoints.length` 仍是语义控制点数量的权威值。
 
-## 10. Self-intersection policy
+## 11. Geometry validation policy
 
-曲线箭头不会静默输出自交 Polygon。过紧 S 形、过宽箭身或过度折返的路径会被 `isSimpleRing()` 拒绝。
+曲线箭头和攻击箭头不会静默输出自交 Polygon。
+
+攻击箭头额外要求：
+
+- 两个尾缘必须具有有效距离；
+- 尾缘必须横跨初始 spine direction；
+- 参数必须产生有限、闭合、逆时针、简单 ring；
+- Definition validation 必须在 Store mutation 前完成完整可生成性检查。
 
 Playground 当前：
 
 - 不提交无效 draft；
-- 无效 handle preview 不进入 Store；
-- 用户可减少弯曲、简化控制点或缩小宽度；
+- 无效 handle preview 不进入 Store 或 History；
+- 保留最后一个合法 preview；
+- 用户可调整尾缘、减少弯曲、简化控制点或收窄 body；
 - 后续 UI 将增加可见 validation feedback。
 
-## 11. Pages 部署
+## 12. Pages 部署
 
 `.github/workflows/pages.yml` 仅从 `main` 部署。
 
@@ -227,7 +264,9 @@ Playground 当前：
 Settings → Pages → Build and deployment → GitHub Actions
 ```
 
-## 12. 强制约束
+PR #12 合并后必须验证在线页面已包含六种符号，再宣布 0.0.10 Playground 发布完成。
+
+## 13. 强制约束
 
 - Playground 不直接编辑 MapLibre Source；
 - Polygon 不是原始数据；
@@ -236,8 +275,9 @@ Settings → Pages → Build and deployment → GitHub Actions
 - dev、preview、E2E、Pages 统一 `/PlotLibre/`；
 - 每个新符号同阶段加入 selector、示例和浏览器测试；
 - 浏览器测试必须验证 actual rendered feature，而不是只检查 Store 数量；
-- 多点测试必须覆盖 double-click、缩放恢复和中间 semantic handle。
+- 多点测试必须覆盖 double-click、相机稳定、缩放恢复和语义 handle；
+- topology-sensitive symbol 必须验证 invalid preview 不进入 Store/History。
 
-## 13. 下一步
+## 14. 下一步
 
-下一单一纵向切片是 `arrow.attack`。它将复用通用多点交互和共享曲线/offset 基础，但必须建立独立攻击箭头 body/head/tail 语义，不能只是 `arrow.curved` 的参数别名。
+下一单一纵向切片是 `arrow.attack.tailed`。它必须复用 `AttackArrowFrame` 并新增独立 inward swallowtail closing strategy，不能复制平尾攻击箭头 generator，也不能只是修改默认参数。
