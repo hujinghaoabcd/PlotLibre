@@ -75,7 +75,7 @@ Never copy proprietary Mapbox code. Current project packages remain `UNLICENSED`
 - Definition defaults are part of the visual/data contract.
 - Every semantic path control must survive PlotJSON round trip.
 - Derived centerline samples, offset vertices, notch vertices, branch points and polygon vertices must not be serialized as semantic controls.
-- Definition-derived draft controls are transient rendering aids only and must never enter Store, History, handles or PlotJSON.
+- Definition-derived draft controls and semantic draft guides are transient rendering aids only and must never enter Store, History, handles or PlotJSON.
 
 Current public Arrow identifiers:
 
@@ -101,6 +101,9 @@ arrow.double
 - Normal pointer drafts require a candidate satisfying the minimum semantic point count.
 - A Definition may optionally derive a complete transient draft control set from an incomplete authored state.
 - Derived draft controls are for rendering only; completion always uses actual committed points plus an actual pointer candidate when present.
+- A draw session may become terminal only after the completion candidate passes full Registry generation/renderability preflight.
+- Rejected completion remains in the active drawing session so the user can move or replace the final candidate.
+- A rejected fixed-count final point must not trap the session at `maximumPoints`.
 - Enter and double-click completion must preserve all semantic controls when enabled by the Definition.
 - Backspace/Delete removes one uncommitted multi-point control at a time.
 - Drawing-state point removal is not Store history.
@@ -108,10 +111,11 @@ arrow.double
 - Cancel and destroy must restore the previous zoom-handler state immediately.
 - One completed handle drag produces one `ReplacePlotCommand`.
 - Invalid handle previews do not enter Store or History.
-- Invalid transient draw drafts are cleared without completing, cancelling or mutating the active session.
-- Any geometry that can fail during render must be rejected before command execution.
+- Invalid transient pointer geometry preserves the last valid full draft.
+- If no valid full draft exists yet, MapLibre renders a transient semantic guide line and control points rather than a blank canvas.
+- `create`, `replace` and document import must run full Registry generation before Store mutation; partial invisible state is prohibited.
 - Derived notch/head/body/branch/bridge vertices are never semantic handles.
-- `arrow.double` must show a transient mirrored draft immediately after the third click, replace it with the live pointer candidate on movement, and auto-complete on the fourth click through the generic maximum-point session path.
+- `arrow.double` must show either a complete transient draft or a visible semantic guide immediately after the third click, replace it with the live fourth-point candidate on movement, and auto-complete only when the fourth-click geometry is renderable.
 
 ## 7. Testing requirements
 
@@ -151,6 +155,7 @@ New geometry requires numerical, degenerate, parameter-isolation and golden-fixt
 - camera stability and zoom restoration when double-click is used;
 - semantic handle edit, history depth and undo;
 - invalid geometry rejection before Store mutation;
+- rejected completion recovery;
 - any Definition-derived draft remains transient and cannot satisfy completion by itself.
 
 Variant tests must additionally show that changing the variant-specific parameter does not silently change shared body/head geometry.
@@ -159,12 +164,14 @@ Compound-symbol tests must additionally cover shared-body topology, pair-role in
 
 MapLibre `querySourceFeatures()` may return duplicate tile copies. Semantic handle counts must be validated by unique `plotId + handleIndex`, not raw Feature count.
 
-Current minimum regression baseline after the double-arrow third-click preview fix:
+Current minimum regression baseline after the cross-symbol rendering-reliability slice:
 
 ```text
-101 Node tests
-14 Chromium tests
+107 Node tests
+15 Chromium tests
 ```
+
+The Chromium suite includes a draft-and-committed visibility matrix for all eight public Arrow types.
 
 ## 8. Playground and Pages
 
@@ -176,7 +183,8 @@ Current minimum regression baseline after the double-arrow third-click preview f
 - Every public symbol gets a selector/catalog entry and browser test in the same slice.
 - Multi-point symbols require visible instructions for their actual completion mode and point removal.
 - Fixed-count symbols must clearly state automatic maximum-point completion.
-- The double-arrow browser suite must assert a rendered draft immediately after the third click without requiring a later `mousemove`.
+- The double-arrow browser suite must assert visible draft output immediately after the third click without requiring a later `mousemove`.
+- The all-arrow matrix must verify both Source presence and actual rendered features for draft and committed states.
 - Pages deploys only from `main`.
 
 ## 9. Documentation and handover
@@ -219,37 +227,28 @@ One complete high-quality vertical slice is preferred to many incomplete symbols
 
 ## 11. Current priority
 
-The active corrective slice is the `arrow.double` third-click preview fix on:
+The active corrective slice is cross-symbol Arrow rendering reliability on:
 
 ```text
-branch: agent/double-arrow-third-click-preview
-PR: #17 Fix double-arrow third-click preview
+branch: agent/arrow-render-reliability
+PR: #19 Fix cross-symbol arrow rendering reliability
 workspace: 0.0.12
-Node tests: 101
-Chromium tests: 14
+Node tests: 107
+Chromium tests: 15
 ```
 
 The corrective contract is:
 
-1. the third click immediately renders a complete transient mirrored draft;
-2. reflection is computed in local metres around the forward axis perpendicular to the tail baseline;
-3. pointer movement replaces the mirrored objective with the real fourth-point candidate;
-4. pressing Enter with only three authored controls does not complete;
-5. the fourth click remains the only normal fixed-count completion event;
-6. Store, History, handles and PlotJSON contain only the four authored controls;
-7. invalid transient draft geometry clears the draft without breaking the draw session;
-8. no symbol-ID branch is added to the interaction or MapLibre packages.
+1. temporary non-renderable geometry never makes an active drawing appear completely blank;
+2. the last valid full draft remains visible when later pointer geometry is invalid;
+3. before the first valid full draft, a semantic guide line and control points remain visible;
+4. invalid completion does not terminate the session or mutate Store/History;
+5. fixed-count symbols can replace a rejected final candidate;
+6. create, replace, import and drag acceptance use full Registry generation preflight;
+7. strict finite/closed/simple topology remains enabled;
+8. all eight public Arrow types pass draft and committed actual-rendering browser coverage.
 
-Authoritative double-arrow records remain:
-
-```text
-docs/design/arrow-double-semantic-design.md
-docs/algorithms/arrow-double.md
-docs/handover/2026-07-29-milestone-005h-double-arrow-implementation.md
-docs/handover/2026-07-29-milestone-005h-double-arrow-finalization.md
-```
-
-After PR #17 is green and merged, the next development priority is an independent canonical semantic design for `arrow.pincer`. Before implementation, that design must freeze:
+After PR #19 is green and merged, the next development priority is an independent canonical semantic design for `arrow.pincer`. Before implementation, that design must freeze:
 
 1. authored control count and role of every control;
 2. whether control groups are ordered or unordered;
