@@ -71,16 +71,14 @@ test("squad combat produces a finite counterclockwise simple polygon", () => {
 });
 
 test("squad combat responds to path shape and derived-width ratio", () => {
-  const straight = buildSquadCombatRing([
-    [0, 0],
-    [0, 0.01],
-  ]);
-  const curved = buildSquadCombatRing([
-    [0, 0],
-    [0.0015, 0.005],
-    [0, 0.01],
-  ]);
-  assert.notDeepEqual(straight, curved);
+  const straightControls = [controls[0], controls[2]];
+  const straightDerived = deriveSquadCombatAttackControls(straightControls);
+  const curvedDerived = deriveSquadCombatAttackControls(controls);
+  assert.notDeepEqual(straightDerived.slice(0, 2), curvedDerived.slice(0, 2));
+  assert.notDeepEqual(
+    buildSquadCombatRing(straightControls),
+    buildSquadCombatRing(controls),
+  );
 
   const projection = createLocalProjection(controls[0]);
   const narrow = buildSquadCombatRing(controls, {
