@@ -17,14 +17,15 @@ arrow.fine.tailed
 arrow.assault-direction
 arrow.curved
 arrow.attack
+arrow.attack.tailed
 ```
 
-The Playground supports two-point and multi-point drawing, live preview, double-click/Enter completion, semantic control-point editing, undo/redo, style editing, mixed Nanjing samples, and PlotJSON import/export.
+The Playground supports two-point and multi-point drawing, live preview, double-click/Enter completion, semantic control-point editing, undo/redo, style editing, seven mixed Nanjing samples, and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.10
+workspace version: 0.0.11
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
 ```
@@ -42,9 +43,10 @@ Implemented foundations:
 - vector, polyline, curve, offset, ring and geodesic primitives;
 - antimeridian and coordinate-mode policies;
 - deterministic golden fixtures, degenerate-input tests and Chromium actual-rendered-feature tests;
-- Definition-level renderability validation for topology-sensitive attack arrows.
+- Definition-level complete renderability validation for topology-sensitive attack arrows;
+- reusable `FineArrowFrame` and `AttackArrowFrame` variant boundaries.
 
-The next single-symbol vertical slice is `arrow.attack.tailed`.
+The next single-symbol vertical slice is `arrow.double`.
 
 ## Why semantic plotting
 
@@ -191,12 +193,44 @@ Properties:
 - tail-input order does not change the derived polygon;
 - tail width drives body and head scale;
 - the body can bulge before narrowing into the neck;
-- the terminal tangent controls head direction;
 - every tail/spine control is editable and undoable;
 - full geometry generation is part of Definition validation;
 - invalid or self-intersecting edits are rejected before Store mutation.
 
 See [`docs/algorithms/arrow-attack.md`](docs/algorithms/arrow-attack.md).
+
+### `arrow.attack.tailed`
+
+A swallowtail attack variant that preserves the complete `arrow.attack` semantic model and reuses `AttackArrowFrame`. Only the tail-closing strategy is different.
+
+```ts
+import { buildTailedAttackArrowRing } from "@plotlibre/geometry";
+
+const ring = buildTailedAttackArrowRing(
+  [
+    [118.745, 32.035],
+    [118.755, 32.025],
+    [118.79, 32.075],
+    [118.85, 32.12],
+  ],
+  {
+    tailNotchDepthRatio: 0.75,
+    tailNotchWidthRatio: 0.65,
+  },
+);
+```
+
+Properties:
+
+- the two tail-edge controls and objective remain exact;
+- notch roots and notch tip are derived, not semantic handles;
+- flat and tailed variants share identical body/head golden coordinates;
+- notch depth and opening width are independent parameters;
+- the notch must remain behind the neck;
+- self-intersecting notch/body combinations are rejected before Store mutation;
+- the full semantic path and notch parameters round-trip through PlotJSON.
+
+See [`docs/algorithms/arrow-attack-tailed.md`](docs/algorithms/arrow-attack-tailed.md).
 
 ## MapLibre usage
 
@@ -204,8 +238,8 @@ See [`docs/algorithms/arrow-attack.md`](docs/algorithms/arrow-attack.md).
 import { Map, setWorkerUrl } from "maplibre-gl";
 import { PlotLibre } from "@plotlibre/maplibre";
 import {
-  ATTACK_ARROW_TYPE,
   builtInSymbols,
+  TAILED_ATTACK_ARROW_TYPE,
 } from "@plotlibre/symbols";
 
 setWorkerUrl("/PlotLibre/assets/maplibre-gl-worker.mjs");
@@ -219,11 +253,11 @@ const map = new Map({
 
 map.on("load", () => {
   const plot = new PlotLibre(map, { definitions: builtInSymbols });
-  plot.draw(ATTACK_ARROW_TYPE);
+  plot.draw(TAILED_ATTACK_ARROW_TYPE);
 });
 ```
 
-For an attack arrow:
+For either attack-arrow variant:
 
 1. click the first tail edge;
 2. click the second tail edge across the initial attack direction;
@@ -238,8 +272,8 @@ During double-click completion PlotLibre keeps MapLibre double-click zoom disabl
 
 ```json
 {
-  "id": "attack-direction-1",
-  "plotType": "arrow.attack",
+  "id": "tailed-attack-direction-1",
+  "plotType": "arrow.attack.tailed",
   "definitionVersion": "1.0.0",
   "controlPoints": [
     [118.745, 32.035],
@@ -258,7 +292,9 @@ During double-click completion PlotLibre keeps MapLibre double-click zoom disabl
     "segmentsPerSpan": 16,
     "miterLimit": 3,
     "minimumTailWidthMeters": 1,
-    "maximumTailWidthMeters": 100000
+    "maximumTailWidthMeters": 100000,
+    "tailNotchDepthRatio": 0.75,
+    "tailNotchWidthRatio": 0.65
   },
   "style": {},
   "metadata": {},
@@ -291,6 +327,7 @@ npm run playground:e2e
 - [Geometry foundation](docs/GEOMETRY_FOUNDATION.md)
 - [Curved arrow algorithm](docs/algorithms/arrow-curved.md)
 - [Attack arrow algorithm](docs/algorithms/arrow-attack.md)
+- [Tailed attack arrow algorithm](docs/algorithms/arrow-attack-tailed.md)
 - [MapLibre Worker packaging](docs/MAPLIBRE_WORKER_PACKAGING.md)
 - [Playground](docs/PLAYGROUND.md)
 - [PlotJSON](docs/PLOTJSON_SPEC.md)
