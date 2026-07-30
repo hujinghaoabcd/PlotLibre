@@ -11,12 +11,12 @@
 ## 当前基线
 
 ```text
-workspace:          0.0.17
-public Arrow types: 12
-Node tests:         145
+workspace:          0.0.18
+public Arrow types: 14
+Node tests:         154
 Chromium tests:     20
-active branch:      agent/route-corridor-symbol-group
-active PR:          #28 Add route and corridor symbol group
+active branch:      agent/route-multihead-group
+active PR:          #29 Add route multi-head symbol group
 ```
 
 公开箭头：
@@ -34,6 +34,8 @@ arrow.pincer
 arrow.squad-combat
 arrow.route
 arrow.corridor
+arrow.route.bidirectional
+arrow.route.double-head
 ```
 
 ## 已完成里程碑
@@ -46,18 +48,19 @@ arrow.corridor
 | 005H | 双箭头 | 已完成 |
 | 006A–006D | 钳形箭头、自然点击顺序、失败原因提示 | 已完成 |
 | 006E | 分队战斗箭头 | 已完成并合并 |
-| 006F–006G | 路线箭头 + 走廊箭头共享 PathRibbon 基础 | PR #28 |
+| 006F–006G | 路线箭头 + 走廊箭头共享 PathRibbon 基础 | 已完成并合并 |
+| 006H | 双向路线 + 双头路线共享多头路径基础 | PR #29 |
 
-## Milestone 006F–006G：Route/Corridor 相关符号组
+## Milestone 006H：Route Multi-Head 相关符号组
 
 ### 共享中心路径
 
 两个符号均保存用户定义的中心路径：
 
 ```text
-controlPoints[0]      = path start / endpoint A
+controlPoints[0]      = exact start / route origin
 controlPoints[1..n-2] = optional path controls
-controlPoints[n-1]    = objective tip / endpoint B
+controlPoints[n-1]    = exact end / primary objective
 ```
 
 ```text
@@ -66,58 +69,67 @@ maxPoints = 64
 completeOnDoubleClick = true
 ```
 
-共享 `PathRibbonFrame` 负责：
+共享多头路线几何负责：
 
-- 局部米制投影；
-- Catmull–Rom 中心线采样；
-- 路径长度测量；
-- `width = pathLength × widthPathRatio`；
-- 左右 offset 与 bounded miter；
-- finite/closed/winding/simple topology validation。
+- `PathRibbonFrame` 局部米制投影与中心线采样；
+- 路径长度派生宽度；
+- 起终点切向与 neck plane；
+- 距离切片和 offset shaft；
+- primary/secondary head construction；
+- 每个 Polygon 组件的 finite/closed/winding/simple validation。
 
-所有 sampled centerline、offset、width、neck、head 和 polygon vertices 均为派生数据，不进入 Store、handles、History 或 PlotJSON。
+所有 sampled centerline、offset、width、neck 和 head vertices 均为派生数据，不进入 Store、handles、History 或 PlotJSON。
 
-### `arrow.route`
+### `arrow.route.bidirectional`
 
-有方向路径符号：
+双向路径符号：
 
-- 起点为路线起点；
-- 末点为精确 objective/tip；
-- 路径带在派生 neck plane 截断；
-- 使用独立 exact-tip arrow head 闭合；
-- 不是分队战斗箭头的参数变体。
+- 首点和末点都是精确箭尖；
+- 两端具有同等方向强调；
+- shaft 仅位于两个派生 neck plane 之间；
+- 输出一个闭合、逆时针、简单 Polygon；
+- 反转控制点顺序仍保持双尖拓扑。
 
-### `arrow.corridor`
+### `arrow.route.double-head`
 
-无方向路径符号：
+同向双头路径符号：
 
-- 两端均为普通走廊端点；
-- 左右边界以平头端盖闭合；
-- 不包含隐藏、零宽或退化箭头头部；
-- 与 route 共享路径带基础，但保持独立闭合结构。
+- 末点为精确 primary objective/tip；
+- 主体保持普通 route 语义；
+- secondary emphasis head 在 primary neck 后方沿相同路径派生；
+- secondary head 为独立 Polygon render component；
+- secondary 参数不得改变 primary route body。
 
 ### 合并条件
 
 1. Node 20.19 success；
 2. Node 22 success；
-3. 145 Node tests success；
+3. 154 Node tests success；
 4. Playground typecheck/build success；
 5. 20 Chromium tests success；
-6. 十二类型 draft/committed 实际渲染矩阵 success；
+6. 十四类型 draft/committed 实际渲染矩阵 success；
 7. handover contract success；
 8. unresolved review threads = 0；
-9. PR #28 Ready and squash merged；
+9. PR #29 Ready and squash merged；
 10. merge SHA 与 `main` identical。
 
 ## 后续符号组顺序
 
-### Milestone 006H：多头路径扩展组
-
-在 Route/Corridor 合并后开发 2–3 个共享分叉路径基础的多头符号。先冻结分叉点、目标点、路径耦合和 PlotJSON 语义，再决定具体公共标识符。不得把 `arrow.double` 直接重命名或套壳。
-
 ### Milestone 006I：闭合行动区域组
 
-开发 closed route、gathering place、freehand closed curve 等共享闭合曲线基础的区域符号。
+开发 2–3 个共享闭合曲线基础的区域符号，优先考虑：
+
+```text
+area.closed-curve
+area.gathering-place
+area.route-loop
+```
+
+实现前冻结公共标识符、最少控制点、自动闭合规则、方向语义和 Polygon/LineString 输出。不得将普通自由手绘 GeoJSON 当作 canonical state。
+
+### Milestone 006J：弧形与扇形区域组
+
+开发 arc、sector、lune 等共享圆弧/方位角基础的区域符号。
 
 ### Milestone 007：专业编辑
 
@@ -129,7 +141,7 @@ RBush、顶点/线段/中点/交点吸附、角度/方位/平行/垂直约束和
 
 ### Milestone 009：区域、旗帜和注记
 
-Arc、sector、lune、closed curve、gathering place、flags、callout 和区域控制措施。
+更多 closed curve、flags、callout 和区域控制措施。
 
 ### Milestone 010：IO 和项目管理
 
