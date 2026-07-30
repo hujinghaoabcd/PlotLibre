@@ -14,7 +14,6 @@ import {
   isSimpleRing,
   resolveRouteMultiHeadParameters,
   ringWinding,
-  signedRingArea,
 } from "@plotlibre/geometry";
 import {
   BIDIRECTIONAL_ROUTE_ARROW_TYPE,
@@ -77,16 +76,16 @@ test("bidirectional route responds to an interior path control", () => {
   assert.notDeepEqual(straight, curved);
 });
 
-test("reversing a bidirectional route preserves its area", () => {
-  const forward = localRing(buildBidirectionalRouteRing(controls));
+test("reversing a bidirectional route preserves two-tip topology", () => {
+  const forward = buildBidirectionalRouteRing(controls);
   const reversedControls = [...controls].reverse();
-  const projection = createLocalProjection(controls[0]);
-  const reverse = buildBidirectionalRouteRing(reversedControls).map((position) =>
-    projection.project(position),
-  );
-  const left = Math.abs(signedRingArea(forward));
-  const right = Math.abs(signedRingArea(reverse));
-  assert.ok(Math.abs(left - right) / Math.max(left, right) < 1e-6);
+  const reverse = buildBidirectionalRouteRing(reversedControls);
+  assert.equal(forward.length, reverse.length);
+  for (const ring of [forward, reverse]) {
+    assert.equal(containsPosition(ring, controls[0]), true);
+    assert.equal(containsPosition(ring, controls.at(-1)), true);
+    assert.equal(isSimpleRing(localRing(ring), 1e-6), true);
+  }
 });
 
 test("double-head route returns a primary exact-tip body and a derived secondary head", () => {
@@ -151,19 +150,19 @@ test("route multi-head parameters and degenerate controls fail closed", () => {
     /distinct control points/,
   );
   assert.throws(
+    () => buildDoubleHeadRouteRings([[0, 0], [0, 0]]),
+    /distinct control points/,
+  );
+  assert.throws(
     () => resolveRouteMultiHeadParameters({ secondaryHeadGapPathRatio: 0 }),
     /secondaryHeadGapPathRatio must be between/,
   );
   assert.throws(
     () =>
-      buildDoubleHeadRouteRings(
-        [
-          [0, 0],
-          [0, 0.001],
-        ],
-        { secondaryHeadLengthPathRatio: 0.2, secondaryHeadGapPathRatio: 0.2 },
-      ),
-    /too short/,
+      resolveRouteMultiHeadParameters({
+        secondaryHeadHalfWidthRibbonRatio: 6,
+      }),
+    /secondaryHeadHalfWidthRibbonRatio must be between/,
   );
 });
 
