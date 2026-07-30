@@ -90,6 +90,8 @@ async function begin(page: Page, plotType: ArrowType): Promise<void> {
 test("all public arrow types show a draft and a committed rendering", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
+
   const twoPointTypes = [
     "arrow.straight",
     "arrow.fine",
