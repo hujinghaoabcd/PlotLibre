@@ -7,6 +7,8 @@ export * from "./double-arrow.js";
 export * from "./fine-arrow.js";
 export * from "./pincer-arrow.js";
 export * from "./route-arrow.js";
+export * from "./route-bidirectional.js";
+export * from "./route-double-head.js";
 export * from "./squad-combat.js";
 export * from "./straight-arrow.js";
 export * from "./style.js";
