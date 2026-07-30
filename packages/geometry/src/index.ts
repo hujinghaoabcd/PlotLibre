@@ -16,6 +16,7 @@ export * from "./pincer-arrow.js";
 export * from "./polyline.js";
 export * from "./ring.js";
 export * from "./route-arrow.js";
+export * from "./route-multihead.js";
 export * from "./squad-combat.js";
 export * from "./straight-arrow.js";
 export * from "./tailed-attack-arrow.js";
