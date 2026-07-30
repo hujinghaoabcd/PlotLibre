@@ -46,7 +46,7 @@ Rules:
 - Semantic controls must remain separate from curve samples and polygon vertices.
 - Self-intersection checks must not be removed merely to make a difficult path render.
 - Topology-sensitive Definitions must validate complete renderability before Store mutation.
-- Compound symbols must declare their coupling topology and produce one coherent semantic geometry.
+- Compound symbols must declare their coupling topology and produce coherent render components under one semantic Definition.
 - Shaft/head joins must not retain offset vertices beyond the head neck plane.
 
 ## 4. Related-symbol groups
@@ -107,6 +107,8 @@ arrow.pincer
 arrow.squad-combat
 arrow.route
 arrow.corridor
+arrow.route.bidirectional
+arrow.route.double-head
 ```
 
 ### Squad combat
@@ -145,7 +147,29 @@ n-1    endpoint B
 
 The output is a constant-width ribbon with flat end caps and no arrow head. It must not be implemented as a route arrow with a hidden, zero-width or degenerate head.
 
-Route and corridor may share `PathRibbonFrame`, but their public closure structures remain independent.
+### Bidirectional route
+
+`arrow.route.bidirectional@1.0.0` stores a centre path whose two authored endpoints are exact tips:
+
+```text
+0      exact start tip
+1..n-2 optional path controls
+n-1    exact end tip
+```
+
+The two neck planes and the shaft between them are derived. Reversing the authored path preserves two-tip topology. The result is one closed simple Polygon.
+
+### Double-head route
+
+`arrow.route.double-head@1.0.0` stores a directed centre path:
+
+```text
+0      route origin
+1..n-2 optional path controls
+n-1    exact primary objective/tip
+```
+
+The primary route body and exact tip use ordinary route semantics. A second same-direction emphasis head is derived behind the primary neck and rendered as an additional Polygon component. The secondary head must never enter Store, History, handles or PlotJSON.
 
 ## 7. Interaction and rejection rules
 
@@ -171,7 +195,7 @@ Route and corridor may share `PathRibbonFrame`, but their public closure structu
 - One completed handle drag produces one `ReplacePlotCommand`.
 - Invalid handle previews never enter Store or History.
 - Variable path symbols show a full draft after one committed start plus the live terminal candidate.
-- Squad combat, route and corridor complete with double-click or Enter and persist only authored centre-path controls.
+- Squad combat, route, corridor and route multi-head symbols complete with double-click or Enter and persist only authored centre-path controls.
 
 ## 8. Testing requirements
 
@@ -205,23 +229,24 @@ New geometry additionally requires:
 - completion mode;
 - invalid geometry rejection before Store mutation.
 
-Path-ribbon group tests additionally prove:
+Route multi-head tests additionally prove:
 
-- one shared width is derived from authored path length;
-- route preserves the exact terminal tip;
-- route shaft is trimmed at a derived neck plane;
-- corridor has flat end caps and no head;
-- both respond to an interior path control and width parameter;
-- both produce one coherent no-hole simple Polygon;
-- sampled centreline and offset vertices do not survive PlotJSON;
-- actual browser draft and committed rendering are visible for both.
+- bidirectional route preserves both exact authored endpoint tips;
+- bidirectional route remains one closed counterclockwise simple Polygon;
+- path reversal preserves two-tip topology;
+- double-head route preserves the exact primary terminal tip;
+- the secondary head is derived and structurally separate;
+- secondary-head parameters do not change the primary route body;
+- both Definitions are independently registered and validated;
+- PlotJSON contains only authored center-path controls;
+- actual draft and committed rendering is visible for both.
 
 Current minimum regression baseline:
 
 ```text
-145 Node tests
+154 Node tests
 20 Chromium tests
-12 public Arrow types
+14 public Arrow types
 ```
 
 ## 9. Playground and Pages
@@ -234,9 +259,9 @@ Current minimum regression baseline:
 - Every public symbol gets selector, sample and browser coverage in the same slice.
 - Fixed-count symbols clearly state automatic maximum-point completion.
 - Variable symbols clearly state double-click/Enter completion.
-- Production exposes squad combat, route and corridor by default.
+- Production exposes squad combat and all path symbols by default.
 - Extended E2E uses `?e2e=1&squad=1&paths=1`; legacy initial nine-symbol/sample tests remain stable.
-- Clicking Load Sample under the extended flag produces all twelve samples.
+- Clicking Load Sample under the extended flag produces all fourteen samples.
 - Pages deploys only from `main`.
 
 ## 10. Documentation and handover
@@ -268,25 +293,25 @@ Prefer one complete related-symbol group to many incomplete symbols. Do not deve
 Active related-symbol group:
 
 ```text
-branch: agent/route-corridor-symbol-group
-PR: #28 Add route and corridor symbol group
-workspace: 0.0.17
-Definitions: arrow.route@1.0.0, arrow.corridor@1.0.0
-expected Node baseline: 145
+branch: agent/route-multihead-group
+PR: #29 Add route multi-head symbol group
+workspace: 0.0.18
+Definitions: arrow.route.bidirectional@1.0.0, arrow.route.double-head@1.0.0
+expected Node baseline: 154
 expected Chromium baseline: 20
 ```
 
 Approved behavior:
 
-1. both symbols persist authored centre paths;
+1. both Definitions persist authored centre paths;
 2. both allow a two-control straight form and optional intermediate controls;
-3. `PathRibbonFrame` is the shared pure geometry foundation;
-4. route is directed and preserves an exact terminal tip;
-5. corridor is undirected and uses flat end caps;
-6. strict simple-ring validation remains;
+3. both share pure route/head geometry rather than copied generators;
+4. bidirectional route gives equal directional emphasis to exact authored endpoints;
+5. double-head route preserves one exact objective and one derived secondary emphasis head;
+6. strict simple-ring validation remains for every Polygon component;
 7. Store and PlotJSON contain only authored controls;
 8. no symbol-ID branch is added to interaction;
-9. Playground exposes twelve public symbols and a full twelve-sample action;
+9. Playground exposes fourteen public symbols and a full fourteen-sample action;
 10. this group stays in one implementation PR.
 
-After PR #28 merges, continue to the next related symbol group rather than returning to pincer hardening. The next planned group is multi-head path extensions, with exact identifiers frozen before implementation.
+After PR #29 merges, continue to the next related symbol group rather than returning to pincer hardening. The next planned group should move beyond route-head variants and add a new area/curve family.

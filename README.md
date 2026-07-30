@@ -23,17 +23,19 @@ arrow.pincer
 arrow.squad-combat
 arrow.route
 arrow.corridor
+arrow.route.bidirectional
+arrow.route.double-head
 ```
 
-The Playground supports exact two-point, variable two-point-path, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; semantic-guide fallback; maximum-point or explicit completion; structured completion-rejection feedback; semantic control-point editing; undo/redo; style editing; twelve-symbol samples; and PlotJSON import/export.
+The Playground supports exact two-point, variable two-point-path, variable multi-point, fixed-four-point and fixed-five-point drawing; live preview; semantic-guide fallback; maximum-point or explicit completion; structured completion-rejection feedback; semantic control-point editing; undo/redo; style editing; fourteen-symbol samples; and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.17
+workspace version: 0.0.18
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
-Node tests:        145
+Node tests:        154
 Chromium tests:    20
 ```
 
@@ -56,7 +58,33 @@ Implemented foundations:
 - local-metre projection and strict finite/closed/simple topology validation;
 - shared pure geometry frames for related symbol groups;
 - deterministic geometry fixtures and actual-rendered-feature Chromium tests;
-- browser visibility coverage for all twelve public Arrow types.
+- browser visibility coverage for all fourteen public Arrow types.
+
+## Route multi-head group
+
+`arrow.route.bidirectional` and `arrow.route.double-head` share the authored center-path model and route-head geometry while keeping different directional topology.
+
+### Bidirectional route
+
+```text
+0      exact start tip
+1..n-2 optional path controls
+n-1    exact end tip
+```
+
+Both authored endpoints are exact arrow tips. The body is derived only between two neck planes, producing one closed simple Polygon with equal directional emphasis in both directions.
+
+### Double-head route
+
+```text
+0      route origin
+1..n-2 optional path controls
+n-1    exact primary objective/tip
+```
+
+The primary body retains ordinary route-arrow semantics. A second same-direction emphasis head is derived behind the primary neck and rendered as an additional Polygon component. It is never stored as a control point.
+
+Both Definitions are version `1.0.0`. Widths, sampled paths, necks, endpoint heads and the secondary emphasis head remain derived geometry.
 
 ## Route and corridor group
 
