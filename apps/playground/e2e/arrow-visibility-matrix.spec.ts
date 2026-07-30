@@ -12,7 +12,9 @@ type ArrowType =
   | "arrow.pincer"
   | "arrow.squad-combat"
   | "arrow.route"
-  | "arrow.corridor";
+  | "arrow.corridor"
+  | "arrow.route.bidirectional"
+  | "arrow.route.double-head";
 
 async function openPlayground(page: Page): Promise<void> {
   await page.goto("/PlotLibre/?e2e=1&squad=1&paths=1");
@@ -129,6 +131,8 @@ test("all public arrow types show a draft and a committed rendering", async ({
     "arrow.squad-combat",
     "arrow.route",
     "arrow.corridor",
+    "arrow.route.bidirectional",
+    "arrow.route.double-head",
   ] as const) {
     await page.reload();
     await openPlayground(page);
