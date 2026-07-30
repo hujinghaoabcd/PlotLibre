@@ -10,7 +10,7 @@ export const playgroundTemplate = `
       </a>
       <div class="header-links">
         <a href="https://github.com/hujinghaoabcd/PlotLibre" target="_blank" rel="noreferrer">GitHub</a>
-        <span class="version-badge">v0.0.17 demo</span>
+        <span class="version-badge">v0.0.18 demo</span>
       </div>
     </header>
 
@@ -105,6 +105,8 @@ export const playgroundTemplate = `
             <li>分队战斗箭头：首点为尾部中心，后续点为行动路径和目标，尾宽自动派生。</li>
             <li>路线箭头：首点为路线起点，后续点定义中心路线，末点为精确目标箭尖。</li>
             <li>走廊箭头：控制点定义无方向中心路径，派生双向平头走廊。</li>
+            <li>双向路线箭头：首末点均为精确箭尖，中间控制点定义共同路线。</li>
+            <li>双头路线箭头：末点为精确目标，后方同向强调头自动派生。</li>
             <li>可变多点箭头双击最后一点或按 Enter 完成；Backspace/Delete 逐点回退。</li>
             <li>完成后可拖动任一圆形语义控制点重新编辑。</li>
           </ol>
