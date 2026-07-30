@@ -6,7 +6,7 @@
 PR：`#29 Add route multi-head symbol group`  
 Workspace：`0.0.18`  
 Definitions：`arrow.route.bidirectional@1.0.0`、`arrow.route.double-head@1.0.0`  
-状态：十四个公共箭头已完成；154 Node / 20 Chromium 全绿；等待最终 handover-inclusive CI、Ready 和 squash merge
+状态：十四个公共箭头已完成；154 Node / 20 Chromium 与最终 handover-inclusive CI 全绿；合并条件已满足
 
 ## Current state
 
@@ -44,37 +44,37 @@ PR #29
 - workspace/demo 为 `0.0.18`；
 - Node baseline 为 154；
 - Chromium baseline 为 20；
-- README、AGENTS、路线图、设计和算法文档已更新；
+- README、AGENTS、路线图、设计、算法和 immutable handover 已更新；
 - pincer hardening 继续冻结。
 
 ## Validation
 
 ```text
-Initial CI:              30509683256
-Corrected core CI:       30510035357
-Full implementation CI:  30510457314
-Node 20.19:              success
-Node 22:                 success
-Node tests:              154 passed / 0 failed
-Chromium tests:          20 passed / 0 failed
-14-type render matrix:   success
-Typecheck/build:         success
-Playground build:        success
-Handover contract:       success
+Initial CI:                30509683256
+Corrected core CI:         30510035357
+Full implementation CI:    30510457314
+Handover-inclusive CI:     30510686480
+Node 20.19:                success
+Node 22:                   success
+Node tests:                154 passed / 0 failed
+Chromium tests:            20 passed / 0 failed
+14-type render matrix:     success
+Typecheck/build:           success
+Playground build:          success
+Handover contract:         success
 ```
 
 ## Next tasks
 
-1. 完成最终 handover-inclusive CI；
-2. 检查 unresolved review threads；
-3. 更新 PR #29 描述；
-4. 标记 Ready；
-5. squash merge 并 compare main；
-6. 核对 Pages `v0.0.18 demo`；
-7. 下一组进入闭合行动区域；
-8. 冻结 closed-curve、gathering-place、route-loop 语义；
-9. 暂不增加更多路线头部变体；
-10. 不返回 pincer 加固。
+1. 检查 unresolved review threads；
+2. 更新 PR #29 最终说明；
+3. 标记 Ready；
+4. squash merge 并 compare main；
+5. 核对 Pages `v0.0.18 demo`；
+6. 下一组进入闭合行动区域；
+7. 冻结 closed-curve、gathering-place、route-loop 语义；
+8. 暂不增加更多路线头部变体；
+9. 不返回 pincer 加固。
 
 ## Risks and decisions
 
@@ -86,4 +86,4 @@ Handover contract:       success
 - 当前工具不能可靠直接确认 Pages 缓存；
 - packages 仍为 `UNLICENSED`。
 
-Continuation：最终 CI 全绿后直接执行 PR #29 的 review-thread 检查、Ready、squash merge 和 main compare。下一开发组转向闭合行动区域。
+Continuation：当前分支已满足合并条件。检查 PR #29 review threads，更新最终描述，Ready，使用 expected head SHA squash merge，再 compare merge SHA 与 main。下一开发组转向闭合行动区域。
