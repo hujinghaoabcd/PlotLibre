@@ -10,13 +10,15 @@ import type {
 
 /**
  * Handles selection modifiers in the canvas capture phase before MapLibre's
- * built-in Shift box-zoom and other pointer handlers can consume the DOM event.
- * Plain clicks remain owned by MapLibrePlotInteraction.
+ * built-in pointer handlers can consume the DOM event. PlotLibre reserves Shift
+ * for additive selection while installed, so MapLibre box zoom is restored only
+ * when this adapter is destroyed.
  */
 export class MapLibreSelectionModifierCapture {
   readonly #map: MapLibreMapLike;
   readonly #selection: SelectionController;
   readonly #renderer: MapLibrePlotRenderer;
+  readonly #boxZoomWasEnabled: boolean;
 
   readonly #onMouseDown = (event: MapCanvasMouseEventLike): void => {
     const intent = readModifierIntent(event);
@@ -38,6 +40,8 @@ export class MapLibreSelectionModifierCapture {
     this.#map = map;
     this.#selection = selection;
     this.#renderer = renderer;
+    this.#boxZoomWasEnabled = this.#map.boxZoom?.isEnabled?.() ?? false;
+    if (this.#boxZoomWasEnabled) this.#map.boxZoom?.disable();
     this.#map.getCanvas().addEventListener(
       "mousedown",
       this.#onMouseDown,
@@ -51,6 +55,7 @@ export class MapLibreSelectionModifierCapture {
       this.#onMouseDown,
       { capture: true },
     );
+    if (this.#boxZoomWasEnabled) this.#map.boxZoom?.enable();
   }
 
   #queryPlotId(x: number, y: number): string | undefined {
