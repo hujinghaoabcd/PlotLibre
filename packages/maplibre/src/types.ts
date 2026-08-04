@@ -86,6 +86,7 @@ export interface PlotLibreLayerIds {
   readonly draftFill: string;
   readonly draftLine: string;
   readonly draftPoint: string;
+  readonly handleGuide: string;
   readonly handle: string;
 }
 
