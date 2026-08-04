@@ -1,16 +1,16 @@
 # PlotLibre Design Notes
 
-本目录保存公共符号在 geometry 实现前冻结的语义设计，以及多个相关符号共享数学基础时的组设计。
+本目录保存公共符号或专业编辑能力在 runtime 实现前冻结的语义设计，以及多个相关功能共享状态或数学基础时的组设计。
 
 设计文档应回答：
 
-- public `plotType` 和 Definition version；
-- authored control roles；
-- 顺序、交换与 canonicalization 不变量；
-- derived geometry 和 transient guide 边界；
-- completion、validation 和 degenerate-input policy；
+- public identifiers、versions 或 interaction modes；
+- authored controls、selection state 或 transaction ownership；
+- 顺序、交换、canonicalization 与 mutation 不变量；
+- derived geometry、overlay 和 transient guide 边界；
+- completion、validation、rollback 和 degenerate-input policy；
 - PlotJSON/migration boundary；
-- shared frame 与独立 public semantics；
+- shared frame/state model 与独立 public semantics；
 - clean-room references、licenses 和 code-reuse declaration；
 - deterministic test plan and non-goals。
 
@@ -23,9 +23,9 @@
 | `route-corridor-group.md` | route + flat-cap corridor | 已实现并合并 |
 | `route-multihead-group.md` | bidirectional + derived secondary-head route | 已实现并合并 |
 | `closed-action-area-group.md` | closed curve + gathering place | 已实现并通过 PR #31 合并 |
-| `circular-arc-family.md` | circular arc + sector + circular segment | 设计通过 PR #33 合并；PR #34 实现与最终验证阶段 |
+| `circular-arc-family.md` | circular arc + sector + circular segment | 设计 PR #33、实现 PR #34 均已合并 |
 
-## Milestone 006J 已冻结并实现的契约
+## Milestone 006J 最终状态
 
 公共范围：
 
@@ -54,35 +54,60 @@ area.lune
 - 三者 fixed-three，第三个有效点击自动完成；
 - 1.0 local-metre only；
 - duplicate、collinear、unstable、excessive-radius、unsupported extent 和 invalid topology fail closed；
-- no two-point fallback、no hidden control movement、no singular degradation、no silent geodesic switch；
+- no two-point fallback、hidden control movement、singular degradation 或 silent geodesic switch；
 - `segmentsPerCircle` 只影响采样密度；
 - exact authored controls survive PlotJSON；
-- circular centers、radii、sweeps、samples、derived endpoints 和 closing coordinates 均为派生状态。
+- centers、radii、sweeps、samples、derived endpoints 和 closing coordinates 均为派生状态。
 
-## Sector semantic-guide extension
+### Sector semantic-guide extension
 
-006J 实现增加通用 Definition hook：
+006J 增加通用 Definition hook：
 
 ```text
 deriveSemanticGuidePaths(feature)
 ```
 
-Sector 使用它声明 `center → end-bearing handle`。MapLibre 在 complete draft、selection 和 handle drag 中渲染虚线，但 guide 不进入 committed RenderBundle、Store、History 或 PlotJSON。
+Sector 声明 `center → end-bearing handle`。MapLibre 在 complete draft、selection 和 handle drag 中渲染虚线，但 guide 不进入 committed RenderBundle、Store、History 或 PlotJSON。
 
-该能力属于通用语义设计机制，不是 MapLibre 层的 `area.sector` 特判。
+该能力是通用语义机制，不是 MapLibre 层的 `area.sector` 特判。
 
-## 当前实现证据
-
-PR #34 当前目标：
+### Merge evidence
 
 ```text
-workspace: 0.0.20
-symbols:   19 (14 Arrow + 1 Line + 4 Area)
-Node:      184
-Chromium:  28
+workspace:        0.0.20
+symbols:          19 (14 Arrow + 1 Line + 4 Area)
+Node:             184 passed
+Chromium:         28 passed
+implementation:   PR #34
+squash merge SHA: 297d0a644eaa3427f8fd59b82b7bc3582221d49e
 ```
 
 详细语义见 `circular-arc-family.md`，数学与 provenance 见 `../algorithms/circular-arc-foundation.md`。
+
+## Milestone 007 设计入口
+
+下一阶段是专业编辑语义设计，而不是继续增加符号。拟新增设计文档应覆盖：
+
+```text
+multi-selection
+box/lasso selection
+whole-object translation
+rotation and scale
+groups, locks and z-order
+multi-object commands and atomic rollback
+keyboard, pointer and touch behavior
+performance and browser fixtures
+```
+
+核心原则：
+
+- selection overlay 和 transform handles 是 transient UI state；
+- object transforms 修改 authored controls，不修改 rendered Polygon vertices；
+- multi-object mutation 必须先对全部 affected features 完成 Registry preflight；
+- 任一 feature 无效时整批不 mutation；
+- one gesture = one history entry；
+- group/lock/z-order 进入 canonical document 前必须明确 PlotJSON schema 和 migration；
+- design PR 合并前不得编写 Milestone 007 runtime。
 
 ## 状态说明
 
