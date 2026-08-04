@@ -198,7 +198,6 @@ test("invalid lasso retries directly and Shift adds in Store order", async ({
     [bounds.maxX, bounds.minY],
     [bounds.maxX, bounds.maxY],
     [bounds.minX, bounds.maxY],
-    [bounds.minX, bounds.minY],
   ]);
   await page.keyboard.up("Shift");
 
