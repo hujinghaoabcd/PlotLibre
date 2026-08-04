@@ -20,10 +20,10 @@ PlotLibre 会系统研究其他标绘与编辑库，但不会把多个库直接�
 |---|---|---|---|
 | `ol-plot` | 传统箭头、区域、圆弧、控制点编辑 | public behavior、传统名称、控制点约定 | OpenLayers Feature 继承、fallback 和源码表达 |
 | `maptalks.plot` | 态势符号、旗帜、集结地、圆弧族 | 符号目录、中文术语、交叉验证 | Maptalks 对象模型、singular degradation |
-| Terra Draw | Mode lifecycle、selection、drag/rotate/scale、adapter separation | engine-independent selection/gesture state | ordinary GeoJSON as canonical source、源码实现 |
-| MapLibre-Geoman | editing events、selection、drag/rotate/scale、toolbar | professional MapLibre UX and events | direct generated-geometry editing、runtime dependency |
-| Mapbox GL Draw | simple/direct select、whole-feature drag、mode tests | mode separation、selection behavior、test organization | Mapbox-specific Store/modes、generated vertex editing |
-| MapLibre GL JS | Sources/Layers、events、render queries | native adapter and actual-rendered tests | proprietary Mapbox follow-up code |
+| Terra Draw | Mode lifecycle、selection、adapter separation | engine-independent selection/gesture state | ordinary GeoJSON as canonical source、源码实现 |
+| MapLibre-Geoman | editing events、selection、toolbar/mode separation | professional MapLibre UX and events | direct generated-geometry editing、runtime dependency |
+| Mapbox GL Draw | simple/direct select、whole-feature drag、box select | input arbitration、mode tests、DOM region UX | Mapbox-specific Store/modes、generated vertex editing |
+| MapLibre GL JS | Sources/Layers、events、project、render queries | native adapter、broad-phase candidate query | engine internals as PlotLibre canonical state |
 | `mil-sym-ts` | MIL-STD/APP-6 rendering | optional standards backend | rebuilding standards from scratch |
 
 ## 3. 通用地址
@@ -60,18 +60,19 @@ PlotLibre rejects reference two-point and singular fallbacks and independently i
 
 | 项目 | Revision | License | Observable behavior studied | Code reuse |
 |---|---|---|---|---|
-| `JamesLMilner/terra-draw` | `26d7ec91f071ab5d2bdeab774d14763746cd798b` | MIT，Copyright 2022 James Milner | select mode lifecycle、programmatic select/deselect、keyboard-configured delete/rotate/scale、whole-feature editing tests | none |
-| `geoman-io/maplibre-geoman` | `b177748cac826fc820ff7ea068186f8eb6e0fc3c` | MIT，Copyright 2024 Geoman | MapLibre editing event separation、selection/edit UX、drag/rotate/scale vocabulary | none |
-| `mapbox/mapbox-gl-draw` | `cb0ca464872d8468f0b912a2321f2e0503718c52` | ISC-style，Copyright Mapbox | simple-select/direct-select split、whole-feature drag、selection API and tests | none |
+| `JamesLMilner/terra-draw` | `26d7ec91f071ab5d2bdeab774d14763746cd798b` | MIT，Copyright 2022 James Milner | select mode lifecycle、programmatic select/deselect、adapter/mode separation、whole-feature editing tests | none |
+| `geoman-io/maplibre-geoman` | `b177748cac826fc820ff7ea068186f8eb6e0fc3c` | MIT，Copyright 2024 Geoman | MapLibre editing event separation、selection/edit UX、drag/rotate/scale vocabulary、toolbar modes | none |
+| `mapbox/mapbox-gl-draw` | `cb0ca464872d8468f0b912a2321f2e0503718c52` | ISC-style，Copyright Mapbox | simple/direct select、whole-feature drag、Shift box selection lifecycle、DOM rectangle、id de-duplication | none |
+| `maplibre/maplibre-gl-js` | `v6.0.0` | BSD-3-Clause，Copyright MapLibre contributors | `queryRenderedFeatures` point/bounds input、layer filtering、screen PointLike、project/camera interaction boundaries | none |
 
 ### 5.1 Observed common patterns
 
-- selection is an explicit interaction mode/state；
+- selection is explicit interaction state；
 - direct control editing and whole-feature editing are distinct；
-- drag、rotate、scale and delete have separate lifecycle/events；
+- drag、rotate、scale、box and delete have separate lifecycle；
 - programmatic selection is required；
-- keyboard mappings need explicit policy；
-- tests cover mode start/stop、selection、drag and deletion。
+- keyboard/modifier mappings need explicit policy；
+- tests cover mode start/stop、selection、drag and cancellation。
 
 ### 5.2 PlotLibre differences
 
@@ -82,17 +83,20 @@ authored controls
 Registry preflight
 atomic Store transactions
 selection snapshots
-one gesture / one history entry
+one gesture / one history entry for document mutation
+one event for transient selection mutation
 ```
 
 Specific differences：
 
 - multi-feature transform edits authored controls only；
-- every affected feature is canonicalized/generated before any mutation；
-- one invalid member rejects the whole batch；
-- selection is transient and excluded from PlotJSON；
+- every affected feature is canonicalized/generated before document mutation；
+- one invalid member rejects the whole document batch；
+- selection and region paths are transient and excluded from PlotJSON；
 - batch delete undo restores exact document order and selection；
 - Store listener errors cannot create untracked mutations；
+- region selection uses MapLibre only as broad phase and applies an independent exact screen-geometry narrow phase；
+- query result order never becomes selection order；
 - group/lock/z-order cannot be hidden in arbitrary metadata；
 - no reference source expression、Store structure、mode code or event implementation is copied。
 
@@ -100,24 +104,103 @@ Specific differences：
 
 | Capability | Reference pattern | PlotLibre frozen direction |
 |---|---|---|
-| Single selection | explicit select mode | backward-compatible `selectedId` alias to primary selection |
+| Single selection | explicit select mode | backward-compatible `selectedId` alias to Primary |
 | Multi-selection | mode/programmatic selection | ordered `selectedIds` + final `primaryId` |
-| Direct edit | vertex/control mode | primary feature authored handles only |
+| Direct edit | vertex/control mode | Primary authored handles only |
 | Whole-object drag | feature translation | one local-metre delta applied to all selected authored controls |
 | Batch delete | delete selected features | one atomic transaction and one history entry |
-| Undo selection | varies by library | command stores before/after selection snapshots |
-| Box selection | rendered candidates | intersection policy, dedup by `plotId`, order by Store order |
-| Lasso | optional mode/plugin behavior | dedicated simple screen-space lasso, self-intersection rejected |
+| Undo selection | varies | command stores before/after selection snapshots for document mutations |
+| Box selection | Shift box / rendered candidate query | thresholded neutral Shift-empty add plus explicit box mode |
+| Lasso | optional mode/plugin behavior | explicit one-shot freehand simple screen lasso |
+| Region ordering | renderer/API order varies | dedup by `plotId`, then Store/document order |
+| Region hit policy | rendered feature bbox/query | MapLibre broad phase + exact projected semantic geometry |
+| Region overlay | DOM or map layer | DOM/SVG screen overlay; no PlotJSON/Source identity |
 | Rotation | separate mode/gesture | shared local pivot, all-feature preflight |
 | Scale | separate mode/gesture | positive uniform only in first version |
 | Lock/group/z-order | product-specific | deferred until formal PlotJSON schema/migration |
 
-## 7. Unified evaluation dimensions
+## 7. Milestone 007B focused evidence
+
+### 7.1 Mapbox GL Draw observable box behavior
+
+At `cb0ca464872d8468f0b912a2321f2e0503718c52`：
+
+- `boxSelect` is enabled by default；
+- Shift mousedown can arm box selection；
+- dragPan is disabled/restored around extended interactions；
+- a DOM element renders the screen rectangle；
+- mouseup queries features in the screen bounding box；
+- feature ids are deduplicated before selection；
+- box selection adds ids rather than replacing by default。
+
+PlotLibre reuses none of the implementation。Differences frozen for 007B：
+
+- no selection mutation on mousedown；
+- 4 CSS-pixel threshold；
+- neutral convenience starts only on empty selectable space；
+- explicit box mode supports replace/add/toggle/subtract；
+- candidate ids normalized by Store order；
+- bounding-box query is broad phase only；
+- exact generated screen geometry removes lasso/box false positives；
+- one effective region completion emits one SelectionChange。
+
+### 7.2 MapLibre GL JS API boundary
+
+MapLibre GL JS `v6.0.0` is the runtime engine baseline。007B uses only public adapter-level behavior：
+
+```text
+PointLike screen coordinates
+queryRenderedFeatures(screen point or bounds, { layers })
+project(WGS84 coordinate)
+map/container/pointer lifecycle
+```
+
+`layers` explicitly restricts rendered-feature queries。PlotLibre queries committed fill/line/point layers and excludes selection、draft and handle layers。
+
+MapLibre query output is not canonical state and is not trusted for ordering or exact lasso geometry。
+
+### 7.3 Lasso independence
+
+No reviewed reference is treated as the source of PlotLibre lasso mathematics。PlotLibre independently freezes：
+
+```text
+2 px sample spacing
+1.5 px RDP tolerance
+16 px² minimum area
+raw and simplified simple-ring validation
+non-adjacent crossing/touch/overlap rejection
+hole-aware exact geometry intersection
+```
+
+## 8. 007B architecture decision matrix
+
+| Question | Frozen decision |
+|---|---|
+| Where are region points stored? | transient engine-independent screen session |
+| Does region enter PlotJSON? | no |
+| Does selection enter History? | no |
+| Broad phase | MapLibre rendered index over committed layers |
+| Narrow phase | Registry-generated geometry projected to screen |
+| Geometry style footprint | ignored; semantic centerline/boundary/fill |
+| Candidate order | Store/document order |
+| Candidate duplicate identity | `plotId` |
+| Box overlay | DOM/SVG |
+| Lasso overlay | DOM/SVG |
+| New MapLibre Sources/Layers | none in 007B v1 |
+| Box neutral shortcut | Shift drag from empty space, add default |
+| Replace box | explicit one-shot mode |
+| Lasso activation | explicit one-shot mode only |
+| Invalid lasso | fail closed, selection unchanged, retry allowed |
+| Persistent tool mode | deferred |
+| Touch | deferred |
+| Custom persistent spatial index | deferred pending measurement |
+
+## 9. Unified evaluation dimensions
 
 ### Editing
 
 - single/multi selection；
-- primary selection；
+- Primary selection；
 - control versus object edit；
 - box/lasso；
 - translate/rotate/scale；
@@ -144,24 +227,24 @@ Specific differences：
 - fixed revision and license audit；
 - performance at 100/1,000/10,000 features。
 
-## 8. PlotLibre differentiation
+## 10. PlotLibre differentiation
 
 1. MapLibre-native rendering with engine-independent semantic state；
 2. authored controls and parameters remain canonical；
 3. complete Registry preflight before Store mutation；
 4. atomic multi-object commands and undo；
-5. transient selection/guide overlays；
-6. exact distinction between control edit and object transform；
-7. PlotJSON versioning and future migration；
-8. clean-room algorithms and fixed provenance；
-9. actual-rendered browser validation；
-10. future snapping、collaboration and standards backends。
+5. transient selection/guide/region overlays；
+6. exact distinction between control edit、object transform and region selection；
+7. MapLibre broad phase plus independent exact screen narrow phase；
+8. Store-order deterministic multi-selection；
+9. PlotJSON versioning and future migration；
+10. clean-room algorithms and actual-rendered browser validation。
 
-## 9. Follow-up research
+## 11. Follow-up research
 
-- benchmark selection APIs on large documents；
-- review spatial-index options before box/lasso runtime；
-- study touch transform gesture conflict policies；
-- review accessibility patterns for keyboard selection and transform handles；
+- benchmark broad/narrow region selection on 100/1,000/10,000-feature documents；
+- review custom index options only after measured candidate/query data；
+- study touch region-selection conflict policies；
+- review accessibility patterns for keyboard-only region selection；
 - freeze collaboration/presence boundaries before CRDT work；
 - continue recording exact revisions and licenses for every new behavior reference。
