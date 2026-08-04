@@ -1,116 +1,111 @@
-# PlotLibre Development Handover — 007C Runtime Merged
+# PlotLibre Development Handover — Milestone 008 Design
 
 日期：2026-08-05  
 仓库：`hujinghaoabcd/PlotLibre`  
-完整交接：`docs/handover/2026-08-05-milestone-007c-runtime-post-merge-finalization.md`
+完整交接：`docs/handover/2026-08-05-milestone-008-plotjson-migrations-design.md`
 
 ## Current state
 
 ```text
-main:               2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0
+main:               fa1648fcd7b263244dabdba31bcdb5b69f74f9a2
 workspace:          0.0.22
+PlotJSON schema:    1.0.0
+production migrations: none
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 Node tests:         299
 Chromium tests:     34
 MapLibre Sources:   4
 MapLibre Layers:    10
-benchmark jobs:     region selection + selection transform
-007C design:        merged PR #47/#48
-007C runtime:       merged PR #49
-current branch:     agent/007c-runtime-post-merge-finalization
-next branch:        agent/008-plotjson-migrations-design
+007C:               merged PR #47–#50
+current branch:     agent/008-plotjson-migrations-design
+next branch:        agent/008a-plotjson-version-json-safety-runtime
 ```
 
 ## Validation
 
-```text
-PR:                    #49
-validated head:        c9c8cadf678a0758075af76d078b2e5a5bfbd379
-CI:                    30943895213 / #505
-Node 20.19 / 22:       success
-Node tests:            299 passed
-Playground typecheck:  success
-Playground build:      success
-handover check:        success
-Chromium tests:        34 passed
-review threads:        0 unresolved
-merge method:          squash
-squash/main SHA:       2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0
-```
-
-Exact-head benchmark artifacts:
+Previous synchronized main authority:
 
 ```text
-region-selection-benchmark-30943895213
-artifact id: 8906262138
-
-selection-transform-benchmark-30943895213
-artifact id: 8906253893
+PR #49 runtime CI:      30943895213 / #505
+PR #49 runtime squash:  2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0
+PR #50 docs CI:         30946115205 / #508
+PR #50 docs squash:     fa1648fcd7b263244dabdba31bcdb5b69f74f9a2
+Node baseline:          299 passed
+Chromium baseline:      34 passed
+review threads:         0 at merge
 ```
+
+Milestone 008 design exact-head evidence must be added to its PR after CI. This design branch is required to remain Markdown-only.
 
 ## Completed in this milestone
 
-- ordered complete-selection clockwise rotation;
-- positive uniform scale `[0.01,100]`;
-- one order-independent local-metre frame;
-- fixed authored-control AABB-center pivot;
-- authored-control-only transformation;
-- all-member Registry preflight;
-- complete last-valid preview and structured rejection;
-- one stale-safe atomic `BatchEditCommand`;
-- exact captured undo/redo;
-- explicit public APIs and mutually exclusive interaction modes;
-- DOM/SVG frame, pivot and handles without new MapLibre resources;
-- four CSS-pixel start radius and 24 CSS-pixel minimum visual frame;
-- Playground controls and real Chromium flows;
-- all-19-Definition transform validation;
-- reproducible `1/100/1,000` transform benchmark;
-- actual squash SHA and merged authority synchronized across current-state documentation.
+- inventoried current PlotJSON document, feature, parser, Registry and import behavior;
+- separated document `schemaVersion` from feature `definitionVersion` responsibilities;
+- froze canonical numeric persisted-version syntax;
+- rejected the old single `PlotDefinition.migrate()` proposal in favor of a separate migration registry;
+- froze deterministic linear document and Definition migration chains;
+- prohibited cycles, branch ambiguity, silent aliases and future-version guessing;
+- froze migration purity, input immutability and JSON-safe output requirements;
+- defined JSON-safety and resource-limit surfaces;
+- documented current `1.0.0` historical normalizations;
+- froze migration report and stable PlotJSON error categories;
+- defined full parse → migrate → Definition migrate → Registry preflight ordering;
+- identified missing duplicate-id validation and Definition-version enforcement;
+- identified the current partial-import risk from `store.clear()` plus repeated `add()`;
+- required one complete atomic Store replacement and one batch event;
+- added compatibility, failure-state, determinism and fixture matrices;
+- divided runtime into 008A–008E reviewable slices;
+- kept production schema at `1.0.0` during migration-foundation runtime;
+- froze the conditions that later unblock 007D groups/locks/visibility/z-order.
 
 Authority:
 
 ```text
-docs/design/rotation-uniform-scale.md
-docs/design/rotation-uniform-scale-runtime.md
-docs/algorithms/selection-local-transform.md
-docs/performance/selection-transform-benchmark.md
-docs/handover/2026-08-05-milestone-007c-rotation-scale-runtime.md
-docs/handover/2026-08-05-milestone-007c-runtime-post-merge-finalization.md
+docs/PLOTJSON_SPEC.md
+docs/design/plotjson-migrations.md
+docs/design/plotjson-compatibility-matrix.md
+docs/algorithms/plotjson-migration-pipeline.md
+docs/handover/2026-08-05-milestone-008-plotjson-migrations-design.md
 ```
 
 ## Next tasks
 
-1. complete exact-head CI for the documentation-only finalization PR;
-2. verify zero unresolved review threads;
-3. mark the finalization PR Ready without changing its head;
-4. squash merge with the expected finalization head SHA;
-5. verify the new `main` SHA;
-6. create `agent/008-plotjson-migrations-design` from that synchronized `main`;
-7. inventory the current PlotJSON parser, types, fixtures and version semantics;
-8. freeze schema and migration behavior in a documentation/design-only PR.
+1. verify changed files are Markdown only;
+2. create a Draft design PR against synchronized main;
+3. run Node 20.19 and Node 22 validation;
+4. confirm 299 historical Node tests and Playground build;
+5. confirm handover contract and both benchmark jobs;
+6. confirm 34 Chromium tests;
+7. resolve every review thread;
+8. record exact head, CI and artifacts in the PR;
+9. mark Ready without changing the head;
+10. squash merge with expected head SHA;
+11. verify new main and synchronize post-merge authority if required;
+12. create `agent/008a-plotjson-version-json-safety-runtime`;
+13. implement only version parsing, JSON-safety cloning/scanning, resource limits and PlotJsonError primitives in 008A.
 
-007D groups/locks/visibility/z-order remains blocked by document persistence and compatibility semantics. The 008 design must freeze:
+Runtime sequence:
 
-1. current schema inventory;
-2. schema-version and Definition-version responsibilities;
-3. parse, structural validation, migration and semantic validation order;
-4. migration registry API and chaining;
-5. unknown version, Definition and field behavior;
-6. document order and future reference integrity;
-7. lock, visibility and z-order persistence boundaries;
-8. stable fail-closed migration errors;
-9. historical golden fixtures and compatibility matrix;
-10. implementation milestones that unblock 007D.
+```text
+008A version / JSON safety / limits / errors
+008B migration registry / chain planner / report
+008C current reader compatibility / invariants
+008D Registry-aware preparation / atomic import
+008E runtime documentation / handover / synchronization
+```
 
-No migration runtime or group runtime belongs in the design PR.
+007D remains blocked until 008D/E are merged.
 
 ## Risks and decisions
 
-- parameters remain unchanged by selection scale, so absolute caps can prevent strict rendered similarity;
-- unsupported global/extreme coordinate domains fail closed;
-- partial preview, partial import and partial commit remain prohibited;
-- no persistent transform cache or spatial index is justified by current measurements;
-- benchmark artifacts expire, while checked-in performance documents remain authoritative;
-- packages still lack a coordinated public release;
-- the Playground bundle still reports a large-chunk warning;
-- branch deletion may require manual cleanup because delete-ref is unavailable through the connector.
+- current `1.0.0` parser defaults several malformed optional fields rather than rejecting;
+- changing same-version normalization silently would break compatibility;
+- unknown `1.0.0` structural fields are dropped and cannot preserve future core state;
+- direct object input may contain non-JSON values or cycles and needs deeper validation;
+- Registry currently ignores Definition-version mismatch;
+- current import can partially replace Store when duplicate ids fail after `clear()`;
+- `PlotStore.applyTransaction()` does not yet provide a direct complete-document replacement with reused ids;
+- concrete resource-limit defaults require runtime tests and measurement;
+- migration reports must not leak complete metadata;
+- arbitrary migration DAGs, downgrade, future-version best effort and unresolved-feature mode are excluded;
+- exact future group/lock/visibility JSON shape belongs to 007D design, not 008 foundation.
