@@ -96,6 +96,7 @@ async function dragBox(page: Page, bounds: ScreenBounds): Promise<void> {
 async function dragLasso(
   page: Page,
   points: readonly (readonly [number, number])[],
+  steps = 3,
 ): Promise<void> {
   const canvas = await canvasBox(page);
   const [first, ...rest] = points;
@@ -104,7 +105,7 @@ async function dragLasso(
   await page.mouse.down();
   for (const point of rest) {
     await page.mouse.move(canvas.x + point[0], canvas.y + point[1], {
-      steps: 3,
+      steps,
     });
   }
   await page.mouse.up();
@@ -192,13 +193,19 @@ test("invalid lasso retries directly and Shift adds in Store order", async ({
     });
   await expect(page.getByTestId("status-text")).toContainText("区域选择被拒绝");
 
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  const centerX = (bounds.minX + bounds.maxX) / 2;
   await page.keyboard.down("Shift");
-  await dragLasso(page, [
-    [bounds.minX, bounds.minY],
-    [bounds.maxX, bounds.minY],
-    [bounds.maxX, bounds.maxY],
-    [bounds.minX, bounds.maxY],
-  ]);
+  await dragLasso(
+    page,
+    [
+      [bounds.minX - width * 0.35, bounds.maxY + height * 0.35],
+      [bounds.maxX + width * 0.35, bounds.maxY + height * 0.35],
+      [centerX, bounds.minY - height * 0.8],
+    ],
+    1,
+  );
   await page.keyboard.up("Shift");
 
   await expect
