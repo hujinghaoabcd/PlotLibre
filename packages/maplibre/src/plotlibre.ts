@@ -24,6 +24,7 @@ import {
   type StartPlotDrawOptions,
 } from "./interaction.js";
 import { MapLibrePlotRenderer } from "./renderer.js";
+import { MapLibreSelectionModifierCapture } from "./selection-modifier-capture.js";
 import {
   MapLibreSelectionTranslation,
   type SelectionTransformRejection,
@@ -44,6 +45,7 @@ export class PlotLibre {
   public readonly history: CommandHistory;
   public readonly selection: SelectionController;
   public readonly renderer: MapLibrePlotRenderer;
+  public readonly selectionModifiers: MapLibreSelectionModifierCapture;
   public readonly translation: MapLibreSelectionTranslation;
   public readonly interaction: MapLibrePlotInteraction;
   readonly #unsubscribe: () => void;
@@ -66,6 +68,12 @@ export class PlotLibre {
     this.#unsubscribe = this.store.subscribe(() => {
       this.renderer.render(this.store.list(), this.registry);
     });
+
+    this.selectionModifiers = new MapLibreSelectionModifierCapture(
+      map,
+      this.selection,
+      this.renderer,
+    );
 
     // Register body-translation listeners before the general interaction
     // controller so Escape can cancel the preview before single-selection
@@ -313,6 +321,7 @@ export class PlotLibre {
   public destroy(): void {
     this.translation.destroy();
     this.interaction.destroy();
+    this.selectionModifiers.destroy();
     this.selection.destroy();
     this.#unsubscribe();
     this.renderer.destroy();
