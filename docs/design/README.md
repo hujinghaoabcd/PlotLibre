@@ -23,11 +23,11 @@
 | `arrow-pincer-semantic-design.md` | 五控制钳形箭头、paired arms、authored inner junction | 已实现并升级为 `arrow.pincer@1.1.0` |
 | `route-corridor-group.md` | 共享 PathRibbon 的有向 route 与无向 flat-cap corridor | 已实现并合并 |
 | `route-multihead-group.md` | bidirectional exact-two-tip route 与 derived-secondary-head route | 已实现并合并 |
-| `closed-action-area-group.md` | 可变控制闭合曲线与固定三控制集结地 | 006I 语义已冻结，正在实现 |
+| `closed-action-area-group.md` | 可变控制闭合曲线与固定三控制集结地 | 已实现并通过 PR #31 合并 |
 
 ## Milestone 006I 决策
 
-本阶段公共范围固定为：
+公共范围：
 
 ```text
 area.closed-curve@1.0.0
@@ -38,7 +38,7 @@ area.gathering-place@1.0.0
 
 `area.route-loop` 已延期。只有在能够证明独立路线、方向、入口/出口或行动语义时才会成为 public Definition；若只是 closed curve 的参数或样式变体，则不应加入目录。
 
-006I 默认：
+006I 已落地：
 
 - 输出一个无孔 Polygon；
 - authored controls 不重复首点；
@@ -46,7 +46,32 @@ area.gathering-place@1.0.0
 - derived ring 统一 counterclockwise；
 - duplicate、zero-area 和 self-intersection 全部 fail closed；
 - 不进行静默 polygon repair；
-- 不复用 arrow head、shaft、notch 或 route ribbon 语义。
+- 不复用 arrow head、shaft、notch 或 route ribbon 语义；
+- 163 Node / 23 Chromium 全绿；
+- merge SHA 为 `f873052d44a98f7029f0eda27ea70cda8b1af347`。
+
+## Milestone 006J 设计入口
+
+下一设计组候选：
+
+```text
+area.arc
+area.sector
+area.lune
+```
+
+006J 必须先回答：
+
+- LineString、Polygon 或 compound output；
+- center、radius、start/end bearing 的 authored roles；
+- clockwise/counterclockwise 和 sweep normalization；
+- exact endpoints、crossing 0°、sweep > 180°；
+- local-metre 与 geodesic 边界；
+- antimeridian/high-latitude policy；
+- 哪些候选具有独立语义，哪些只是参数变体；
+- completion schema、PlotJSON 和 deterministic test fixtures。
+
+在这些问题冻结前，不创建 006J geometry 或 public Definition。
 
 ## 状态说明
 

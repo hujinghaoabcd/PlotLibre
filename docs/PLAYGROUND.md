@@ -22,6 +22,7 @@ Pages base:           /PlotLibre/
 Node tests:           163
 Chromium tests:       23
 public symbols:       16 (14 Arrow + 2 Area)
+main SHA:             f873052d44a98f7029f0eda27ea70cda8b1af347
 ```
 
 公共 packages 仍为开发期独立版本，Playground package 仍为 `0.0.3`。根 workspace `0.0.19` 是里程碑基线，不代表统一 npm release。
@@ -280,12 +281,14 @@ npm run playground:e2e
 - style reload、delete、PlotJSON；
 - camera stability 和 zoom restoration。
 
-当前目标权威基线：
+当前权威基线：
 
 ```text
 Node tests:      163 passed
 Chromium tests:  23 passed
 public symbols:  16
+final PR run:    #294 / 30883623452
+merged PR:       #31
 ```
 
 ## 12. `querySourceFeatures()` 注意事项
@@ -363,11 +366,13 @@ live page manually verified
 
 ## 16. 下一步
 
-006I 在 PR #31 完成最终 CI、交接与 squash merge 后，进入 006J：
+006I 已通过 PR #31 合并。完成 post-merge 文档同步后进入 006J 语义设计：
 
-1. 研究 arc/sector/lune 的公共行为和许可证；
-2. 冻结 center、radius、bearings 和 arc direction roles；
-3. 明确 Polygon/LineString/compound output；
+1. 研究 arc/sector/lune 的公共行为、术语、固定 revision 和许可证；
+2. 冻结 center、radius、start/end bearings 和 arc direction roles；
+3. 明确 LineString、Polygon 或 compound output；
 4. 决定 local-metre 与 geodesic 策略；
-5. 建立共享 circular-arc frame；
-6. 同阶段完成 Definition、Registry、PlotJSON、Playground 和浏览器纵向切片。
+5. 定义 crossing 0°、sweep > 180°、exact endpoints 和 degenerate radius；
+6. 决定哪些候选具有独立 public semantics；
+7. 冻结 interaction、PlotJSON、deterministic fixtures 和 browser matrix；
+8. 设计未冻结前不增加 selector、样例、geometry 或 public Definition。
