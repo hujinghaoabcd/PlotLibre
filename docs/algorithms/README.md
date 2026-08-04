@@ -1,24 +1,6 @@
 # PlotLibre Algorithm Records
 
-本目录记录参数化符号、共享几何基础以及专业编辑事务的独立算法说明、来源边界、失败策略与测试要求。
-
-每份记录至少包含：
-
-```text
-public Definition / state model / shared algorithm
-canonical authored state
-mathematical or transaction construction
-coordinate-mode policy
-derived/transient boundary
-parameter or operation contract
-failure and rollback policy
-clean-room references and revisions
-license review
-code reuse declaration
-tests and deterministic fixtures
-```
-
-目录中的公式和行为说明用于解释 PlotLibre 的独立实现，不代表允许复制参考项目源码。通用政策见 `../ALGORITHM_POLICY.md`。
+本目录记录参数化符号、共享几何基础以及专业编辑事务的独立算法说明、来源边界、失败策略与测试要求。公式与行为说明用于解释 PlotLibre 的独立实现，不代表允许复制参考源码。
 
 ## 当前算法记录
 
@@ -38,169 +20,152 @@ tests and deterministic fixtures
 | `closed-action-area.md` | closed curve/gathering place | 已实现 |
 | `circular-arc-foundation.md` | circular arc/segment/sector shared frame | 已实现并合并 |
 | `batch-edit-transaction.md` | selection、Store transaction、batch commands、translation | 007A 已实现并合并 |
-| `screen-region-selection.md` | box/lasso capture、topology、screen intersection、batch intent | 007B 当前设计冻结候选；runtime 禁止 |
+| `screen-region-selection.md` | box/lasso capture、topology、screen intersection、batch intent | 设计已通过 PR #40 合并；runtime 下一步 |
 
-## 当前合并基线
+## 当前基线
 
 ```text
-main:               d08c56b6687ea64e0c599fd04fd77115d320d8f2
+main:               a9b9efc090c01f45133f3f136a0049a97ee52b90
 workspace:          0.0.21
 public symbols:     19
-Node tests:         219 passed
-Chromium tests:     30 passed
-MapLibre Sources:   4
-MapLibre Layers:    10
-007A runtime PR:    #38
-007A finalization:  #39
+Node tests:         219
+Chromium tests:     30
+Sources/Layers:     4 / 10
+007B design PR:     #40
+validated head:     4a8ee1102bb923801ada95c648a258225ccb9ec4
+validated CI:       #413 / 30912109618
 ```
 
-## 007A transaction foundation
+## 007A algorithm foundation
 
-- ordered transient SelectionController；
-- exact `PlotStore.applyTransaction()`；
+Detailed record：`batch-edit-transaction.md`.
+
+- ordered transient selection；
+- atomic Store transaction；
 - listener failure isolation；
-- selection-aware `BatchEditCommand`；
-- exact document-order restoration；
+- exact-order BatchEditCommand；
 - batch delete；
-- local-metre whole-selection translation；
-- one command per completed mutation gesture；
-- 219 Node / 30 Chromium baseline。
+- local-metre whole-selection translation。
 
-Detailed record: `batch-edit-transaction.md`.
+## 007B merged screen-region algorithms
 
-## 007B screen-region algorithm freeze
+Detailed record：`screen-region-selection.md`.
 
-Detailed record: `screen-region-selection.md`.
-
-### Coordinate domain
+### Numeric policy
 
 ```text
-CSS-pixel ScreenPoint relative to map container
+box activation:       4 CSS px
+lasso sample spacing: 2 CSS px
+lasso RDP tolerance:  1.5 CSS px
+minimum lasso area:   16 CSS px²
+minimum points:       3
 ```
 
-Core and PlotJSON remain free of screen coordinates。
-
-### Frozen numeric policy
+### Lasso topology
 
 ```text
-box activation threshold: 4 CSS px
-lasso sample spacing:     2 CSS px
-lasso RDP tolerance:      1.5 CSS px
-minimum lasso area:       16 CSS px²
-```
-
-### Lasso validation
-
-```text
-raw path
+raw samples
 → remove consecutive duplicates
 → reject repeated non-consecutive vertices
-→ reject non-adjacent segment crossing/touch/overlap
+→ reject non-adjacent crossing/touch/overlap
 → RDP simplify
-→ validate simplified ring again
+→ validate simplified closed ring again
 ```
 
 Simplification cannot hide an invalid raw loop。
 
-### Candidate resolution
+### Broad/narrow candidate resolution
 
 ```text
-screen region bounds
-→ MapLibre queryRenderedFeatures on committed fill/line/point layers
-→ plotId de-duplication
-→ Store/document-order normalization
+screen bounding box
+→ MapLibre committed fill/line/point query
+→ plotId dedup
+→ Store-order normalization
 → Registry.generate once per unique candidate
-→ map.project generated fills/lines/points
+→ project fills/lines/points
 → exact screen intersection
-→ one SelectionController.applyMany event
 ```
 
-Broad-phase MapLibre return order and tile duplicates never determine selection order。
-
-### Exact geometry policy
-
-- Point center only；
-- LineString/MultiLineString segment intersection；
-- Polygon/MultiPolygon crossing、containment and hole-aware fill；
+- Point center；
+- LineString/MultiLineString segments；
+- Polygon/MultiPolygon crossing and containment with holes；
+- compound any-component semantics；
 - boundary inclusive；
-- compound feature selected once when any component intersects；
-- CSS line width、point radius、selection overlay、draft、guides and labels ignored；
-- generated sampled vertices are authoritative for curved paths；
-- any query、generation or projection failure rejects the whole completion。
+- CSS stroke/radius and transient layers ignored；
+- query/generation/projection failure fails closed。
 
-### Multi-id intent
+### Deterministic selection intent
 
-`SelectionController.applyMany(ids,intent,reason)` must apply replace/add/subtract/toggle in one immutable event。
+```text
+replace  candidates
+add      current + new candidates
+subtract current survivors
+toggle   current survivors + newly selected candidates
+```
 
-- replace uses candidate Store order；
-- add appends only new ids；
-- subtract preserves survivors；
-- toggle removes current candidates then appends newly selected candidates in Store order；
-- valid empty replace clears；other empty intents no-op；
-- region selection never creates History entries。
+`SelectionController.applyMany()` must produce at most one immutable event. Region selection is not a History command。
 
-### Overlay and lifecycle
+### Screen overlay and lifecycle
 
-- box/lasso overlay uses DOM/SVG screen UI；
-- no new GeoJSON Source/Layer in 007B v1；
-- active gesture cancels on camera、resize、style、Store or external selection change；
-- pointer capture and dragPan state restore exactly once；
-- boxZoom ownership moves from immediate Shift capture to unified region adapter；
-- synthetic post-drag click is suppressed。
+- DOM/SVG overlay；
+- no new Source/Layer；
+- pointer capture and dragPan/boxZoom restoration；
+- synthetic click suppression；
+- cancel on camera/style/resize/Store/external selection/programmatic lifecycle changes。
 
-## Required 007B fixture families
+## Runtime fixture families
 
-### Pure Node
+### Pure algorithms
 
-- all box drag quadrants and thresholds；
-- lasso sampling、area、RDP and topology；
-- bow-tie、repeat、touch、overlap rejection；
-- Point/Line/MultiLine intersection；
-- Polygon containment/crossing/hole exclusion；
-- MultiPolygon/compound any-component hit；
+- box quadrant/threshold/degenerate fixtures；
+- lasso sample/area/RDP/simple-ring fixtures；
+- repeat、bow-tie、touch and overlap rejection；
+- Point/Line/MultiLine predicates；
+- Polygon crossing/containment/hole exclusion；
+- MultiPolygon/compound hit；
+- applyMany ordering、Primary and no-op；
 - broad-phase duplicate/query-order normalization；
-- applyMany intent ordering and Primary behavior；
-- one event/no-op；
-- fail-closed generation/projection。
+- fail-closed query/generation/projection。
 
-### Adapter and Chromium
+### Adapter/Chromium
 
-- Shift click still adds after immediate mousedown mutation is removed；
-- Shift-empty drag performs one additive box；
-- explicit box replace and modifier overrides；
-- lasso exact rejection of bbox false positives；
-- invalid lasso changes nothing；
-- DOM overlay cleanup；
-- pointer capture、dragPan、boxZoom and synthetic click lifecycle；
-- region selection followed by translation and batch delete；
-- no History mutation from selection alone；
-- all historical 219/30 regressions。
+- Shift click after immediate mousedown mutation removal；
+- neutral additive box；
+- explicit replace/toggle/subtract box；
+- lasso bbox false-positive removal；
+- invalid lasso no mutation；
+- DOM overlay/pointer/camera cleanup；
+- no History mutation；
+- region selection followed by translation/delete/undo；
+- all historical regressions。
 
 ## Performance boundary
 
-Functional runtime must generate only unique broad-phase candidates, not every Store feature when candidate count is smaller than document size。
+MapLibre rendered index is the first broad phase. Runtime must generate only unique candidates, not every Store feature when candidate count is smaller。
 
-Measured fixtures：
+Measured fixtures：`100 / 1,000 / 10,000` features。Record environment、camera、feature mix、vertices、candidate count、query/narrow/total times、median and p95。No hard latency guarantee before measurements。
+
+## Runtime implementation order
 
 ```text
-100
-1,000
-10,000 features
+screen utilities
+→ applyMany
+→ exact predicates
+→ candidate resolver
+→ unified region adapter
+→ DOM/SVG overlay
+→ public API
+→ Playground/E2E/benchmarks
 ```
 
-Record hardware、OS、browser、viewport、camera、feature mix、generated vertices、candidate count、query time、projection/intersection time、total latency、median and p95。No public latency guarantee before measured evidence。
-
-## Later algorithms
-
-- 007C：local rotation and positive uniform scale around authored-control bounds center；
-- 007D：canonical groups/locks/visibility/z-order after PlotJSON migration design。
+Planned branch：`agent/007b-box-lasso-selection` after finalization merges。
 
 ## Clean-room references
 
 ```text
-JamesLMilner/terra-draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
-geoman-io/maplibre-geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
-mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
+Terra Draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
+MapLibre-Geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
+Mapbox GL Draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
+MapLibre GL JS@v6.0.0 — BSD-3-Clause
+code reuse: none
 ```
-
-007B specifically studies observable Mapbox GL Draw box-select lifecycle、DOM rectangle、dragPan ownership、bounding-box candidate query and id de-duplication。Code reuse：`none`。
