@@ -14,7 +14,8 @@
   },
   "files": ["dist"],
   "dependencies": {
-    "@plotlibre/core": "0.0.2"
+    "@plotlibre/core": "0.0.2",
+    "@plotlibre/geometry": "0.0.2"
   },
   "license": "UNLICENSED"
 }
