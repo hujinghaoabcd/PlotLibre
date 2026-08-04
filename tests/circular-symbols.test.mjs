@@ -131,6 +131,17 @@ test("sector direction parameter changes derived geometry without moving control
   );
 });
 
+test("sector derives only the center-to-bearing semantic guide path", () => {
+  const feature = createFeature(
+    sectorDefinition,
+    "sector-guide",
+    sectorControls,
+  );
+  const paths = sectorDefinition.deriveSemanticGuidePaths?.(feature);
+  assert.deepEqual(paths, [[sectorControls[0], sectorControls[2]]]);
+  assert.equal(paths?.some((path) => path.includes(sectorControls[1])), false);
+});
+
 test("PlotJSON preserves only authored circular controls and parameters", () => {
   const features = [
     createFeature(circularArcDefinition, "arc-json", arcControls),
