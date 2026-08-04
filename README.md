@@ -28,18 +28,19 @@ It supports fixed/variable-point drawing, live preview, semantic handles, ordere
 ## Current baseline
 
 ```text
-main SHA:           d8b2d889dee81064069f96e555dd75b1c851ccf3
+main SHA:           c77c5c50ea5976f7afd40f0e48bc712515a99cd5
 workspace version:  0.0.22
 MapLibre GL JS:     6.0.0
 Node.js:            20.19+
-tests:              324 Node / 34 Chromium
+merged tests:       324 Node / 34 Chromium
+008B expected:      348 Node / 34 Chromium
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 MapLibre resources: 4 Sources / 10 Layers
 benchmark jobs:     region selection + selection transform
 007C:               merged PR #47–#50
 008 design:         merged PR #51/#52
-008A runtime:       merged PR #53
-next runtime:       008B migration registry / planner / report records
+008A runtime:       merged PR #53/#54
+008B runtime:       Draft PR #55
 ```
 
 The root version is a development baseline, not yet a coordinated npm release across all public packages.
@@ -59,7 +60,7 @@ core + interaction <- maplibre
 public packages <- playground / wrappers
 ```
 
-- `@plotlibre/core`: domain types, PlotJSON foundations, Registry, transactional Store, commands and History;
+- `@plotlibre/core`: domain types, PlotJSON foundations, migration planning, Registry, transactional Store, commands and History;
 - `@plotlibre/geometry`: pure planar, circular, closed-area and geodesic geometry;
 - `@plotlibre/symbols`: nineteen built-in parametric Definitions;
 - `@plotlibre/interaction`: drawing, ordered selection, region algorithms, batch commands and local transforms;
@@ -112,20 +113,20 @@ Invalid region completion preserves selection and explicit mode can retry. Regio
 
 Batch delete, translation, rotation and scale use one atomic command. Preview, rejection, cancellation and no-op never enter Store or History. Listener failures are isolated after commit.
 
-### Whole-selection translation
+### Whole-selection transforms
 
 ```text
 ordered authored controls
 → one order-independent local projection
-→ one metre delta
-→ translate every selected control
+→ translation delta or fixed AABB-centre pivot
+→ translate, rotate clockwise or scale uniformly
 → canonicalize/generate every candidate
 → one atomic command
 ```
 
-Store is unchanged during preview. One invalid member rejects the complete batch.
+Uniform scale accepts `[0.01, 100]`; reflection and non-uniform scale are excluded. Store is unchanged during preview, and one invalid member rejects the complete batch.
 
-### Whole-selection rotation and positive uniform scale
+Public transform APIs:
 
 ```ts
 plot.selectionTransform
@@ -135,18 +136,6 @@ plot.startSelectionRotation()
 plot.startSelectionScale()
 plot.cancelSelectionTransform()
 ```
-
-```text
-all selected authored controls
-→ one shared local-metre frame
-→ fixed authored-control AABB-centre pivot
-→ clockwise rotation or positive uniform scale
-→ canonicalize/generate every member
-→ complete preview or rejection
-→ one stale-safe BatchEditCommand
-```
-
-Uniform scale accepts `[0.01, 100]`; reflection and non-uniform scale are excluded. Parameters, style, metadata, document order, selection order and Primary are preserved.
 
 The derived DOM/SVG overlay uses a 4 CSS-pixel minimum start radius and a 24 CSS-pixel minimum visual frame for tiny selections. It adds no MapLibre resource.
 
@@ -183,7 +172,7 @@ Direct-object JSON safety accepts only null, strings, booleans, finite numbers, 
 
 Traversal is iterative and deterministic. Repeated non-cyclic references are cloned independently. Own `__proto__` and `constructor` keys remain safe data properties and cannot pollute prototypes.
 
-### Default safety ceilings
+Default finite safety ceilings:
 
 ```text
 UTF-8 input:             16 MiB
@@ -196,9 +185,61 @@ controls per feature:    10,000
 total authored controls: 1,000,000
 ```
 
-These are finite untrusted-input ceilings, not recommended document sizes, memory guarantees or latency SLAs. Overrides must be finite positive safe integers.
+These are untrusted-input ceilings, not recommended document sizes, memory guarantees or latency SLAs.
 
-008A does **not** connect these primitives to the existing parser or import path. Historical PlotJSON `1.0.0` normalization remains unchanged. Migration registry, report-bearing reading, Definition-version enforcement and atomic document replacement are delivered in 008B–008D.
+### 008B migration planning
+
+008B adds descriptors, separate document/Definition graphs, deterministic planning and immutable report records:
+
+```ts
+PlotJsonMigrationRegistry
+PlotJsonMigrationRegistryError
+
+PlotJsonDocumentMigration
+PlotJsonDefinitionReference
+PlotJsonDefinitionMigration
+PlotJsonPlannedDocumentStep
+PlotJsonPlannedDefinitionStep
+
+PlotJsonMigrationReport
+createPlotJsonMigrationReport(...)
+```
+
+Document graph nodes are schema versions. Definition graph nodes are exact `(plotType, definitionVersion)` pairs, allowing explicit type-renaming chains.
+
+```ts
+const migrations = new PlotJsonMigrationRegistry()
+  .registerDocument({
+    fromVersion: "1.0.0",
+    toVersion: "1.1.0",
+    migrate: migrateDocument,
+  })
+  .registerDefinition({
+    from: { plotType: "arrow.legacy", definitionVersion: "1.0.0" },
+    to: { plotType: "arrow.current", definitionVersion: "2.0.0" },
+    migrate: migrateArrow,
+  });
+
+const documentPlan = migrations.planDocument("1.0.0", "1.1.0");
+const featurePlan = migrations.planDefinition(
+  { plotType: "arrow.legacy", definitionVersion: "1.0.0" },
+  { plotType: "arrow.current", definitionVersion: "2.0.0" },
+);
+```
+
+Registry rules:
+
+```text
+canonical versions only
+strictly increasing edges
+one outgoing edge per source node
+no duplicates, branches, self edges, downgrade or cycles
+registration order cannot change a plan
+plans and snapshots are frozen
+planning never invokes migration functions
+```
+
+008B does **not** execute migrations and does not connect to the current parser or import path. `readPlotDocument()`, historical `1.0.0` normalization reporting and document invariants are 008C work; atomic Store/MapLibre import is 008D.
 
 ## Rendering resources
 
@@ -245,21 +286,23 @@ docs/ARCHITECTURE.md
 docs/PLOTJSON_SPEC.md
 docs/DEVELOPMENT_PLAN.md
 
-docs/design/region-selection.md
-docs/design/rotation-uniform-scale.md
-docs/design/rotation-uniform-scale-runtime.md
 docs/design/plotjson-migrations.md
 docs/design/plotjson-compatibility-matrix.md
 docs/design/plotjson-version-json-safety-runtime.md
-
-docs/algorithms/selection-local-transform.md
+docs/design/plotjson-migration-registry-runtime.md
 docs/algorithms/plotjson-migration-pipeline.md
+
+docs/design/region-selection.md
+docs/design/rotation-uniform-scale.md
+docs/design/rotation-uniform-scale-runtime.md
+docs/algorithms/selection-local-transform.md
 
 docs/performance/region-selection-benchmark.md
 docs/performance/selection-transform-benchmark.md
 
 docs/handover/LATEST.md
 docs/handover/2026-08-05-milestone-008a-post-merge-finalization.md
+docs/handover/2026-08-05-milestone-008b-migration-planning.md
 ```
 
-The next runtime slice is `agent/008b-plotjson-migration-registry-runtime`: migration step/reference types, graph validation, deterministic linear planning and immutable report record types only. Parser, Registry, Store and MapLibre integration remain later milestones.
+After 008B squash merge and post-merge synchronization, the next runtime slice is `agent/008c-plotjson-reader-runtime`. Parser/reader and Definition execution belong there; Store and MapLibre integration remain later milestones.
