@@ -9,7 +9,7 @@
 Workspace：`0.0.18`  
 状态：006H 已合并；十四个公共箭头已进入 `main`；下一开发阶段为 006I 闭合行动区域组
 
-## Current baseline
+## Current state
 
 ```text
 workspace:          0.0.18
