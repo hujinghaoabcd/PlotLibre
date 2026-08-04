@@ -2,7 +2,7 @@
 
 ## 总体策略
 
-采用“相关符号组完整纵向切片”：同一数学基础的 2–3 个符号在一个里程碑内完成语义冻结、共享纯几何、独立 Definition、Registry、PlotJSON、交互、Playground、浏览器测试、算法记录和交接。
+采用“相关能力完整纵向切片”：符号族先冻结语义和数学，再完成共享纯几何、独立 Definition、Registry、PlotJSON、交互、Playground、浏览器测试、算法记录和交接；编辑能力同样先冻结状态模型、事务边界和失败策略，再进入 runtime。
 
 禁止：
 
@@ -13,18 +13,19 @@
 - 在多个复杂符号族之间并行扩散；
 - 在设计冻结前先写运行时代码。
 
-## 当前实现基线
+## 当前合并基线
 
 ```text
-base main SHA:     0cae0efe7e4877ade23028a7224c6c6daee16b9b
-active branch:     agent/006j-circular-arc-family
-active PR:         #34 Add circular arc family
+main SHA:          297d0a644eaa3427f8fd59b82b7bc3582221d49e
+merged PR:         #34 Add circular arc family
 workspace:         0.0.20
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
 Node tests:        184
 Chromium tests:    28
-current milestone: 006J circular arc family implementation
+completed:         006J circular arc family implementation
+current slice:     006J post-merge documentation finalization
 next milestone:    007 professional editing semantic design
+finalization:      agent/006j-post-merge-finalization
 ```
 
 当前公共 Definitions：
@@ -63,9 +64,9 @@ area.sector
 | 006H | 双向路线 + 双头路线 | 已完成并合并 |
 | 006I | 闭合曲线 + 集结地 | PR #31、#32 已合并 |
 | 006J Design | 圆弧、扇形、圆弓形语义与数学冻结 | PR #33 已合并 |
-| 006J Implementation | 三个 circular Definitions 完整纵向切片 | PR #34 最终验证阶段 |
+| 006J Implementation | 三个 circular Definitions、semantic guides、19 类 Playground | PR #34 已合并 |
 
-## Milestone 006J：圆弧族实现
+## Milestone 006J：圆弧族最终状态
 
 ### 公共范围
 
@@ -89,7 +90,7 @@ area.lune
 
 - local-metre coordinate-mode gate；
 - traversal-order-independent projection origin；
-- scale-aware three-point circumcentre；
+- scale-aware three-point circumcenter；
 - exact radius and angle derivation；
 - through-point-directed minor/major sweep selection；
 - clockwise/counterclockwise deltas；
@@ -100,132 +101,28 @@ area.lune
 - directed sector ring；
 - finite、area、winding 和 simple-ring validation。
 
-### Circular arc
-
-```text
-0 exact start
-1 exact through-point
-2 exact end
-```
-
-- 输出一个 open LineString；
-- third click 自动完成；
-- exact through-point 决定小弧或大弧；
-- no fill / no chord / no closure；
-- no control canonicalization。
-
-### Circular segment
-
-```text
-0 arc/chord start
-1 exact through-point
-2 arc/chord end
-```
-
-- selected arc + exact straight chord；
-- 输出无孔 simple Polygon；
-- minor 和 major segment 均支持；
-- winding normalization 不改写 controls。
-
-### Sector
-
-```text
-0 center
-1 exact radius/start-boundary point
-2 end-bearing handle
-```
-
-- control 1 定义唯一半径与 exact start；
-- control 2 只定义结束方位，距离不改变半径；
-- rendered end-boundary point 在 start radius 上派生；
-- 显式 `sweepDirection = clockwise | counterclockwise`；
-- crossing 0° 与 sweep > 180° 可用；
-- zero/full sweep fail closed；
-- third click 自动完成。
-
 ### Definition-driven semantic guides
 
-Core 新增：
+Core public extension：
 
 ```text
 PlotDefinition.deriveSemanticGuidePaths(feature)
 ```
 
-MapLibre 新增：
+MapLibre layer：
 
 ```text
 plotlibre-handle-guide
 ```
 
-Sector 返回 `center → end-bearing handle` 路径。该虚线在完整 draft、选中和 handle drag 状态显示，但不进入：
+Sector 返回 `center → end-bearing handle`。该虚线在 complete draft、selection 和 handle drag 状态显示，但不进入 committed RenderBundle、Store、History 或 PlotJSON。
+
+### Final validation and merge
 
 ```text
-committed RenderBundle
-Store
-History
-PlotJSON
-```
-
-该扩展是通用 Definition hook，不在 MapLibre 层硬编码 `area.sector`。
-
-### Coordinate and failure policy
-
-Version 1.0 仅支持 local-metre mode。以下输入在 Store mutation 前拒绝：
-
-- invalid WGS84 / non-finite controls；
-- duplicate controls；
-- collinear / near-collinear / unstable circumcircle；
-- excessive circumradius；
-- antimeridian、high latitude 或 large extent；
-- ambiguous through sweep；
-- zero/full sector sweep；
-- invalid parameters；
-- degenerate 或 self-intersecting Polygon。
-
-禁止 two-point committed fallback、polyline/triangle degradation、hidden control movement、automatic minor-sweep override 和 silent geodesic switch。
-
-### Registry、PlotJSON 与 Playground
-
-- 新增 `lineSymbols`，同时保持 `arrowSymbols` 和 `areaSymbols`；
-- `builtInSymbols = 19`；
-- create/replace/import 继续 full generation preflight；
-- PlotJSON 只保存三个 authored controls 和 explicit parameters；
-- production selector/sample catalog = 19；
-- base `?e2e=1` 继续保持原九类兼容 surface；
-- full E2E：
-
-```text
-?e2e=1&squad=1&paths=1&areas=1&circular=1
-```
-
-### 006J 验证目标
-
-Node 184 项覆盖：
-
-- minor/major、顺逆方向、跨 0°；
-- exact start/through/end；
-- reversal；
-- density isolation；
-- circular segment minor/major area；
-- sector end-bearing distance isolation；
-- coordinate/failure policy；
-- Registry、PlotJSON、guide contract；
-- style reload guide-layer recovery；
-- 所有历史回归。
-
-Chromium 28 项覆盖：
-
-- 19-symbol catalog/sample；
-- circular arc actual draft/committed line；
-- circular segment actual draft/committed Polygon；
-- sector fixed-three completion and derived endpoint；
-- transient radial guide actual rendering；
-- guide absent from committed source；
-- 所有历史 Arrow/Area/worker/edit/style/PlotJSON 回归。
-
-Final merge gate：
-
-```text
+implementation PR: #34
+validated head:    608567d4f8f662242b0356c54742a2ffcb087c66
+CI run:            #337 / 30893450723
 Node 20.19:        success
 Node 22:           success
 Node tests:        184 passed
@@ -233,45 +130,183 @@ Chromium tests:    28 passed
 Playground build: success
 handover check:   success
 review threads:   0 unresolved
+squash merge SHA: 297d0a644eaa3427f8fd59b82b7bc3582221d49e
 ```
 
-## Milestone 007：专业编辑设计与实现
+### Current catalog and renderer
 
-006J 合并并完成 post-merge 状态同步后，从最终 `main` 开始设计，不在 PR #34 中实现。
+```text
+arrowSymbols:   14
+lineSymbols:     1
+areaSymbols:     4
+builtInSymbols: 19
+MapLibre Sources: 3
+MapLibre Layers:  8
+```
 
-优先冻结：
+Production Playground loads 19 selectors and 19南京 samples. Base `?e2e=1` retains the original nine-selector compatibility surface; full current E2E uses：
 
-1. 多选的 canonical selection model；
-2. box select 与 lasso select 的命中规则；
-3. 整体平移是否只移动 authored controls；
-4. rotation/scale 的 pivot、coordinate mode 和 parameter semantics；
-5. group、lock、z-order 与 document schema；
-6. 多对象 command transaction；
-7. invalid transform 的 atomic rollback；
-8. keyboard/touch/pointer behavior；
-9. multi-object undo/redo；
-10. browser performance and large-selection fixtures。
+```text
+?e2e=1&squad=1&paths=1&areas=1&circular=1
+```
 
-建议先建立 documentation-only design PR，再创建实现分支。
+## Milestone 007：专业编辑语义设计
+
+006J post-merge documentation 合并后，从最终 `main` 创建：
+
+```text
+agent/007-professional-editing-design
+```
+
+该阶段先做 documentation-only design，不立即实现 runtime。
+
+### 7.1 Multi-selection model
+
+必须冻结：
+
+- `selectedIds` 是否有稳定有序语义；
+- primary/active selection 与集合 selection 的区别；
+- 单击、Ctrl/Cmd-click、Shift-click、空白点击的集合变更；
+- 删除、锁定、隐藏或 import 后 selection cleanup；
+- Store change 与 selection change 的事件顺序；
+- selection 是否属于 document canonical state（初步建议：不属于 PlotJSON）。
+
+### 7.2 Box and lasso selection
+
+必须冻结：
+
+- contain、intersect 或 configurable hit policy；
+- 使用 authored controls、derived geometry、hit-area 或组合判定；
+- Polygon holes、LineString、Point 和 compound output 的一致规则；
+- 屏幕空间与地理空间的边界；
+- additive、subtractive、toggle gestures；
+- drag threshold、camera gesture 冲突和 touch behavior；
+- 大对象数量时的索引和性能预算。
+
+### 7.3 Whole-object translation
+
+初步原则：
+
+```text
+translate authored controls only
+→ canonicalize
+→ validate/generate every affected feature
+→ all valid: one batch command
+→ any invalid: no mutation
+```
+
+必须明确：
+
+- local-metre 与 geodesic translation；
+- antimeridian、高纬度和大范围输入；
+- Definition parameters 是否随平移变化（通常不变）；
+- group translation；
+- locked features；
+- transient preview 与 final commit；
+- one gesture = one undo step。
+
+### 7.4 Rotation and scale
+
+必须冻结：
+
+- pivot：selection center、bounding-box center、primary feature anchor 或 authored pivot；
+- local projection origin；
+- rotation direction and angle normalization；
+- uniform/non-uniform scale；
+- negative scale/reflection 是否禁止；
+- screen-sized parameters 与 ground-sized controls 的关系；
+- scale 对 radius/width 参数的影响；
+- local-only Definitions 在 transform 后的 coordinate-mode gate；
+- invalid multi-feature transform 的 atomic rollback。
+
+### 7.5 Groups, locks and z-order
+
+必须冻结：
+
+- group 是 document metadata、独立 entity 还是 feature relation；
+- stable group identifiers；
+- nested groups 是否允许；
+- lock 对 selection、style edit、handle edit 和 transform 的影响；
+- hidden/visible state；
+- z-order 是全局、layer 内还是 group 内；
+- PlotJSON schema 和 migration；
+- import unresolved group references 的策略。
+
+### 7.6 Multi-object commands and transactions
+
+必须新增或冻结：
+
+- batch create/replace/delete command；
+- transaction preflight；
+- all-or-nothing Store mutation；
+- listener exception rollback policy；
+- history entry shape and memory limits；
+- undo/redo selection restoration；
+- command serialization/audit boundary；
+- future collaboration/CRDT compatibility。
+
+### 7.7 Interaction and accessibility
+
+- pointer capture；
+- keyboard nudging and modifiers；
+- Escape cancellation；
+- touch transform gestures；
+- focus and ARIA feedback；
+- camera drag/box zoom conflicts；
+- visible transform handles and guides；
+- reduced-motion and high-contrast behavior。
+
+### 7.8 Required design fixtures
+
+设计 PR 必须先列出：
+
+- mixed Point/Line/Polygon multi-selection；
+- additive/subtractive/toggle selection；
+- contain/intersect box fixtures；
+- lasso self-intersection policy；
+- translation across multiple Definitions；
+- invalid member causing atomic rollback；
+- rotation/scale around deterministic pivot；
+- locked/grouped objects；
+- one gesture / one history entry；
+- undo/redo selection behavior；
+- style reload and selection overlays；
+- 100、1,000、10,000 features performance targets；
+- actual-rendered Chromium interaction matrix。
+
+### 7.9 Design merge gate
+
+```text
+no runtime changes
+Node 20.19:       success
+Node 22:          success
+Node tests:       184 passed
+Chromium tests:   28 passed
+Playground build: success
+handover check:  success
+review threads:  0 unresolved
+```
+
+设计 PR 合并后，才创建 Milestone 007 implementation branch。
 
 ## Milestone 008：吸附与约束
 
-- 空间索引；
-- 顶点、线段、中点和交点吸附；
-- 网格、角度、方位、平行和垂直约束；
-- guide 与可解释吸附原因。
+- spatial index；
+- vertex/segment/midpoint/intersection snapping；
+- grid、angle、bearing、parallel、perpendicular constraints；
+- guides and explainable snap reasons。
 
 ## Milestone 009：更多符号与注记
 
-- 更多 control measures 和 Area families；
+- more control measures and Area families；
 - rectangle、triangle、flags；
 - callout、leader label、text、image、SVG annotation；
 - true two-arc lune（若独立语义成立）。
 
 ## Milestone 010：IO 与项目管理
 
-- 正式 PlotJSON JSON Schema；
-- document/definition migrations；
+- formal PlotJSON JSON Schema；
+- document/Definition migrations；
 - unresolved Definition preservation；
 - GeoJSON、SVG、PNG import/export；
 - layers、groups、z-order；
@@ -293,9 +328,9 @@ review threads:   0 unresolved
 2. 统一 workspace 与 package version strategy；
 3. 引入 Changesets 或等价 release workflow；
 4. 建立正式 PlotJSON JSON Schema；
-5. 增加 transaction/rollback；
+5. 实现 transaction/rollback；
 6. 自动检查 README、LATEST、Playground 和 Registry 数量一致性；
-7. 建立性能基准与大对象测试；
+7. 建立 performance benchmarks；
 8. 正式 0.1.0 前完成 npm package-boundary review；
 9. 处理 Playground bundle 超过 1 MB 的 code splitting；
 10. 持续区分 source/build ready、workflow deployed 与 live manually verified。
