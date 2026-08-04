@@ -1,10 +1,12 @@
 import type { PlotDefinition } from "@plotlibre/core";
 import { assaultDirectionDefinition } from "./assault-direction.js";
 import { attackArrowDefinition } from "./attack-arrow.js";
+import { closedCurveDefinition } from "./closed-curve.js";
 import { corridorArrowDefinition } from "./corridor.js";
 import { curvedArrowDefinition } from "./curved-arrow.js";
 import { doubleArrowDefinition } from "./double-arrow.js";
 import { fineArrowDefinition } from "./fine-arrow.js";
+import { gatheringPlaceDefinition } from "./gathering-place.js";
 import { pincerArrowDefinition } from "./pincer-arrow.js";
 import { routeArrowDefinition } from "./route-arrow.js";
 import { bidirectionalRouteArrowDefinition } from "./route-bidirectional.js";
@@ -31,4 +33,12 @@ export const arrowSymbols: readonly PlotDefinition[] = [
   doubleHeadRouteArrowDefinition,
 ];
 
-export const builtInSymbols: readonly PlotDefinition[] = [...arrowSymbols];
+export const areaSymbols: readonly PlotDefinition[] = [
+  closedCurveDefinition,
+  gatheringPlaceDefinition,
+];
+
+export const builtInSymbols: readonly PlotDefinition[] = [
+  ...arrowSymbols,
+  ...areaSymbols,
+];
