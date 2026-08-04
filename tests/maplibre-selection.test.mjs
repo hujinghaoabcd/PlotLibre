@@ -97,8 +97,11 @@ class FakeMap {
   queryRenderedFeatures(_point, options) {
     if (
       this.targetId !== undefined &&
-      (options?.layers?.includes("plotlibre-fill") ||
-        options?.layers?.includes("plotlibre-line"))
+      (options?.layers?.includes("plotlibre-selection-line") ||
+        options?.layers?.includes("plotlibre-selection-point") ||
+        options?.layers?.includes("plotlibre-fill") ||
+        options?.layers?.includes("plotlibre-line") ||
+        options?.layers?.includes("plotlibre-point"))
     ) {
       return [{ properties: { plotId: this.targetId } }];
     }
@@ -129,7 +132,15 @@ function addArrow(plot, id, offset) {
   });
 }
 
-test("MapLibre clicks apply normalized multi-selection intents", () => {
+function selectionFeatures(map) {
+  return map.getSource("plotlibre-selection").data.features;
+}
+
+function selectedPlotIds(map) {
+  return [...new Set(selectionFeatures(map).map((feature) => feature.properties.plotId))];
+}
+
+test("MapLibre clicks apply normalized multi-selection intents and derived overlays", () => {
   const map = new FakeMap();
   const plot = new PlotLibre(map, {
     definitions: [straightArrowDefinition],
@@ -139,47 +150,75 @@ test("MapLibre clicks apply normalized multi-selection intents", () => {
   addArrow(plot, "c", 0.2);
 
   assert.equal(plot.selection, plot.interaction.selection);
+  assert.equal(map.sources.size, 4);
+  assert.equal(map.layers.size, 10);
 
   map.targetId = "a";
   map.fire("click", mouse());
   assert.deepEqual(plot.selectedIds, ["a"]);
   assert.equal(plot.selectedId, "a");
+  assert.deepEqual(selectedPlotIds(map), ["a"]);
+  assert.equal(
+    selectionFeatures(map).every(
+      (feature) => feature.properties.selectionPrimary === true,
+    ),
+    true,
+  );
 
   map.targetId = "b";
   map.fire("click", mouse({ shiftKey: true }));
   assert.deepEqual(plot.selectedIds, ["a", "b"]);
   assert.equal(plot.selectedId, "b");
+  assert.deepEqual(selectedPlotIds(map), ["a", "b"]);
+  assert.equal(
+    selectionFeatures(map)
+      .filter((feature) => feature.properties.selectionPrimary === true)
+      .every((feature) => feature.properties.plotId === "b"),
+    true,
+  );
+  assert.equal(map.getSource("plotlibre-handles").data.features.length, 2);
+  assert.equal(
+    map.getSource("plotlibre-handles").data.features.every(
+      (feature) => feature.properties.plotId === "b",
+    ),
+    true,
+  );
 
   map.targetId = "a";
   map.fire("click", mouse());
   assert.deepEqual(plot.selectedIds, ["b", "a"]);
   assert.equal(plot.selectedId, "a");
+  assert.deepEqual(selectedPlotIds(map), ["b", "a"]);
 
   map.targetId = "c";
   map.fire("click", mouse({ metaKey: true }));
   assert.deepEqual(plot.selectedIds, ["b", "a", "c"]);
+  assert.deepEqual(selectedPlotIds(map), ["b", "a", "c"]);
 
   map.targetId = "b";
   map.fire("click", mouse({ altKey: true }));
   assert.deepEqual(plot.selectedIds, ["a", "c"]);
   assert.equal(plot.selectedId, "c");
+  assert.deepEqual(selectedPlotIds(map), ["a", "c"]);
 
   map.targetId = undefined;
   map.fire("click", mouse({ shiftKey: true }));
   assert.deepEqual(plot.selectedIds, ["a", "c"]);
   map.fire("click", mouse());
   assert.deepEqual(plot.selectedIds, []);
+  assert.equal(selectionFeatures(map).length, 0);
 
   plot.selection.replace(["a", "b"]);
   plot.select("c");
   assert.deepEqual(plot.selectedIds, ["c"]);
   assert.deepEqual(plot.interaction.selectedIds, ["c"]);
+  assert.deepEqual(selectedPlotIds(map), ["c"]);
   assert.equal(map.getSource("plotlibre-handles").data.features.length, 2);
 
   plot.destroy();
 });
 
-test("Ctrl toggles selection and Escape clears the complete set", () => {
+test("Ctrl toggles selection and Escape clears overlays and handles", () => {
   const map = new FakeMap();
   const plot = new PlotLibre(map, {
     definitions: [straightArrowDefinition],
@@ -192,16 +231,19 @@ test("Ctrl toggles selection and Escape clears the complete set", () => {
   map.targetId = "b";
   map.fire("click", mouse({ ctrlKey: true }));
   assert.deepEqual(plot.selectedIds, ["a", "b"]);
+  assert.deepEqual(selectedPlotIds(map), ["a", "b"]);
 
   map.targetId = "a";
   map.fire("click", mouse({ ctrlKey: true }));
   assert.deepEqual(plot.selectedIds, ["b"]);
+  assert.deepEqual(selectedPlotIds(map), ["b"]);
 
   map.canvas.fire("keydown", {
     key: "Escape",
     preventDefault() {},
   });
   assert.deepEqual(plot.selectedIds, []);
+  assert.equal(selectionFeatures(map).length, 0);
   assert.equal(map.getSource("plotlibre-handles").data.features.length, 0);
 
   plot.destroy();
