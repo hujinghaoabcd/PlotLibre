@@ -14,7 +14,10 @@ import {
   type PlotFeature,
   type PlotFeatureInput,
 } from "@plotlibre/core";
-import { SelectionController } from "@plotlibre/interaction";
+import {
+  BatchEditCommand,
+  SelectionController,
+} from "@plotlibre/interaction";
 import {
   MapLibrePlotInteraction,
   type MapLibrePlotInteractionOptions,
@@ -67,6 +70,7 @@ export class PlotLibre {
       {
         create: (input) => this.create(input),
         replace: (feature) => this.replace(feature),
+        removeSelection: () => this.removeSelected(),
       },
       options.idFactory !== undefined
         ? { idFactory: options.idFactory }
@@ -121,6 +125,33 @@ export class PlotLibre {
 
   public remove(id: string): void {
     this.history.execute(new DeletePlotCommand(this.store, id));
+  }
+
+  public removeSelected(): boolean {
+    const beforeSelection = this.selection.snapshot();
+    if (beforeSelection.selectedIds.length === 0) return false;
+
+    const document = this.store.list();
+    const selected = new Set(beforeSelection.selectedIds);
+    const removed = document.filter((feature) => selected.has(feature.id));
+    if (removed.length === 0) return false;
+
+    this.history.execute(new BatchEditCommand(this.store, this.selection, {
+      label: "delete-selection",
+      execute: {
+        remove: removed.map((feature) => feature.id),
+      },
+      undo: {
+        add: removed,
+        orderedIds: document.map((feature) => feature.id),
+      },
+      beforeSelection,
+      afterSelection: {
+        selectedIds: [],
+        revision: beforeSelection.revision,
+      },
+    }));
+    return true;
   }
 
   public draw(plotType: string, options: StartPlotDrawOptions = {}): string {
