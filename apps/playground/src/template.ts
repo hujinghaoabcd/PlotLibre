@@ -10,7 +10,7 @@ export const playgroundTemplate = `
       </a>
       <div class="header-links">
         <a href="https://github.com/hujinghaoabcd/PlotLibre" target="_blank" rel="noreferrer">GitHub</a>
-        <span class="version-badge">v0.0.20 demo</span>
+        <span class="version-badge">v0.0.21 demo</span>
       </div>
     </header>
 
@@ -32,7 +32,7 @@ export const playgroundTemplate = `
       <span class="toolbar-divider" aria-hidden="true"></span>
       <button id="undo-button" data-testid="undo-button" type="button">撤销</button>
       <button id="redo-button" data-testid="redo-button" type="button">重做</button>
-      <button id="delete-button" data-testid="delete-button" type="button">删除选中</button>
+      <button id="delete-button" data-testid="delete-button" type="button">批量删除选中</button>
       <button id="clear-button" data-testid="clear-button" type="button">清空</button>
       <span class="toolbar-divider" aria-hidden="true"></span>
       <button id="sample-button" data-testid="sample-button" type="button">加载示例</button>
@@ -57,7 +57,7 @@ export const playgroundTemplate = `
             <strong id="plot-count" data-testid="plot-count">0 个标绘</strong>
           </div>
           <div>
-            <span class="eyebrow">选中对象</span>
+            <span class="eyebrow">选择 / Primary</span>
             <strong id="selected-id" data-testid="selected-id">未选择</strong>
           </div>
         </section>
@@ -66,7 +66,7 @@ export const playgroundTemplate = `
           <div class="section-heading">
             <div>
               <span class="eyebrow">Style</span>
-              <h2>选中标绘样式</h2>
+              <h2>Primary 标绘样式</h2>
             </div>
             <span id="selection-state" class="state-pill">未选择</span>
           </div>
@@ -96,6 +96,11 @@ export const playgroundTemplate = `
           <span class="eyebrow">Workflow</span>
           <h2>交互说明</h2>
           <ol class="instruction-list">
+            <li>普通点击替换选择；Shift 点击添加；Ctrl/Cmd 点击切换；Alt 点击移除。</li>
+            <li>多选中的最后一个对象是 Primary，只有 Primary 显示语义控制点并接受样式编辑。</li>
+            <li>拖动任一已选对象的主体可整体平移全部选中对象；拖动期间只更新临时预览，释放后一次原子提交。</li>
+            <li>Delete/Backspace 或“批量删除选中”会生成一个历史命令；撤销恢复原文档顺序、选择集合和 Primary。</li>
+            <li>整体平移按同一个局部米制向量移动全部 authored controls；Escape 取消，任一对象无效时整批拒绝。</li>
             <li>两点箭头：点击箭尾，再点击箭尖完成。</li>
             <li>曲线箭头：第一个点为尾部中心，后续点定义路径。</li>
             <li>攻击箭头：前两个点定义左右尾缘，后续点定义进攻骨架和目标。</li>
@@ -120,7 +125,7 @@ export const playgroundTemplate = `
 
         <section class="inspector-section technical-card">
           <span class="eyebrow">Architecture</span>
-          <p>PlotLibre 保存控制点、参数和样式。地图上的 LineString、Polygon 与语义引导线均为派生结果，可随编辑、算法升级或地图样式重载重新生成。</p>
+          <p>PlotLibre 保存 authored controls、参数、样式和元数据。选择轮廓、平移预览、LineString、Polygon 与语义引导线均为派生结果，可随编辑、算法升级或地图样式重载重新生成。</p>
         </section>
       </aside>
     </main>
