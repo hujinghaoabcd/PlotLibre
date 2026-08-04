@@ -258,7 +258,9 @@ export class MapLibreSelectionRegionResolver {
 
     let projected: { readonly x: number; readonly y: number };
     try {
-      projected = project.call(this.#map, position);
+      // MapLibre's LngLatLike tuple is mutable. Copy the canonical readonly
+      // Position so the adapter remains structurally compatible with MapLibre.
+      projected = project.call(this.#map, [position[0], position[1]]);
     } catch (error) {
       throw new SelectionRegionResolutionError(
         "SELECTION_REGION_PROJECTION_FAILED",
