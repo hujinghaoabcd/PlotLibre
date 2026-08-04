@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   createPlotFeature,
@@ -9,12 +10,24 @@ import { SelectionTransformSession } from "@plotlibre/interaction";
 import { builtInSymbols } from "@plotlibre/symbols";
 
 const ORIGIN = [118.8, 32.06];
+const AUTHORITATIVE_FIXTURE_BY_TYPE = Object.freeze({
+  "arrow.attack": loadFixture("attack-arrow.json"),
+  "arrow.attack.tailed": loadFixture("tailed-attack-arrow.json"),
+  "arrow.double": loadFixture("double-arrow.json"),
+  "arrow.pincer": loadFixture("pincer-arrow.json"),
+});
+
+function loadFixture(filename) {
+  return JSON.parse(
+    readFileSync(new URL(`./fixtures/${filename}`, import.meta.url), "utf8"),
+  );
+}
 
 function localPosition(x, y) {
   return createLocalProjection(ORIGIN).unproject({ x, y });
 }
 
-function controlFixture(count) {
+function genericControlFixture(count) {
   const fixed = [
     [-160, -45],
     [-95, 55],
@@ -45,14 +58,20 @@ function pointAt(frame, x, y) {
 }
 
 function buildFeature(registry, definition) {
-  const count = definition.controlSchema.minPoints;
+  const fixture = AUTHORITATIVE_FIXTURE_BY_TYPE[definition.type];
+  const controlPoints = fixture?.controlPoints ??
+    genericControlFixture(definition.controlSchema.minPoints);
+  const parameters = {
+    ...definition.defaultParameters,
+    ...(fixture?.parameters ?? {}),
+  };
   const feature = registry.canonicalize(
     createPlotFeature({
       id: `catalog-${definition.type}`,
       plotType: definition.type,
       definitionVersion: definition.version,
-      controlPoints: controlFixture(count),
-      parameters: { ...definition.defaultParameters },
+      controlPoints,
+      parameters,
       style: { ...definition.defaultStyle },
       metadata: { catalogSmoke: true },
     }),
