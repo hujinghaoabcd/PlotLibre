@@ -14,52 +14,24 @@ PlotLibre separates semantic interaction from MapLibre:
 MapLibre GL JS
 ```
 
-`@plotlibre/interaction` owns engine-independent drawing sessions, ordered selection, batch commands, local translation and future screen-region session mathematics. MapLibre owns browser-event normalization, screen projection, rendered-index queries, cursors and derived presentation. Only canonicalized, validated PlotFeatures enter Store and History.
+Interaction owns engine-independent drawing sessions, ordered selection, batch commands, local translation and screen-region algorithms. MapLibre owns browser-event normalization, screen projection, rendered-index queries, pointer/camera lifecycle and derived presentation. Core never depends on DOM, MapLibre or CSS-pixel types.
 
-Core never depends on DOM, MapLibre or CSS-pixel types.
+## 2. Drawing
 
-## 2. Drawing sessions
-
-```ts
-interface DrawSession {
-  readonly status: "ready" | "drawing" | "completed" | "cancelled";
-  snapshot(): DrawSessionSnapshot;
-  click(position: Position): DrawSessionSnapshot;
-  doubleClick(position: Position): DrawSessionSnapshot;
-  pointerMove(position: Position): DrawSessionSnapshot;
-  keyDown(key: string): DrawSessionSnapshot;
-  cancel(): DrawSessionSnapshot;
-}
-```
-
-Sessions return authored controls only. Samples, rings, mirrored controls, closure points and semantic guides remain derived. Invalid completion preserves the active session and structured rejection; Store and History remain unchanged.
-
-Session selection is schema-driven:
-
-```text
-minPoints = 2 and maxPoints = 2 → TwoPointDrawSession
-otherwise                         → MultiPointDrawSession
-```
-
-## 3. Drawing completion
+Drawing sessions return authored controls only. Samples, rings, mirrored points, closures and guides remain derived.
 
 ```text
 candidate
-→ merge defaults
 → canonicalize authored controls
 → Registry validation
 → full Registry generation
-→ invalid: rejection, no mutation
-→ valid: one create command and Store commit
+→ invalid: active session + rejection, no mutation
+→ valid: one command and Store commit
 ```
 
-Current modes include exact two-point, variable multi-point, fixed four/five and fixed three-control Definitions.
+Session choice remains schema-driven, never `plotType`-driven.
 
-## 4. Semantic guides
-
-`PlotDefinition.deriveSemanticGuidePaths(feature)` returns transient WGS84 paths. Guides do not enter committed RenderBundle, Store, History or PlotJSON. They may appear for complete drafts, Primary selection and handle-drag preview.
-
-## 5. SelectionController
+## 3. SelectionController
 
 ```ts
 interface SelectionSnapshot {
@@ -72,133 +44,96 @@ interface SelectionSnapshot {
 - ids are unique existing Store ids;
 - order is acquisition order;
 - Primary is the final selected id;
-- empty selection has no Primary;
 - one effective operation emits one immutable snapshot;
 - no-op emits nothing;
-- Store remove/clear reconciles once;
-- history restoration preserves membership/order/Primary but allocates a fresh monotonic interaction revision;
-- selection does not increment PlotFeature revision and is excluded from PlotJSON.
+- Store removal reconciles once;
+- selection is excluded from PlotJSON and feature revision.
 
-Current operations are replace, add, subtract, toggle, clear, make-primary, Store reconcile and history restore.
-
-007B adds one batch operation candidate:
-
-```ts
-selection.applyMany(ids, intent, "box" | "lasso")
-```
-
-It must validate all ids and emit at most one SelectionChange.
-
-## 6. Click selection
+Current click intents:
 
 ```text
-plain click       replace or make hit selected object Primary
-Shift + click     add
-Ctrl/Cmd + click  toggle
-Alt + click       subtract
-empty plain click clear
-Escape            clear when no higher-priority operation is active
+plain       replace / make-primary
+Shift       add
+Ctrl/Cmd    toggle
+Alt         subtract
+empty plain clear
 ```
 
-Modifier priority is Alt, then Ctrl/Cmd, then Shift, then default.
+Modifier priority: `Alt > Ctrl/Cmd > Shift > default`.
 
-The current 007A adapter performs Shift-add on MapLibre `mousedown`. 007B runtime must replace this with a unified thresholded region adapter so Shift click and Shift-empty box cannot both mutate selection.
+## 4. Selection rendering
 
-Compatibility aliases remain:
+Current derived MapLibre resources:
 
 ```text
-plot.select(id | undefined)
-plot.selectedId
-interaction.select(id | undefined)
-interaction.selectedId
+Sources:
+  plotlibre-committed
+  plotlibre-selection
+  plotlibre-draft
+  plotlibre-handles
+
+Layers:
+  plotlibre-fill
+  plotlibre-line
+  plotlibre-point
+  plotlibre-selection-line
+  plotlibre-selection-point
+  plotlibre-draft-fill
+  plotlibre-draft-line
+  plotlibre-draft-point
+  plotlibre-handle-guide
+  plotlibre-handle
 ```
 
-## 7. Selection rendering
+Polygon selections render as boundaries, LineStrings as lines and Points as points. Only Primary exposes authored handles and Definition guides.
 
-Current Sources:
-
-```text
-plotlibre-committed
-plotlibre-selection
-plotlibre-draft
-plotlibre-handles
-```
-
-Current Layers:
+## 5. Direct handle editing
 
 ```text
-plotlibre-fill
-plotlibre-line
-plotlibre-point
-plotlibre-selection-line
-plotlibre-selection-point
-plotlibre-draft-fill
-plotlibre-draft-line
-plotlibre-draft-point
-plotlibre-handle-guide
-plotlibre-handle
-```
-
-Polygon selections render as boundaries, LineStrings as lines and Points as points. Compound output is de-duplicated. Only Primary contributes authored handles and Definition guides.
-
-## 8. Handle drag
-
-```text
-mousedown authored handle
+pointer down on authored handle
 → capture original feature
-→ disable dragPan
-→ pointerMove creates generated preview
-→ mouseup commits one ReplacePlotCommand
-→ clear draft and restore dragPan
+→ generated preview
+→ Registry preflight
+→ pointer up: one ReplacePlotCommand
 ```
 
-Invalid preview does not mutate Store. Escape cancels without a command. Handle drag has priority over body translation and region selection.
+Invalid preview does not mutate Store. Escape cancels. Handle drag has priority over body translation and region selection.
 
-## 9. Atomic Store transaction
+## 6. Atomic document editing
 
-`PlotStore.applyTransaction()` stages add/replace/remove and optional exact ordering in a cloned ordered map.
+`PlotStore.applyTransaction()` stages add/replace/remove/exact order and commits once. Listener errors after commit are isolated through `onListenerError`.
 
-```text
-validate complete transaction
-→ apply staged changes
-→ validate exact order
-→ any error: no mutation/event
-→ commit once
-→ emit one batch event
-```
+`BatchEditCommand` stores exact before/after features, document order and selection. Execute/undo/redo replay exact revisions. One document-mutation gesture creates one History entry.
 
-After commit, every listener runs. Listener errors are collected and reported through `onListenerError`; they do not prevent History from recording an already committed command.
+## 7. Batch delete
 
-## 10. BatchEditCommand
+Delete/Backspace and `removeSelected()` remove all selected features through one command and one Store transaction. Undo restores exact values, order, selected ids and Primary.
 
-The command stores exact before/after features, document order and selection snapshots. Execute/redo applies exact after-state; undo applies exact before-state. Revisions are replayed exactly. One completed document-mutation gesture or batch action creates one History entry.
-
-## 11. Batch delete
+## 8. Whole-selection translation
 
 ```text
-Delete / Backspace / removeSelected()
-→ capture selected features, order and selection
-→ one BatchEditCommand
-→ one atomic remove transaction
-→ after selection empty
-```
-
-Undo restores exact values, order, selected ids and Primary.
-
-## 12. Whole-selection translation
-
-```text
-pointer down on selected body
-→ capture selected features
-→ one shared local coordinate frame
+selected body pointer down
+→ one shared local frame
 → one common metre delta
-→ generated transient preview
-→ pointer up commits one BatchEditCommand
+→ transient generated preview
+→ all candidates preflight
+→ pointer up: one BatchEditCommand
 ```
 
-Store is unchanged during preview. Any invalid member rejects the full batch. Escape cancels. Parameters/style/metadata remain unchanged. One gesture creates at most one History entry.
+Store remains unchanged during preview. Escape cancels. Any invalid member rejects the full batch. Parameters/style/metadata remain unchanged.
 
-## 13. 007B ScreenSelectionRegionSession
+## 9. 007B merged design state
+
+```text
+Design PR:          #40
+Design head:        4a8ee1102bb923801ada95c648a258225ccb9ec4
+Design CI:          #413 / 30912109618
+Design squash SHA:  a9b9efc090c01f45133f3f136a0049a97ee52b90
+```
+
+The design is merged. Runtime remains unimplemented until the post-merge finalization completes and a new branch is created from latest `main`.
+
+## 10. ScreenSelectionRegionSession
 
 Candidate engine-independent types:
 
@@ -218,9 +153,9 @@ interface ScreenBounds {
 type SelectionRegionStatus = "idle" | "armed" | "active" | "rejected";
 ```
 
-The pure session captures screen points, box bounds, lasso samples and topology rejection only. It never queries MapLibre or mutates SelectionController.
+The pure session captures box/lasso screen geometry and rejection state only. It never queries MapLibre or mutates SelectionController.
 
-## 14. 007B region activation
+## 11. Region activation
 
 Neutral convenience:
 
@@ -229,29 +164,44 @@ Shift + primary drag from empty selectable space
 → one-shot additive box
 ```
 
-Explicit one-shot API:
+Explicit one-shot modes:
 
 ```text
-start box mode   → default replace
-start lasso mode → default replace
+box   default replace
+lasso default replace
 ```
 
-Explicit modes support modifier override to add/toggle/subtract. Intent is captured at pointer down and does not change during the gesture.
+Explicit modes support add/toggle/subtract through modifier override. Intent is captured on pointer down. Lasso is explicit only. Touch is deferred.
 
-Lasso is explicit-mode only. Touch region selection is deferred.
+The current immediate Shift-add-on-mousedown adapter must be replaced, not supplemented.
 
-## 15. Box state machine
+## 12. Gesture priority
 
 ```text
-idle
-→ Shift-empty pointer down: armed
-→ movement <4 CSS px: armed
-→ movement >=4 CSS px: active
-→ pointer up: resolve candidates and apply once
-→ cancel/degenerate: no selection mutation
+active drawing
+> authored handle drag
+> active selection translation
+> active region gesture
+> explicit region mode
+> neutral Shift-empty box arm
+> selected-body translation
+> click selection
+> camera gesture
 ```
 
-A valid box has positive width and height. Selection changes only on pointer up.
+Convenience box never starts from a handle or plot body.
+
+## 13. Box state machine
+
+```text
+pointer down: armed
+movement <4 CSS px: remain armed
+movement >=4 CSS px: active rectangle
+pointer up: resolve and apply once
+cancel/degenerate: no mutation
+```
+
+Positive width and height are required. Selection changes only on pointer up.
 
 Empty result:
 
@@ -260,86 +210,95 @@ replace clears
 add/subtract/toggle no-op
 ```
 
-## 16. Lasso state machine
+## 14. Lasso state machine
 
 ```text
-explicit mode armed
-→ pointer down: active freehand capture
-→ accept points at >=2 CSS px spacing
-→ pointer up: validate raw ring
-→ simplify at 1.5 CSS px
-→ validate simplified ring
-→ resolve/apply and exit
+sample spacing:       2 CSS px
+minimum distinct pts: 3
+minimum area:         16 CSS px²
+RDP tolerance:        1.5 CSS px
 ```
 
-Minimum: three distinct points and 16 CSS px² absolute area.
+```text
+raw sample path
+→ duplicate cleanup
+→ raw simple-ring validation
+→ RDP simplify
+→ simplified simple-ring validation
+→ resolve/apply
+```
 
-Non-adjacent segment crossing, touch, collinear overlap or repeated non-consecutive vertex rejects. Invalid completion preserves selection, shows rejection and leaves the mode armed for one retry.
+Repeated non-consecutive vertices and non-adjacent crossing/touch/overlap reject. Invalid lasso preserves selection, displays transient rejection and leaves one retry armed.
 
-## 17. Region multi-id intent
+## 15. One-event multi-id intent
+
+Required direction:
+
+```ts
+selection.applyMany(ids, intent, "box" | "lasso")
+```
 
 Candidate ids arrive in Store/document order.
 
 ```text
-replace  candidate ids
-add      current + newly added candidates
+replace  candidates
+add      current + new candidates
 subtract current survivors
 toggle   current survivors + newly selected candidates
 ```
 
-One effective completion emits one immutable `box` or `lasso` SelectionChange. Region selection never enters CommandHistory.
+One effective completion emits one selection event. No-op emits nothing. Region selection never enters History.
 
-## 18. MapLibre broad phase
+## 16. Broad phase
 
 ```text
-region screen bounds
-→ queryRenderedFeatures on committed fill/line/point layers
-→ plotId de-duplication
+region bounds
+→ queryRenderedFeatures(committed fill/line/point layers)
+→ plotId dedup
 → Store existence filter
-→ Store/document-order normalization
+→ Store-order normalization
 ```
 
-Exclude selection overlays, drafts, handles, guides and labels. MapLibre return order and tile duplicates are not semantic ordering.
+Selection, draft, handles, guides and labels are excluded. MapLibre return order and tile duplicates are non-semantic.
 
-MapLibre's rendered index is the first broad phase. No custom persistent spatial index is added before measured evidence.
+MapLibre rendered index is the initial broad phase; custom persistent indexing is deferred pending measurement.
 
-## 19. Exact projected narrow phase
+## 17. Exact projected narrow phase
 
 ```text
-Store candidate
+Store feature
 → Registry.generate
 → fills + lines + points
-→ map.project every generated coordinate
+→ map.project coordinates
 → exact region intersection
 ```
 
-- Point uses center;
-- LineString/MultiLineString use segment intersection;
-- Polygon/MultiPolygon support crossing and containment with holes;
-- compound feature selects once when any component intersects;
-- boundaries are inclusive;
-- CSS line width and point radius are ignored;
-- labels, guides, drafts and selection overlays are ignored;
-- generated samples are authoritative for curved paths;
-- query/generation/projection failure rejects the whole completion;
-- partial selection is prohibited.
+- Point center;
+- LineString/MultiLineString segments;
+- Polygon/MultiPolygon crossing and containment with holes;
+- compound any-component semantics;
+- boundary inclusive;
+- CSS stroke/radius ignored;
+- labels/guides/drafts/selection overlays ignored;
+- generated samples authoritative for curved paths;
+- query/generation/projection failure rejects the whole completion.
 
-## 20. Region overlay
+## 18. Region overlay
 
-Box/lasso guides use a DOM/SVG overlay attached to the MapLibre container:
+Box/lasso guides use a DOM/SVG overlay attached to the map container:
 
 ```text
 CSS-pixel coordinates
 pointer-events:none
 aria-hidden:true
-removed on all terminal paths
+removed on complete/cancel/destroy
 ```
 
-No new MapLibre Source or Layer is added in 007B version 1. The four-Source/ten-Layer baseline remains.
+007B v1 adds no MapLibre Source/Layer. Baseline remains four Sources and ten Layers.
 
-## 21. Region lifecycle
+## 19. Region lifecycle
 
-The unified adapter owns pointer capture, dragPan and boxZoom interaction.
+The unified adapter owns pointer capture, dragPan and existing boxZoom lifecycle.
 
 Cancel without selection mutation on:
 
@@ -355,34 +314,9 @@ draw/import/clear/undo/redo
 destroy
 ```
 
-Explicit region mode hides Primary handles/guides while preserving selection overlays, then restores them on exit. Synthetic post-drag click is suppressed.
+Explicit region mode hides Primary handles/guides while preserving selection overlays and restores them on exit. Synthetic post-drag click is suppressed.
 
-## 22. Event priority after 007B
-
-```text
-active drawing
-> authored handle drag
-> active selection translation
-> active region gesture
-> explicit region-mode start
-> neutral Shift-empty box arm
-> selected-body translation
-> click selection
-> camera drag
-```
-
-Expected adapter mapping:
-
-```text
-capture pointerdown  arm click/box/lasso ownership
-pointermove          drawing/handle/translation/region preview
-pointerup            one replace/batch document command or one selection event
-pointercancel        cancel region/drag safely
-style/camera/resize  cancel screen region; restore derived state
-keydown              drawing keys, Escape, delete or selection clear
-```
-
-## 23. Stable region rejections
+## 20. Stable rejections
 
 ```text
 SELECTION_REGION_TOO_SMALL
@@ -395,52 +329,37 @@ SELECTION_REGION_PROJECTION_FAILED
 
 Empty candidates are valid outcomes.
 
-## 24. Style and camera lifecycle
+## 21. Canonical-state rule
 
-Style reload restores four Sources, ten Layers and canonical-derived state. Active region gestures cancel because their screen frame is invalidated; DOM overlays are independent of style resources and must still be removed.
+Generated geometry may be projected for exact hit testing but never becomes authored state. Screen regions, overlays and rejections remain transient. Whole-object transforms continue to modify authored controls only.
 
-## 25. Canonical-state rule
-
-Generated vertices may be used for exact screen hit testing but never become authored state. Region selection, overlays and rejections remain transient. Whole-object transforms continue to modify authored controls only.
-
-## 26. Validation baseline
+## 22. Validation baseline
 
 ```text
-main:              d08c56b6687ea64e0c599fd04fd77115d320d8f2
+main:              a9b9efc090c01f45133f3f136a0049a97ee52b90
 workspace:         0.0.21
 Node tests:        219
 Chromium tests:    30
 Sources/Layers:    4 / 10
 007A PRs:          #38 / #39
+007B design PR:    #40
 ```
 
-007B design branch is Markdown-only and must pass the unchanged baseline on its exact head before merge.
+The documentation-only finalization must pass the unchanged exact-head baseline before merge.
 
-## 27. Current limitations
+## 23. Runtime implementation order
 
-Still deferred:
-
-- touch region gestures;
-- contain-only region policy;
-- persistent region tools;
-- custom persistent spatial index;
-- rotation/scale;
-- groups/locks/visibility/z-order;
-- snapping;
-- geodesic transform mode;
-- published large-document latency guarantee.
-
-## 28. Next runtime slice
-
-After design merge/finalization, create `agent/007b-box-lasso-selection` from latest `main` and implement in this order:
+After finalization, create `agent/007b-box-lasso-selection` from latest `main`:
 
 ```text
-pure screen utilities
-→ applyMany
-→ exact predicates
+screen/RDP/topology utilities
+→ SelectionController.applyMany
+→ exact projected predicates
 → broad-phase resolver
 → unified region adapter
 → DOM/SVG overlay
 → public API
 → Playground/E2E/benchmarks
 ```
+
+Rotation/scale, groups/locks, snapping, new symbols, touch and contain-only region selection remain separate later work.
