@@ -90,8 +90,14 @@ test("makePrimary moves an existing selected id and rejects unselected ids", () 
 test("missing Store ids reject without changing selection", () => {
   const controller = new SelectionController(createStore());
   controller.replace(["a"]);
-  assert.throws(() => controller.add(["missing"]), /was not found/);
-  assert.throws(() => controller.toggle("missing"), /was not found/);
+  assert.throws(
+    () => controller.add(["missing"]),
+    /No plot feature exists with id "missing"/,
+  );
+  assert.throws(
+    () => controller.toggle("missing"),
+    /No plot feature exists with id "missing"/,
+  );
   assert.throws(
     () => controller.replace(["a"], "b"),
     /must belong to selectedIds/,
