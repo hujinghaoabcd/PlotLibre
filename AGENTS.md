@@ -30,31 +30,33 @@ PlotJSON versioning, JSON safety, migration, validation and import preparation b
 ## 3. Current authority
 
 ```text
-main SHA:           d8b2d889dee81064069f96e555dd75b1c851ccf3
-workspace:          0.0.22
-current schema:     PlotJSON 1.0.0
+main SHA:             c77c5c50ea5976f7afd40f0e48bc712515a99cd5
+workspace:            0.0.22
+current schema:       PlotJSON 1.0.0
 production migrations: none
-public symbols:     19 (14 Arrow + 1 Line + 4 Area)
-Node baseline:      324
-Chromium baseline:  34
-MapLibre Sources:   4
-MapLibre Layers:    10
-benchmark jobs:     region selection + selection transform
-007A:               merged PR #38/#39
-007B:               merged PR #40–#44
-007B-P:             merged PR #45/#46
-007C:               merged PR #47–#50
-008 design:         merged PR #51/#52
-008A runtime:       merged PR #53
-current branch:     agent/008a-plotjson-post-merge-finalization
-next runtime branch: agent/008b-plotjson-migration-registry-runtime
+public symbols:       19 (14 Arrow + 1 Line + 4 Area)
+merged Node baseline: 324
+008B expected Node:   348
+Chromium baseline:    34
+MapLibre Sources:     4
+MapLibre Layers:      10
+benchmark jobs:       region selection + selection transform
+007A:                 merged PR #38/#39
+007B:                 merged PR #40–#44
+007B-P:               merged PR #45/#46
+007C:                 merged PR #47–#50
+008 design:           merged PR #51/#52
+008A runtime:         merged PR #53/#54
+008B runtime:         Draft PR #55
+current branch:       agent/008b-plotjson-migration-registry-runtime
+next runtime branch:  agent/008c-plotjson-reader-runtime
 ```
 
-PR #53 validated exact head `cb3db0fa6dc38c9b852524c15e4066b52b0c7b38` in CI run `30951490118`, with 324 Node tests, 34 Chromium tests, both benchmark jobs and zero review threads. It squash-merged as `d8b2d889dee81064069f96e555dd75b1c851ccf3`.
+PR #54 finalized 008A and squash-merged as `c77c5c50ea5976f7afd40f0e48bc712515a99cd5`.
 
 Never use old-head evidence for a newer head. Design, runtime and post-merge finalization remain separate branches.
 
-## 4. Selection and atomic editing
+## 4. Canonical editing and selection
 
 Selection is transient, ordered and Primary-last. It is excluded from PlotJSON and feature revision.
 
@@ -62,38 +64,11 @@ Selection is transient, ordered and Primary-last. It is excluded from PlotJSON a
 
 Preview, rejection, cancellation and no-op never enter Store or History.
 
-## 5. Merged 007C transform contract
-
-Transform authored controls only. Preserve:
-
-```text
-id
-plotType
-definitionVersion
-parameters
-style
-metadata
-Store order
-selection order
-Primary
-```
-
-Each effectively changed feature receives exact `revision + 1`.
-
-Rotation/scale frame:
-
-```text
-all selected authored controls
-→ one order-independent local-metre frame
-→ fixed authored-control AABB-centre pivot
-→ positive clockwise angle or positive uniform factor
-→ complete Registry preflight
-→ one stale-safe atomic command
-```
+Transform authored controls only. Preserve feature identity, Definition version, parameters, style, metadata, Store order, selection order and Primary. Each effectively changed feature receives exact `revision + 1`.
 
 Uniform scale is `[0.01,100]`. Reflection, negative/non-uniform scale, skew and snapping remain excluded.
 
-## 6. PlotJSON design authority
+## 5. PlotJSON design authority
 
 ```text
 docs/PLOTJSON_SPEC.md
@@ -106,7 +81,7 @@ docs/handover/2026-08-05-milestone-008-design-post-merge-finalization.md
 
 Document `schemaVersion` owns document structure, order, references and future persisted editor state. Feature `definitionVersion` owns one Definition's authored control and parameter semantics.
 
-Required future order:
+Required eventual order:
 
 ```text
 raw document
@@ -118,7 +93,7 @@ raw document
 → atomic Store replacement
 ```
 
-## 7. Merged 008A authority
+## 6. Merged 008A authority
 
 ```text
 packages/core/src/plotjson-version.ts
@@ -129,7 +104,7 @@ docs/handover/2026-08-05-milestone-008a-plotjson-foundations.md
 docs/handover/2026-08-05-milestone-008a-post-merge-finalization.md
 ```
 
-Public primitives:
+Public foundations:
 
 ```text
 PLOTJSON_DOCUMENT_TYPE
@@ -145,109 +120,24 @@ clonePlotJsonValue
 scanPlotJsonValue
 ```
 
-008A intentionally does not change `parsePlotDocument()`, Registry, Store, MapLibre, schema shape or persisted output.
+Persisted versions are canonical numeric `MAJOR.MINOR.PATCH` triples. Direct-object safety accepts JSON primitives, dense arrays and plain/null-prototype objects only. Traversal is iterative, descriptor-based and getter-free. Prototype-sensitive keys must remain safe data properties.
 
-## 8. Persisted version contract
-
-Accepted form:
+Finite defaults:
 
 ```text
-MAJOR.MINOR.PATCH
-```
-
-Components are canonical non-negative safe integers. Leading zeros, prefixes, missing components, decimals, exponent forms, prerelease/build suffixes and unsafe integers reject.
-
-Comparison is numeric tuple comparison. Parsed records are frozen. Forged records reject. Invalid messages cannot echo an untrusted payload.
-
-## 9. JSON-safety contract
-
-Accepted direct values:
-
-```text
-null
-string
-boolean
-finite number
-dense array
-plain or null-prototype object
-```
-
-Rejected:
-
-```text
-undefined
-NaN / Infinity
-BigInt / Symbol / function
-Date / Map / Set / RegExp / typed arrays / class instances
-custom prototypes
-accessor / non-enumerable property / symbol key
-sparse array / custom array property
-cycle
-```
-
-Traversal is iterative and descriptor-based. It cannot invoke getters. Object keys are visited lexicographically. Repeated non-cyclic references are cloned independently.
-
-Own `__proto__`, `constructor` and `prototype` keys must remain data properties without changing object prototypes. Use descriptor definition rather than ordinary assignment for untrusted keys.
-
-## 10. Resource-limit contract
-
-```text
-inputBytes:               16 MiB UTF-8
-maximum depth:            128
-total value nodes:        1,000,000
-total object keys:        250,000
+inputBytes:                16 MiB UTF-8
+maximum depth:             128
+total value nodes:         1,000,000
+total object keys:         250,000
 maximum string/key length: 1,000,000 UTF-16 code units
-features:                 100,000
-controls per feature:     10,000
-total authored controls:  1,000,000
+features:                  100,000
+controls per feature:      10,000
+total authored controls:   1,000,000
 ```
 
-These are finite untrusted-input ceilings, not product-size recommendations, memory guarantees or latency SLAs.
+These are security ceilings, not product-size recommendations or latency SLAs.
 
-Overrides must be finite positive safe integers. Zero, negative, fractional, infinite, NaN and unsafe values reject. String length applies to values and keys.
-
-## 11. Structured PlotJSON errors
-
-`PlotJsonError` extends `PlotLibreError`. Context is scalar only:
-
-```text
-path
-featureId
-plotType
-sourceVersion
-targetVersion
-limitName
-limit
-actual
-cause
-```
-
-Never retain or dump complete documents or metadata.
-
-Frozen code union:
-
-```text
-PLOTJSON_SYNTAX_INVALID
-PLOTJSON_VALUE_NOT_JSON
-PLOTJSON_RESOURCE_LIMIT_EXCEEDED
-PLOTJSON_ROOT_INVALID
-PLOTJSON_DOCUMENT_TYPE_UNSUPPORTED
-PLOTJSON_SCHEMA_VERSION_INVALID
-PLOTJSON_SCHEMA_VERSION_UNSUPPORTED
-PLOTJSON_MIGRATION_PATH_MISSING
-PLOTJSON_MIGRATION_OUTPUT_INVALID
-PLOTJSON_CURRENT_SCHEMA_INVALID
-PLOTJSON_FEATURE_ID_DUPLICATE
-PLOTJSON_DEFINITION_NOT_FOUND
-PLOTJSON_DEFINITION_VERSION_INVALID
-PLOTJSON_DEFINITION_VERSION_UNSUPPORTED
-PLOTJSON_DEFINITION_MIGRATION_PATH_MISSING
-PLOTJSON_DEFINITION_MIGRATION_OUTPUT_INVALID
-PLOTJSON_REFERENCE_INVALID
-PLOTJSON_IMPORT_TRANSACTION_INVALID
-```
-
-## 12. Current `1.0.0` compatibility
+## 7. Current `1.0.0` compatibility
 
 Historical parser behavior remains binding until 008C:
 
@@ -260,36 +150,172 @@ missing/non-integer revision → 0
 unknown root/feature fields → dropped
 ```
 
-008A primitives are not integrated into the parser, so 008A does not silently tighten same-version interpretation.
+008A and 008B do not connect their primitives to `parsePlotDocument()`, so same-version interpretation remains unchanged.
 
-## 13. 008B runtime boundary
+## 8. 008B runtime authority
 
-Next branch:
+Runtime:
 
 ```text
-agent/008b-plotjson-migration-registry-runtime
+packages/core/src/plotjson-migration-types.ts
+packages/core/src/plotjson-migration-registry.ts
+packages/core/src/plotjson-migration-report.ts
 ```
 
-Allowed scope:
-
-- immutable document migration step types;
-- immutable Definition migration references and step types;
-- separate document/Definition registration APIs;
-- strict version-increase validation;
-- one outgoing edge per source node and scope;
-- duplicate, self, decreasing, cycle and branch rejection;
-- deterministic linear chain planning independent of registration order;
-- explicit plotType rename edges;
-- immutable applied-step and report record types;
-- public core exports, pure Node tests, runtime docs and immutable handover.
-
-Excluded from 008B:
+Tests:
 
 ```text
-production migration execution
+tests/plotjson-migration-registry.test.mjs
+tests/plotjson-migration-registry-hardening.test.mjs
+tests/plotjson-migration-report.test.mjs
+```
+
+Documentation:
+
+```text
+docs/design/plotjson-migration-registry-runtime.md
+docs/handover/2026-08-05-milestone-008b-migration-planning.md
+```
+
+Allowed scope is descriptors, registry validation, deterministic planning, immutable report records, exports, tests and docs only.
+
+## 9. Migration graph domains
+
+Document node:
+
+```text
+schemaVersion
+```
+
+Definition node:
+
+```text
+(plotType, definitionVersion)
+```
+
+A type rename is an explicit Definition edge:
+
+```text
+arrow.legacy@1.0.0
+→ arrow.bridge@1.1.0
+→ arrow.current@2.0.0
+```
+
+Migration code remains separate from `PlotDefinition.generate()` and `PlotRegistry` aliases.
+
+## 10. Registration rules
+
+Every migration registration must satisfy:
+
+- descriptor object exists;
+- `migrate` is a function;
+- versions parse through `parsePlotJsonVersion()`;
+- target version is strictly greater than source version;
+- Definition plot types are non-empty strings;
+- normalized descriptors and references are copied and frozen;
+- one source node has zero or one outgoing edge;
+- exact duplicate and branch both reject;
+- invalid insertion leaves the registry unchanged;
+- registration order cannot change a valid plan.
+
+Developer configuration errors:
+
+```text
+PLOTJSON_MIGRATION_REGISTRATION_INVALID
+PLOTJSON_MIGRATION_SOURCE_DUPLICATE
+PLOTJSON_MIGRATION_GRAPH_CYCLE
+```
+
+They use `PlotJsonMigrationRegistryError`, a `PlotLibreError` subclass, not `PlotJsonError` for untrusted documents.
+
+## 11. Planning rules
+
+`planDocument()` and `planDefinition()`:
+
+- validate source and target first;
+- return a shared frozen empty plan for exact equality;
+- reject a newer source/downgrade;
+- follow only the unique outgoing edge;
+- reject missing or overshooting paths;
+- require exact target version and exact target plot type;
+- return frozen ordered arrays;
+- never invoke migration functions;
+- never choose a shortest/nearest/best-effort path.
+
+Untrusted path failures reuse stable PlotJSON codes:
+
+```text
+PLOTJSON_SCHEMA_VERSION_INVALID
+PLOTJSON_SCHEMA_VERSION_UNSUPPORTED
+PLOTJSON_MIGRATION_PATH_MISSING
+PLOTJSON_DEFINITION_NOT_FOUND
+PLOTJSON_DEFINITION_VERSION_INVALID
+PLOTJSON_DEFINITION_VERSION_UNSUPPORTED
+PLOTJSON_DEFINITION_MIGRATION_PATH_MISSING
+```
+
+## 12. Migration purity boundary
+
+`PlotJsonMigrationFunction` is trusted synchronous application-installed code. In 008B it is stored but never called.
+
+008C execution must ensure each step:
+
+- receives a cloned JSON object;
+- cannot mutate caller input;
+- returns a new JSON object;
+- is followed by JSON-safety/resource scanning;
+- produces deterministic output and report;
+- exposes no partial result on failure;
+- reads no clock, random, network, DOM, MapLibre, Store or History.
+
+Documents cannot name executable modules.
+
+## 13. Report record contract
+
+`PlotJsonMigrationReport` contains facts only:
+
+```text
+sourceSchemaVersion
+targetSchemaVersion
+documentSteps
+featureSteps
+normalizations
+warnings
+```
+
+Definition applied steps retain explicit source/target references so plotType renames are auditable.
+
+`createPlotJsonMigrationReport()` copies and deeply freezes arrays, records and nested references. It must not retain complete documents, metadata or migration functions.
+
+Normalization codes:
+
+```text
+PLOTJSON_DEFINITION_VERSION_DEFAULTED
+PLOTJSON_PARAMETERS_DEFAULTED
+PLOTJSON_STYLE_DEFAULTED
+PLOTJSON_FEATURE_METADATA_DEFAULTED
+PLOTJSON_REVISION_DEFAULTED
+PLOTJSON_UNKNOWN_FIELD_DROPPED
+```
+
+Warning codes:
+
+```text
+PLOTJSON_INVALID_RECORD_DEFAULTED
+PLOTJSON_INVALID_REVISION_DEFAULTED
+PLOTJSON_UNKNOWN_FIELD_DROPPED
+```
+
+## 14. 008B explicit exclusions
+
+```text
+migration execution
+migration output scanning
+readPlotDocument implementation
 parsePlotDocument replacement
 historical 1.0 normalization integration
-production symbol migrations
+document invariants / duplicate-id detection
+production document or Definition migrations
 Registry Definition-version enforcement
 Store document replacement
 MapLibre import changes
@@ -297,72 +323,73 @@ schema bump
 007D persisted fields
 ```
 
-## 14. Migration graph rules
+No production migration may be registered in 008B.
 
-Migration code remains separate from `PlotDefinition.generate()` and Registry aliases.
+## 15. 008C boundary
+
+After 008B merge and post-merge synchronization, create:
 
 ```text
-PlotJsonMigrationRegistry
-├── document edges keyed by source version
-└── Definition edges keyed by source (plotType, version)
+agent/008c-plotjson-reader-runtime
 ```
 
-Rules:
+008C owns:
 
-- exactly zero or one outgoing edge per source node;
-- target version must be strictly greater than source version;
-- self, duplicate, decreasing, cycle and branch registration reject;
-- registration order cannot change a valid plan;
-- no arbitrary shortest-path search;
-- plotType rename is an explicit Definition edge;
-- missing path becomes a structured PlotJSON error.
+1. string/direct-object reader boundary;
+2. safe migration execution;
+3. post-step output scans;
+4. current `1.0.0` decoding and normalization records;
+5. document invariants and duplicate feature ids;
+6. Definition planning/execution and final equality;
+7. `readPlotDocument()` and compatibility `parsePlotDocument()`;
+8. current/legacy/invalid/future fixtures and repeat-read idempotence.
 
-## 15. Future parser and import boundary
+008C cannot mutate Store or MapLibre. Atomic import remains 008D.
 
-008C integrates the safety/migration foundations into a report-bearing reader while preserving historical `1.0.0` normalizations.
+## 16. Future atomic import
 
-008D replaces current non-atomic import:
+Current `PlotLibre.importDocument()` still preflights features, then performs:
 
 ```text
 store.clear()
 → repeated store.add()
 ```
 
-with complete preparation and one ordered Store replacement transaction.
+A duplicate id can fail after partial replacement. 008D must prepare everything in memory and commit one exact ordered Store document transaction.
 
-Expected input failure must preserve Store, order, selection, History and active interaction state.
+Expected input failure preserves Store, order, selection, History and active interaction state.
 
-## 16. Runtime sequence
+## 17. Runtime sequence
 
 ```text
 008A version / JSON safety / limits / errors — merged
-008B migration registry / planner / report records — next
+008B migration registry / planner / report records — PR #55
 008C report-bearing reader / compatibility / invariants
 008D Registry-aware preparation / atomic import
-008E runtime closure / compatibility fixtures / synchronization
+008E compatibility fixtures / docs / synchronization
 ```
 
 007D groups/locks/visibility/z-order remains blocked through 008D/E.
 
-## 17. Validation gate
+## 18. Validation gate
 
-Every exact runtime head:
+Every exact runtime head must pass:
 
 ```text
 Node 20.19
 Node 22
-324 current Node tests plus milestone tests
+all Node tests (008B expected 348)
 Playground typecheck/build
 handover contract
 region benchmark
 selection-transform benchmark
-34 Chromium tests plus milestone tests
+34 Chromium tests
 zero unresolved review threads
 ```
 
-Post-merge finalization additionally proves Markdown-only scope.
+Initial 008B head `291d08cf517569b1598f40e71487c1fc3c220657` passed 343 Node tests in CI #531, but it is not final evidence after hardening/docs commits.
 
-## 18. Merge discipline
+## 19. Merge discipline
 
 Design, runtime and finalization use separate branches. Runtime remains Draft until exact-head green; every review thread is resolved; immutable handover is written; Ready state does not change head; squash merge uses expected SHA; `main` is verified; post-merge synchronization starts only from latest `main`.
 
