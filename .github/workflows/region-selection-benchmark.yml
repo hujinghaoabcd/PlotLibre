@@ -1,7 +1,7 @@
 name: Region Selection Benchmark
 
 on:
-  pull_request:
+  push:
     paths:
       - ".github/workflows/region-selection-benchmark.yml"
       - "package.json"
@@ -33,7 +33,7 @@ jobs:
 
       - name: Run resolver benchmark
         env:
-          PLOTLIBRE_BENCHMARK_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PLOTLIBRE_BENCHMARK_SHA: ${{ github.sha }}
         run: npm run benchmark:region-selection
 
       - name: Publish benchmark summary
