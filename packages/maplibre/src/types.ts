@@ -1,3 +1,5 @@
+import type { Position } from "@plotlibre/core";
+
 export interface GeoJsonSourceLike {
   setData(data: unknown): void;
 }
@@ -37,6 +39,9 @@ export interface MapCanvasPointerEventLike {
   readonly clientY?: number;
   readonly offsetX?: number;
   readonly offsetY?: number;
+  readonly pointerId?: number;
+  readonly pointerType?: string;
+  readonly button?: number;
   readonly shiftKey?: boolean;
   readonly ctrlKey?: boolean;
   readonly metaKey?: boolean;
@@ -68,8 +73,20 @@ export interface MapCanvasLike {
   getBoundingClientRect?(): {
     readonly left: number;
     readonly top: number;
+    readonly width?: number;
+    readonly height?: number;
   };
+  setPointerCapture?(pointerId: number): void;
+  releasePointerCapture?(pointerId: number): void;
+  hasPointerCapture?(pointerId: number): boolean;
   focus?(): void;
+}
+
+export interface MapContainerLike {
+  appendChild?(child: unknown): unknown;
+  removeChild?(child: unknown): unknown;
+  contains?(child: unknown): boolean;
+  readonly style?: Readonly<Record<string, unknown>>;
 }
 
 export interface MapInteractionHandlerLike {
@@ -92,6 +109,8 @@ export interface MapLibreMapLike {
   on(type: string, listener: MapLibreEventListener): unknown;
   off(type: string, listener: MapLibreEventListener): unknown;
   getCanvas(): MapCanvasLike;
+  getContainer?(): MapContainerLike;
+  project?(position: Position): MapLibrePointLike;
   /**
    * The concrete MapLibre engine uses its own Point class while tests may use a
    * lightweight point object. Keep these arguments opaque at the adapter boundary
