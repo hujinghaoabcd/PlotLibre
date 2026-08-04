@@ -16,7 +16,9 @@ import {
 } from "@plotlibre/core";
 import {
   BatchEditCommand,
+  createSelectionTransformCommand,
   SelectionController,
+  type SelectionTransformRejection as RotationScaleRejection,
 } from "@plotlibre/interaction";
 import {
   MapLibrePlotInteraction,
@@ -31,8 +33,12 @@ import {
   type StartSelectionRegionOptions,
 } from "./selection-region-interaction.js";
 import {
+  MapLibreSelectionTransformInteraction,
+  type MapLibreSelectionTransformSnapshot,
+} from "./selection-transform-interaction.js";
+import {
   MapLibreSelectionTranslation,
-  type SelectionTransformRejection,
+  type SelectionTransformRejection as SelectionTranslationRejection,
 } from "./selection-translation.js";
 import type {
   MapCanvasLike,
@@ -54,6 +60,7 @@ export class PlotLibre {
   public readonly history: CommandHistory;
   public readonly selection: SelectionController;
   public readonly renderer: MapLibrePlotRenderer;
+  public readonly selectionTransform: MapLibreSelectionTransformInteraction;
   public readonly regionSelection: MapLibreSelectionRegionInteraction;
   /** @deprecated Use regionSelection. */
   public readonly selectionModifiers: MapLibreSelectionRegionInteraction;
@@ -80,8 +87,39 @@ export class PlotLibre {
       this.renderer.render(this.store.list(), this.registry);
     });
 
+    let regionSelection: MapLibreSelectionRegionInteraction | undefined;
     let translation: MapLibreSelectionTranslation | undefined;
     let interaction: MapLibrePlotInteraction | undefined;
+
+    // Register transform pointer listeners before region/body interaction so an
+    // armed explicit transform owns its handle or consumes one outside click.
+    this.selectionTransform = new MapLibreSelectionTransformInteraction(
+      map,
+      this.registry,
+      this.store,
+      this.selection,
+      this.renderer,
+      {
+        callbacks: {
+          commit: (completion, selectionSnapshot) => {
+            const command = createSelectionTransformCommand(
+              this.store,
+              this.selection,
+              { completion, selectionSnapshot },
+            );
+            if (command !== undefined) this.history.execute(command);
+            return this.selection.selectedIds.map((id) => this.store.get(id));
+          },
+          cancelRegion: () => regionSelection?.cancel(),
+          cancelTranslation: () => translation?.cancel(),
+          cancelDrawing: () => interaction?.cancelDraw(),
+          isDrawing: () => interaction?.isDrawing ?? false,
+          isRegionActive: () => regionSelection?.isActive ?? false,
+          isTranslating: () => translation?.isTranslating ?? false,
+        },
+      },
+    );
+
     this.regionSelection = new MapLibreSelectionRegionInteraction(
       map,
       this.registry,
@@ -96,6 +134,7 @@ export class PlotLibre {
         },
       },
     );
+    regionSelection = this.regionSelection;
     this.selectionModifiers = this.regionSelection;
 
     // Register body-translation listeners before the general interaction
@@ -229,6 +268,7 @@ export class PlotLibre {
   }
 
   public removeSelected(): boolean {
+    this.selectionTransform.cancel();
     this.regionSelection.cancel();
     const beforeSelection = this.selection.snapshot();
     if (beforeSelection.selectedIds.length === 0) return false;
@@ -257,6 +297,7 @@ export class PlotLibre {
   }
 
   public draw(plotType: string, options: StartPlotDrawOptions = {}): string {
+    this.selectionTransform.cancel();
     this.regionSelection.cancel();
     this.translation.cancel();
     return this.interaction.startDraw(plotType, options);
@@ -269,6 +310,7 @@ export class PlotLibre {
   public startBoxSelection(
     options: StartSelectionRegionOptions = {},
   ): MapLibreSelectionRegionSnapshot {
+    this.selectionTransform.cancel();
     this.translation.cancel();
     this.interaction.cancelDraw();
     return this.regionSelection.start("box", options);
@@ -277,6 +319,7 @@ export class PlotLibre {
   public startLassoSelection(
     options: StartSelectionRegionOptions = {},
   ): MapLibreSelectionRegionSnapshot {
+    this.selectionTransform.cancel();
     this.translation.cancel();
     this.interaction.cancelDraw();
     return this.regionSelection.start("lasso", options);
@@ -286,8 +329,21 @@ export class PlotLibre {
     return this.regionSelection.cancel();
   }
 
+  public startSelectionRotation(): MapLibreSelectionTransformSnapshot {
+    return this.selectionTransform.start("rotate");
+  }
+
+  public startSelectionScale(): MapLibreSelectionTransformSnapshot {
+    return this.selectionTransform.start("scale");
+  }
+
+  public cancelSelectionTransform(): boolean {
+    return this.selectionTransform.cancel();
+  }
+
   /** Replaces the current selection with one feature for API compatibility. */
   public select(id: string | undefined): void {
+    this.selectionTransform.cancel();
     this.regionSelection.cancel();
     this.interaction.select(id);
   }
@@ -310,23 +366,34 @@ export class PlotLibre {
     return this.regionSelection.rejection;
   }
 
-  public get transformRejection(): SelectionTransformRejection | undefined {
+  public get selectionTransformSnapshot(): MapLibreSelectionTransformSnapshot {
+    return this.selectionTransform.snapshot;
+  }
+
+  public get selectionTransformRejection(): RotationScaleRejection | undefined {
+    return this.selectionTransform.rejection;
+  }
+
+  public get transformRejection(): SelectionTranslationRejection | undefined {
     return this.translation.rejection;
   }
 
   public undo(): boolean {
+    this.selectionTransform.cancel();
     this.regionSelection.cancel();
     this.translation.cancel();
     return this.history.undo();
   }
 
   public redo(): boolean {
+    this.selectionTransform.cancel();
     this.regionSelection.cancel();
     this.translation.cancel();
     return this.history.redo();
   }
 
   public clear(): void {
+    this.selectionTransform.cancel();
     this.regionSelection.cancel();
     this.translation.cancel();
     this.interaction.cancelDraw();
@@ -364,6 +431,7 @@ export class PlotLibre {
       this.registry.generate(feature);
     }
 
+    this.selectionTransform.cancel();
     this.regionSelection.cancel();
     this.translation.cancel();
     this.interaction.cancelDraw();
@@ -381,6 +449,7 @@ export class PlotLibre {
   }
 
   public destroy(): void {
+    this.selectionTransform.destroy();
     this.regionSelection.destroy();
     this.translation.destroy();
     this.interaction.destroy();
