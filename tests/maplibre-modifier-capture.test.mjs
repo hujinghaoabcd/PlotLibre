@@ -127,7 +127,24 @@ function addArrow(plot, id, offset) {
   });
 }
 
-test("canvas pointer capture reserves Shift and restores box zoom on destroy", () => {
+function modifierEvent(modifiers) {
+  return {
+    clientX: 110,
+    clientY: 70,
+    ...modifiers,
+    prevented: false,
+    immediateStopped: false,
+    preventDefault() {
+      this.prevented = true;
+    },
+    stopPropagation() {},
+    stopImmediatePropagation() {
+      this.immediateStopped = true;
+    },
+  };
+}
+
+test("canvas capture reserves Shift and restores box zoom on destroy", () => {
   const map = new FakeMap();
   const plot = new PlotLibre(map, {
     definitions: [straightArrowDefinition],
@@ -139,29 +156,39 @@ test("canvas pointer capture reserves Shift and restores box zoom on destroy", (
   plot.select("a");
   map.targetId = "b";
 
-  const event = {
-    clientX: 110,
-    clientY: 70,
-    shiftKey: true,
-    prevented: false,
-    immediateStopped: false,
-    preventDefault() {
-      this.prevented = true;
-    },
-    stopPropagation() {},
-    stopImmediatePropagation() {
-      this.immediateStopped = true;
-    },
-  };
-  map.canvas.fire("pointerdown", event);
+  const pointerEvent = modifierEvent({ shiftKey: true });
+  const mouseEvent = modifierEvent({ shiftKey: true });
+  map.canvas.fire("pointerdown", pointerEvent);
+  map.canvas.fire("mousedown", mouseEvent);
 
   assert.deepEqual(map.queryPoint, { x: 10, y: 20 });
   assert.deepEqual(plot.selectedIds, ["a", "b"]);
   assert.equal(plot.selectedId, "b");
-  assert.equal(event.prevented, true);
-  assert.equal(event.immediateStopped, true);
+  assert.equal(pointerEvent.prevented, true);
+  assert.equal(mouseEvent.prevented, true);
 
   plot.destroy();
   assert.equal(map.boxZoomEnabled, true);
   assert.equal(map.canvas.listeners.get("pointerdown")?.size ?? 0, 0);
+  assert.equal(map.canvas.listeners.get("mousedown")?.size ?? 0, 0);
+});
+
+test("compatibility mousedown is deduplicated while mouse-only toggle still works", () => {
+  const map = new FakeMap();
+  const plot = new PlotLibre(map, {
+    definitions: [straightArrowDefinition],
+  });
+  addArrow(plot, "a", 0);
+  addArrow(plot, "b", 0.1);
+  plot.select("a");
+  map.targetId = "b";
+
+  map.canvas.fire("pointerdown", modifierEvent({ ctrlKey: true }));
+  map.canvas.fire("mousedown", modifierEvent({ ctrlKey: true }));
+  assert.deepEqual(plot.selectedIds, ["a", "b"]);
+
+  map.canvas.fire("mousedown", modifierEvent({ ctrlKey: true }));
+  assert.deepEqual(plot.selectedIds, ["a"]);
+
+  plot.destroy();
 });
