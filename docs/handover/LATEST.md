@@ -1,64 +1,39 @@
-# PlotLibre Development Handover — Milestone 007B-P Benchmark
+# PlotLibre Development Handover — Milestone 007B-P Merged
 
 日期：2026-08-05  
 仓库：`hujinghaoabcd/PlotLibre`  
-当前工作：PR #45 `Add reproducible region-selection benchmark`
+完整交接：`docs/handover/2026-08-05-milestone-007b-benchmark-post-merge.md`
 
 ## Current state
 
 ```text
-main:               012d17ac8a8f7e71264ef375511b764cb398d111
+main:               2f8ea72749ecfdadbc354216d6e411e81bfecee1
 workspace:          0.0.22
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 Node tests:         264
 Chromium tests:     32
 MapLibre Sources:   4
 MapLibre Layers:    10
-branch:             agent/007b-region-selection-benchmark
-PR:                 #45 Draft
-selection runtime:  unchanged
+007B-P:             merged through PR #45
+current branch:     agent/007b-benchmark-post-merge-finalization
+authorized changes: documentation only
 ```
 
-007B design、runtime、Playground、browser correction、0.0.22 documentation 均已合并。当前分支只增加可复现 benchmark infrastructure、冻结原始证据和性能决策。
+`main` was explicitly compared with the PR #45 squash SHA and was identical.
 
 ## Completed in this milestone
 
-已完成：
+- reusable `npm run benchmark:region-selection`；
+- 100 / 1,000 / 10,000 all-candidate resolver fixtures；
+- uninstrumented headline median/p95/throughput；
+- separate diagnostic generation/projection profile；
+- JSON/Markdown artifact workflow；
+- permanent raw JSON and performance report；
+- indexing decision：retain MapLibre rendered-index broad phase and do not add a persistent custom index yet；
+- immutable measurement and post-merge handovers；
+- no selection runtime changes。
 
-- `npm run benchmark:region-selection`；
-- 100 / 1,000 / 10,000 feature fixtures；
-- actual PlotStore、PlotRegistry generation、projection 和 exact intersection；
-- duplicate rendered rows 与 Store-order result validation；
-- headline uninstrumented total、median、p95、throughput 和 RSS；
-- separate instrumented diagnostic profile；
-- reusable benchmark workflow、CI job summary 和 artifact；
-- frozen raw JSON and permanent Markdown report；
-- explicit indexing decision：retain MapLibre broad phase，暂不增加 persistent custom index。
-
-权威文件：
-
-```text
-scripts/benchmark-region-selection.mjs
-.github/workflows/region-selection-benchmark.yml
-docs/performance/README.md
-docs/performance/region-selection-resolver-benchmark.md
-docs/performance/data/2026-08-04-region-selection-resolver-ci.json
-```
-
-## Validation
-
-Frozen corrected measurement：
-
-```text
-CI:                    #457 / 30933193884
-benchmark job:         92072709871
-source head:           2fca8812e206f799c3580380f4e1cd3ed3a73aa8
-workflow checkout:     5a0678fdf6e8e8497e977ffc522292652bc0d4e7
-Node:                  v22.23.1
-CPU:                   AMD EPYC 7763, 4 logical CPUs
-artifact id:           8901993992
-artifact digest:       baedae5c338698903f06c5cbb58ce07bd9f96e7bc6e2468ba76cd28a925ba52a
-```
+Frozen measurement：
 
 ```text
 100 candidates:       2.399 ms median / 5.308 ms p95
@@ -66,27 +41,40 @@ artifact digest:       baedae5c338698903f06c5cbb58ce07bd9f96e7bc6e2468ba76cd28a9
 10,000 candidates:    109.308 ms median / 119.182 ms p95
 ```
 
-This is an all-candidate/all-hit Node/CI pressure profile. It does not measure real MapLibre tile/style query latency、browser frame time、GPU or DOM overlay.
+These are Node/CI pressure-profile observations, not a browser latency SLA.
 
-PR #45 must still pass its final exact-head gate：Node 20.19/22、264 Node、Playground build、handover、benchmark artifact、32 Chromium and zero unresolved threads.
+## Validation
+
+```text
+PR:                   #45
+validated head:       69a2c87767ea5ea2312ab101455bed06069639d0
+CI:                   #464 / 30933921135
+Node 20.19 / 22:      success
+Node tests:           264 passed
+Playground build:     success
+handover check:       success
+benchmark job:        success
+benchmark artifact:   8902285519
+Chromium tests:       32 passed
+unresolved threads:   0
+squash SHA:           2f8ea72749ecfdadbc354216d6e411e81bfecee1
+```
+
+This post-merge branch must independently pass the unchanged 264/32/benchmark baseline before merge.
 
 ## Next tasks
 
-1. add immutable 007B-P handover；
-2. run final exact-head CI for PR #45；
-3. record final head、CI and benchmark artifact in the PR；
-4. confirm zero unresolved review threads；
-5. mark Ready and squash merge with expected head SHA；
-6. verify `main` equals the returned squash SHA；
-7. begin 007C rotation/positive-uniform-scale as a separate design-only branch from latest `main`。
+1. validate and merge this documentation-only synchronization；
+2. verify final `main` against its returned squash SHA；
+3. create Milestone 007C design-only branch from that final `main`；
+4. freeze rotation/positive-uniform-scale pivot、angle、scale、handles、priority、preview、failure and atomic command semantics；
+5. keep runtime、snapping、groups、locks and new symbols outside the design PR。
 
 ## Risks and decisions
 
-- Headline timings are uninstrumented resolver totals；diagnostic phases are separate and not additive。
-- The fixture uses only `arrow.straight` and a 100% candidate/hit ratio。
-- GitHub-hosted runner results are observational, not a hard latency SLA。
-- Current evidence shows candidate count is the important scale variable but does not justify a second persistent index。
-- A future index requires real Chromium/MapLibre measurements、candidate-ratio fixtures and explicit invalidation semantics。
-- Benchmark success validates reproducibility and artifact production, not a latency threshold。
-- Production Playground bundle still has a known non-blocking >500 kB warning。
-- Branch deletion may require manual cleanup because the current connector does not expose delete-ref。
+- Current benchmark does not measure real MapLibre tile/style query or browser frame time。
+- No latency threshold is enforced in CI。
+- A persistent index requires real-browser evidence、varied candidate ratios and complete invalidation design。
+- Root 0.0.22 remains a development baseline, not a coordinated npm release。
+- The Playground retains the known non-blocking >500 kB bundle warning。
+- Branch deletion may require manual cleanup because the connector does not expose delete-ref。
