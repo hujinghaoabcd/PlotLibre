@@ -40,6 +40,7 @@ export interface MapLibrePlotInteractionOptions {
 export interface MapLibrePlotInteractionCallbacks {
   create(input: PlotFeatureInput): PlotFeature;
   replace(feature: PlotFeature): PlotFeature;
+  removeSelection?(): boolean;
 }
 
 interface ControlPointDrag {
@@ -210,6 +211,15 @@ export class MapLibrePlotInteraction {
         event.preventDefault?.();
       }
       this.#applyDrawSnapshot(this.#session.keyDown(event.key));
+      return;
+    }
+
+    if (
+      (event.key === "Delete" || event.key === "Backspace") &&
+      this.#selection.size > 0
+    ) {
+      event.preventDefault?.();
+      this.#callbacks.removeSelection?.();
       return;
     }
 
