@@ -43,6 +43,7 @@ export class PlotLibre {
     this.store = new PlotStore();
     this.history = new CommandHistory({ maxSize: options.historySize ?? 200 });
     this.renderer = new MapLibrePlotRenderer(map, options);
+    this.renderer.setRegistry(this.registry);
 
     if (options.definitions) {
       this.registry.registerMany(options.definitions);
@@ -170,9 +171,6 @@ export class PlotLibre {
       ),
     };
 
-    // Validate every feature, including full geometry generation, before
-    // clearing the current document. This prevents partial imports and Store
-    // states that cannot be rendered by one of the registered definitions.
     for (const feature of document.features) {
       this.registry.generate(feature);
     }
