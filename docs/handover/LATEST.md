@@ -1,11 +1,15 @@
-# PlotLibre Development Handover — Milestone 007B Box/Lasso Design Freeze Candidate
+# PlotLibre Development Handover — Milestone 007B Design Merged / Runtime Next
 
 日期：2026-08-04  
 仓库：`hujinghaoabcd/PlotLibre`  
-当前 `main`：`d08c56b6687ea64e0c599fd04fd77115d320d8f2`  
-当前分支：`agent/007b-box-lasso-design`  
+当前 `main`：`a9b9efc090c01f45133f3f136a0049a97ee52b90`  
+已合并 PR：`#40 Freeze box and lasso selection semantics`  
+合并方式：Squash and merge  
+最终设计 head：`4a8ee1102bb923801ada95c648a258225ccb9ec4`  
+最终 CI：`#413 / 30912109618`  
+Post-merge 分支：`agent/007b-design-post-merge-finalization`  
 Workspace：`0.0.21`  
-状态：Milestone 007B screen-space box/lasso semantics、algorithms、input arbitration and performance boundary are frozen as a documentation-only candidate；runtime prohibited
+状态：Milestone 007B screen-space box/lasso design 已合并；当前仅同步真实合并状态，下一阶段为独立 runtime implementation
 
 ## Current state
 
@@ -18,11 +22,11 @@ Node tests:         219
 Chromium tests:     30
 MapLibre Sources:   4
 MapLibre Layers:    10
-main SHA:           d08c56b6687ea64e0c599fd04fd77115d320d8f2
-007A runtime PR:    #38
-007A finalization:  #39
-current branch:     agent/007b-box-lasso-design
-current scope:      documentation-only design freeze
+main SHA:           a9b9efc090c01f45133f3f136a0049a97ee52b90
+007A runtime/docs:  PR #38 / PR #39
+007B design PR:     #40
+007B design head:   4a8ee1102bb923801ada95c648a258225ccb9ec4
+007B design CI:     #413 / 30912109618
 planned runtime:    agent/007b-box-lasso-selection
 ```
 
@@ -30,153 +34,150 @@ Milestone staging：
 
 ```text
 007A ordered selection + atomic Store + batch delete + local translation — merged
-007B screen-space box/lasso selection — current design
+007B box/lasso design — merged; runtime next
 007C local rotation + positive uniform scale — deferred
 007D groups/locks/visibility/z-order after PlotJSON migration design — deferred
 ```
 
 ## Completed in this milestone
 
-### Input and mode ownership
+### Design merge discipline
 
-- identified conflict between immediate Shift-mousedown add and thresholded Shift box；
-- froze replacement with one unified region adapter；
-- froze neutral `Shift + empty drag` as additive box convenience；
-- froze explicit one-shot box and lasso modes；
-- froze replace/add/toggle/subtract modifier override；
-- froze intent capture at pointer down；
-- froze mouse/pen first and deferred touch；
-- froze event priority against draw、handle drag、translation and camera gestures。
+- design branch started from exact `main@d08c56b...`；
+- changed exactly 10 Markdown files and no runtime；
+- PR #40 remained Draft until exact-head CI completed；
+- Node 20.19/22、219 Node、build、handover and 30 Chromium passed；
+- unresolved review threads were zero；
+- PR was marked Ready only after validation；
+- squash merge used expected head SHA；
+- actual squash SHA is `a9b9efc090c01f45133f3f136a0049a97ee52b90`。
 
-### Screen region state
+### Frozen region input
 
-- froze engine-independent `ScreenPoint` and `ScreenBounds`；
-- froze region status `idle/armed/active/rejected`；
-- kept screen state outside Core、Store、History and PlotJSON；
-- froze four-CSS-pixel box activation threshold；
-- froze box mutation on pointer up only；
-- froze valid-empty intent behavior。
+- current immediate Shift-mousedown mutation must be replaced；
+- one unified region adapter owns click-versus-box arbitration；
+- neutral `Shift + empty drag` performs additive box；
+- explicit one-shot box/lasso modes support replace/add/toggle/subtract；
+- modifier intent is captured on pointer down；
+- drawing、handle drag and translation retain priority；
+- touch is deferred。
 
-### Lasso mathematics
-
-- sample spacing `2 CSS px`；
-- minimum three distinct points；
-- minimum absolute area `16 CSS px²`；
-- RDP tolerance `1.5 CSS px`；
-- raw and simplified simple-ring validation；
-- repeated non-consecutive vertices rejected；
-- non-adjacent crossing、touch and collinear overlap rejected；
-- invalid completion preserves selection and allows one retry。
-
-### One-event selection
-
-- froze `SelectionController.applyMany(ids,intent,reason)` candidate；
-- froze Store/document-order candidate input；
-- froze replace/add/subtract/toggle ordered algorithms；
-- froze one SelectionChange per effective completion；
-- froze no event for no-op；
-- kept region selection outside CommandHistory。
-
-### Candidate and exact hit pipeline
+### Frozen box/lasso mathematics
 
 ```text
-MapLibre committed-layer bounding-box query
-→ plotId de-duplication
+box threshold:        4 CSS px
+lasso sample spacing: 2 CSS px
+minimum lasso points: 3
+minimum lasso area:   16 CSS px²
+RDP tolerance:        1.5 CSS px
+```
+
+- raw and simplified lasso rings are both validated；
+- repeated non-consecutive vertices reject；
+- non-adjacent crossing、touch and collinear overlap reject；
+- invalid lasso preserves selection and permits one retry。
+
+### Frozen selection semantics
+
+- one `SelectionController.applyMany()` operation per region completion；
+- candidates are deduplicated and ordered by Store/document order；
+- replace/add/subtract/toggle algorithms are deterministic；
+- one effective completion emits one immutable selection event；
+- no-op emits nothing；
+- region selection remains outside History and PlotJSON。
+
+### Frozen hit pipeline
+
+```text
+queryRenderedFeatures on committed fill/line/point layers
+→ plotId dedup
 → Store-order normalization
-→ Registry.generate once per candidate
-→ map.project fills/lines/points
+→ Registry.generate once per unique candidate
+→ map.project semantic geometry
 → exact screen intersection
 ```
 
-- MapLibre render index is broad phase only；
-- query result order and tile duplicates are non-semantic；
-- selection/draft/handle/guide/label layers excluded；
-- Point、Line、Polygon、Multi and compound predicates frozen；
-- Polygon holes respected；
-- CSS line width/point radius ignored；
-- generated sampled vertices authoritative；
-- query/generation/projection failure rejects the whole completion；
-- partial selection prohibited。
+- MapLibre query is broad phase only；
+- query order and tile duplicates are non-semantic；
+- selection、draft、handle、guide and label layers are excluded；
+- Point、Line、Polygon、Multi and compound predicates are frozen；
+- Polygon holes are respected；
+- CSS stroke/radius is ignored；
+- query/generation/projection failures reject the whole completion。
 
-### Overlay and lifecycle
+### Frozen overlay/lifecycle/performance
 
-- froze DOM/SVG screen overlay instead of geographic GeoJSON；
-- retained four Sources and ten Layers；
-- froze pointer capture、dragPan and boxZoom ownership；
-- froze synthetic click suppression；
-- froze cancellation on Escape、pointer loss、style、resize、camera、Store、external selection and programmatic lifecycle changes；
-- froze Primary handle/guide hide/restore for explicit region mode。
+- region guides use DOM/SVG screen overlay；
+- no new MapLibre Source/Layer in 007B v1；
+- active region cancels on pointer、camera、style、resize、Store、selection and programmatic lifecycle changes；
+- dragPan、boxZoom and pointer capture restore exactly once；
+- synthetic click is suppressed；
+- MapLibre rendered index is initial broad phase；
+- custom persistent index and hard latency claims wait for measured 100/1,000/10,000-feature evidence。
 
-### Performance and provenance
+### Documentation and provenance
 
-- froze MapLibre rendered index as initial broad phase；
-- deferred custom persistent index pending measurement；
-- froze 100/1,000/10,000-feature benchmark reporting fields；
-- fixed Terra Draw、MapLibre-Geoman、Mapbox GL Draw and MapLibre GL JS references/licenses；
-- declared code reuse `none`；
-- added dedicated semantic design、algorithm record、reference matrix update and immutable handover。
+- added `docs/design/box-lasso-selection.md`；
+- added `docs/algorithms/screen-region-selection.md`；
+- added immutable design and post-merge handovers；
+- synchronized AGENTS、development plan、interaction model、reference matrix and indices；
+- fixed Terra Draw、MapLibre-Geoman、Mapbox GL Draw and MapLibre GL JS revisions/licenses；
+- code reuse declared `none`。
 
 ## Validation
 
-Merged runtime baseline remains：
+Design PR final validation：
 
 ```text
-Node 20.19:         expected unchanged
-Node 22:            expected unchanged
-Node tests:         219
-Chromium tests:     30
-Playground build:   required
-handover contract:  required
+GitHub Actions run: 30912109618 (#413)
+validated head:     4a8ee1102bb923801ada95c648a258225ccb9ec4
+Node 20.19:         success
+Node 22:            success
+Node tests:         219 passed / 0 failed
+Playground build:   success
+handover contract:  success
+Chromium tests:     30 passed / 0 failed
+unresolved threads: 0
+changed files:      10 Markdown / 0 runtime
+merge method:       squash
+squash SHA:         a9b9efc090c01f45133f3f136a0049a97ee52b90
 ```
 
-The exact final design-branch head has not yet completed CI. The PR must remain Draft until：
-
-```text
-Node 20.19 success
-Node 22 success
-219 Node tests passed
-Playground /PlotLibre/ build success
-handover contract success
-30 Chromium tests passed
-zero unresolved review threads
-```
+This post-merge finalization changes documentation only and must independently pass the unchanged 219/30 baseline before merge.
 
 ## Next tasks
 
-1. open a Draft documentation-only 007B design PR；
-2. verify changed files contain no runtime；
-3. run full exact-head 219/30 CI；
-4. fix only evidence-backed documentation/contract failures；
-5. confirm zero unresolved review threads；
-6. update PR body with exact validation evidence；
-7. mark Ready and Squash and merge with expected head SHA；
-8. create documentation-only post-merge finalization from the new main；
-9. record actual design squash SHA and final continuation order；
-10. create `agent/007b-box-lasso-selection` from the latest final `main`；
-11. implement pure screen utilities first；
-12. implement `SelectionController.applyMany()` second；
-13. implement exact projected predicates third；
-14. implement MapLibre resolver and unified region adapter next；
-15. add DOM/SVG overlay、public API、Playground、Chromium and measured benchmark report；
-16. keep rotation/scale、groups/locks、snapping and new symbols outside 007B。
+1. complete this documentation-only post-merge synchronization；
+2. open a Draft finalization PR；
+3. pass exact-head Node 20.19、Node 22、219 Node、30 Chromium、build and handover checks；
+4. confirm zero unresolved review threads；
+5. mark Ready and Squash and merge with expected head SHA；
+6. create `agent/007b-box-lasso-selection` from the latest final `main`；
+7. implement pure screen point、box、lasso、RDP and topology utilities；
+8. implement `SelectionController.applyMany()`；
+9. implement exact projected Point/Line/Polygon/Multi predicates；
+10. implement MapLibre broad-phase resolver and Store ordering；
+11. replace immediate Shift capture with unified region adapter；
+12. add DOM/SVG overlay and public one-shot APIs；
+13. add Playground、actual Chromium and measured benchmark report；
+14. preserve the 4 Source / 10 Layer baseline unless a later measured design explicitly changes it；
+15. keep rotation/scale、groups/locks、snapping and new symbols outside 007B。
 
 ## Risks and decisions
 
-- current 007A Shift mousedown behavior must be replaced, not supplemented；
-- region selection is transient and excluded from History/PlotJSON；
-- exact hit semantics use generated geometry, not rendered CSS footprint；
-- MapLibre query is broad phase and cannot determine ordering；
-- Store order is binding for candidate results；
-- valid empty replace clears selection；other empty intents no-op；
-- invalid lasso/query/generation/projection fails closed；
-- active region cancels when the screen/camera/document frame changes；
-- DOM/SVG overlay avoids adding geographic Sources/Layers；
-- custom persistent indexing and hard performance claims are deferred until measured evidence；
-- touch and contain-only region selection are deferred；
+- screen regions are transient UI geometry, not geographic document geometry；
+- generated geometry is used for exact hit testing but never becomes authored state；
+- Store order determines region result order；
+- valid empty replace clears, other empty intents no-op；
+- selection changes once and remains outside History；
+- query/generation/projection failures fail closed；
+- current Shift-mousedown implementation must be replaced rather than supplemented；
+- DOM/SVG overlay avoids geographic Source/Layer misuse；
+- custom persistent indexing、touch、contain-only selection and persistent region modes are deferred；
 - packages remain `UNLICENSED`；
 - workspace/package versions remain uncoordinated；
 - production bundle still needs code splitting；
 - source/build/deploy/live verification remain separate claims；
 - branch deletion may require manual cleanup because the connector does not expose delete-ref here。
 
-Continuation：validate and merge the 007B design only. Do not add runtime to `agent/007b-box-lasso-design`。
+Continuation：finish the 007B design post-merge finalization, then implement runtime from the latest final `main`. Do not add runtime to the finalization branch。

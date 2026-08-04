@@ -33,23 +33,31 @@ public packages <- playground / wrappers
 ## 3. Current merged baseline
 
 ```text
-main SHA:           d08c56b6687ea64e0c599fd04fd77115d320d8f2
+main SHA:           a9b9efc090c01f45133f3f136a0049a97ee52b90
 workspace:          0.0.21
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 Node baseline:      219
 Chromium baseline:  30
 MapLibre Sources:   4
 MapLibre Layers:    10
-Milestone 007A:     merged through PR #38
-007A finalization:  merged through PR #39
+Milestone 007A:     merged through PR #38/#39
+Milestone 007B design: merged through PR #40
+007B design head:   4a8ee1102bb923801ada95c648a258225ccb9ec4
+007B design CI:     #413 / 30912109618
 ```
 
 Current branch:
 
 ```text
-agent/007b-box-lasso-design
-scope: Milestone 007B design freeze only
+agent/007b-design-post-merge-finalization
+scope: actual-merge documentation synchronization only
 runtime: prohibited
+```
+
+Planned runtime branch after finalization:
+
+```text
+agent/007b-box-lasso-selection
 ```
 
 ## 4. Selection state boundary
@@ -104,7 +112,7 @@ Modifier priority:
 Alt > Ctrl/Cmd > Shift > default
 ```
 
-The SelectionController never reads DOM/MapLibre events. Adapters normalize intent.
+The SelectionController never reads DOM or MapLibre events. Adapters normalize intent.
 
 ## 6. 007B screen-region invariant
 
@@ -169,8 +177,8 @@ Convenience box starts only from empty selectable space. Shift click on a plot r
 
 ```text
 activation threshold: Euclidean distance >= 4 CSS px
-selection mutation:  pointer up only
-valid geometry:      positive width and height
+selection mutation:   pointer up only
+valid geometry:       positive width and height
 ```
 
 Sub-threshold or degenerate gestures preserve selection and emit nothing.
@@ -210,7 +218,7 @@ Simplification cannot hide an invalid raw loop. Invalid completion changes no se
 
 Region selection must use one engine-independent operation, not per-id add/toggle calls.
 
-Candidate API:
+Required API direction:
 
 ```ts
 selection.applyMany(
@@ -342,14 +350,7 @@ Measured fixtures:
 
 Record hardware, OS, browser, viewport/camera, feature mix, generated vertices, candidate count, query time, exact-intersection time, total latency, median and p95. Do not publish a hard latency guarantee before measurement.
 
-## 19. Required validation
-
-Current design baseline:
-
-```text
-219 Node
-30 Chromium
-```
+## 19. Required runtime validation
 
 007B runtime must add coverage for:
 
@@ -379,6 +380,8 @@ all Chromium E2E
 zero unresolved review threads
 ```
 
+Never claim CI is green from an older head.
+
 ## 20. Clean-room references
 
 ```text
@@ -393,26 +396,25 @@ Observed only public/observable mode lifecycle, Shift box behavior, DOM region U
 ## 21. Documentation and merge discipline
 
 - design and implementation use separate branches/PRs;
-- current design branch contains Markdown only;
-- add immutable handover and update `LATEST.md`;
-- keep Draft until exact current-head CI is green;
-- resolve all review threads;
+- finalization branches contain Markdown only;
+- keep PR Draft until exact current-head CI is green;
+- resolve every actionable review thread;
 - mark Ready only after validation;
 - Squash and merge with `expected_head_sha`;
-- synchronize actual squash state through a documentation-only finalization when required.
+- synchronize actual squash state through documentation-only finalization;
+- create runtime work only from the latest final `main`.
 
 ## 22. Continuation order
 
-1. finish 007B design documentation and clean-room evidence;
-2. run unchanged 219/30 current-head CI;
-3. merge the design PR;
-4. finalize actual design merge documentation;
-5. create `agent/007b-box-lasso-selection` from latest final `main`;
-6. implement pure screen utilities first;
-7. implement `SelectionController.applyMany()` second;
-8. implement exact screen predicates third;
-9. implement MapLibre broad-phase resolver fourth;
-10. replace immediate Shift capture with unified region adapter;
-11. add DOM/SVG overlay and public one-shot APIs;
-12. add Playground, Chromium and measured benchmark evidence;
-13. do not mix rotation/scale, groups/locks, snapping or new symbols into 007B.
+1. finish `agent/007b-design-post-merge-finalization` as documentation-only;
+2. pass unchanged 219/30 exact-head CI;
+3. merge finalization with zero unresolved threads;
+4. create `agent/007b-box-lasso-selection` from latest final `main`;
+5. implement pure screen utilities first;
+6. implement `SelectionController.applyMany()` second;
+7. implement exact screen predicates third;
+8. implement MapLibre broad-phase resolver fourth;
+9. replace immediate Shift capture with unified region adapter;
+10. add DOM/SVG overlay and public one-shot APIs;
+11. add Playground, Chromium and measured benchmark evidence;
+12. do not mix rotation/scale, groups/locks, snapping or new symbols into 007B.

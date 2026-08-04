@@ -27,28 +27,35 @@
 ## 当前合并基线
 
 ```text
-main SHA:          d08c56b6687ea64e0c599fd04fd77115d320d8f2
+main SHA:          a9b9efc090c01f45133f3f136a0049a97ee52b90
 workspace:         0.0.21
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
 Node tests:        219
 Chromium tests:    30
 MapLibre Sources:  4
 MapLibre Layers:   10
-completed:         Milestone 007A runtime + finalization
-current slice:     007B box/lasso selection design
-current branch:    agent/007b-box-lasso-design
+completed:         007A runtime/finalization + 007B design PR #40
+current slice:     007B design post-merge finalization
+current branch:    agent/007b-design-post-merge-finalization
 runtime on branch: prohibited
+next runtime:      agent/007b-box-lasso-selection
 ```
 
-007A evidence：
+007B design evidence：
 
 ```text
-runtime PR:       #38
-runtime head:     2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
-runtime CI:       #409 / 30906467230
-runtime squash:   04dca0b120b1440afb49a300eeee92faf6644a7d
-finalization PR:  #39
-current main:     d08c56b6687ea64e0c599fd04fd77115d320d8f2
+PR:               #40
+validated head:   4a8ee1102bb923801ada95c648a258225ccb9ec4
+CI:               #413 / 30912109618
+Node 20.19:       success
+Node 22:          success
+Node tests:       219 passed
+Chromium tests:   30 passed
+Playground build: success
+handover check:  success
+threads:          0 unresolved
+changed files:    10 Markdown / 0 runtime
+squash SHA:       a9b9efc090c01f45133f3f136a0049a97ee52b90
 ```
 
 ## 已完成里程碑
@@ -65,205 +72,141 @@ current main:     d08c56b6687ea64e0c599fd04fd77115d320d8f2
 | 006J | circular design、implementation、semantic guides | 已合并 |
 | 007 Design | professional editing overall semantics | 已合并 |
 | 007A | ordered selection、atomic Store、batch delete、local translation | PR #38/#39 已合并 |
+| 007B Design | screen-space box/lasso semantics and algorithms | PR #40 已合并 |
 
 ## Milestone 007 总体拆分
 
 ```text
 007A — ordered multi-selection + atomic Store + batch delete + local translation — merged
-007B — box/lasso selection — current design
+007B — box/lasso selection design — merged; runtime next
 007C — rotation + positive uniform scale — deferred
 007D — groups/locks/visibility/z-order after PlotJSON migration design — deferred
 ```
 
-## 007A 已合并基础
-
-- ordered transient SelectionController and Primary；
-- replace/add/subtract/toggle/clear/restore/reconcile；
-- one immutable event per effective operation；
-- atomic `PlotStore.applyTransaction()`；
-- listener-error isolation；
-- exact-order `BatchEditCommand`；
-- four Sources and ten Layers；
-- Primary-only handles/guides；
-- batch delete and local-metre whole-selection translation；
-- 219 Node and 30 actual Chromium tests。
-
-## Milestone 007B 设计冻结
+## 007B 已冻结设计
 
 Authoritative documents：
 
 ```text
 docs/design/box-lasso-selection.md
 docs/algorithms/screen-region-selection.md
+docs/handover/2026-08-04-milestone-007b-box-lasso-design.md
 ```
 
-### 7B.1 Input ownership
+### Input ownership
 
-The current immediate Shift-add on MapLibre `mousedown` conflicts with thresholded Shift box selection。
+- replace immediate Shift-add-on-mousedown with one unified thresholded region adapter；
+- neutral `Shift + empty drag` = additive box；
+- explicit one-shot box/lasso = default replace；
+- explicit modes support modifier override add/toggle/subtract；
+- intent captured on pointer down；
+- drawing、handle drag and translation retain priority；
+- touch deferred。
 
-Runtime must replace it with one unified region adapter：
+### Box and lasso numbers
 
 ```text
-pointer down → armed
-movement <4 px → pending click/no-op
-movement >=4 px → active box
-pointer up → exactly one click or region operation
+box threshold:       4 CSS px
+lasso spacing:       2 CSS px
+minimum points:      3
+minimum area:        16 CSS px²
+RDP tolerance:       1.5 CSS px
 ```
 
-Neutral convenience：
+Raw and simplified lasso rings both reject repeated non-consecutive vertices and non-adjacent crossing、touch or overlap。
+
+### One-event selection
 
 ```text
-Shift + empty primary drag → additive box
+SelectionController.applyMany(ids, intent, "box" | "lasso")
 ```
 
-Explicit one-shot box/lasso modes support replace/add/toggle/subtract。Lasso is explicit only。Touch is deferred。
-
-### 7B.2 Screen state
-
-Region capture uses engine-independent CSS-pixel types：
-
-```text
-ScreenPoint
-ScreenBounds
-SelectionRegionSnapshot
-SelectionRegionRejection
-```
-
-Region state is transient and excluded from Store、History、PlotJSON and feature revisions。
-
-### 7B.3 Box
-
-```text
-activation threshold: 4 CSS px
-selection mutation:   pointer up only
-empty replace:        clear
-empty add/sub/toggle: no-op
-```
-
-Degenerate/sub-threshold box is no-op。
-
-### 7B.4 Lasso
-
-```text
-sample spacing:       2 CSS px
-minimum distinct pts: 3
-minimum area:         16 CSS px²
-RDP tolerance:        1.5 CSS px
-```
-
-Validation：
-
-```text
-raw simple-ring validation
-→ RDP simplify
-→ simplified simple-ring validation
-```
-
-Repeated non-consecutive vertices、non-adjacent crossing、touch and collinear overlap reject。Invalid completion changes nothing and keeps one retry armed。
-
-### 7B.5 One-event multi-id selection
-
-Add `SelectionController.applyMany(ids,intent,reason)`。
-
-- inputs validated before mutation；
-- candidate ids supplied in Store order；
-- replace/add/subtract/toggle produce one final ordered state；
-- one effective region completion = one SelectionChange；
+- candidate ids deduplicated before mutation；
+- order supplied by Store/document order；
+- replace/add/subtract/toggle frozen deterministically；
+- one effective completion = one SelectionChange；
 - no-op = no event；
-- region selection never enters CommandHistory。
+- region selection does not enter History or PlotJSON。
 
-### 7B.6 Candidate resolution
+### Broad/narrow hit pipeline
 
 ```text
-region bounding box
-→ queryRenderedFeatures on committed fill/line/point layers
+region bbox
+→ queryRenderedFeatures(committed fill/line/point layers)
 → plotId dedup
 → Store-order normalization
-→ Registry.generate once per unique candidate
-→ map.project semantic fills/lines/points
+→ Registry.generate once per candidate
+→ map.project fills/lines/points
 → exact screen intersection
 ```
 
-MapLibre query is broad phase only。Selection、draft、handles、guides、labels and CSS styling footprint are excluded。
-
-Exact narrow phase：
-
-- Point center；
-- Line segments；
-- Polygon crossing/containment with hole support；
-- Multi and compound any-component semantics；
-- boundary inclusive；
-- failure of query/generation/projection rejects whole completion；
+- MapLibre query is broad phase only；
+- query order and tile duplicates are ignored；
+- selection、draft、handle、guide and label layers excluded；
+- Point、Line、Polygon、Multi and compound predicates frozen；
+- Polygon holes respected；
+- CSS stroke/radius ignored；
+- query/generation/projection failure rejects whole completion；
 - partial selection prohibited。
 
-### 7B.7 Overlay and lifecycle
+### Overlay/lifecycle
 
-Region guide uses DOM/SVG overlay, not GeoJSON Source/Layer。The 4/10 baseline remains unchanged。
+- DOM/SVG screen overlay；
+- no new Source/Layer；
+- 4/10 baseline retained；
+- pointer capture and dragPan/boxZoom restored exactly once；
+- synthetic click suppressed；
+- active region cancels on Escape、pointer loss、style、resize、camera、Store、external selection and programmatic document lifecycle changes。
 
-Cancel on：
+### Performance boundary
 
-```text
-Escape
-pointercancel/lost capture
-style/resize/camera start
-Store change
-external selection change
-draw/import/clear/undo/redo
-destroy
-```
+- MapLibre rendered index is initial broad phase；
+- no custom persistent index before measured evidence；
+- benchmark 100/1,000/10,000 features；
+- record candidate count、query、exact-test、total、median、p95 and environment；
+- no hard public latency guarantee before measurement。
 
-Restore dragPan and boxZoom lifecycle exactly once and suppress synthetic post-drag click。
+## 当前 post-merge finalization
 
-### 7B.8 Stable rejection codes
+`agent/007b-design-post-merge-finalization` 只能：
 
-```text
-SELECTION_REGION_TOO_SMALL
-SELECTION_REGION_LASSO_TOO_FEW_POINTS
-SELECTION_REGION_LASSO_SELF_INTERSECTS
-SELECTION_REGION_QUERY_FAILED
-SELECTION_REGION_CANDIDATE_GENERATION_FAILED
-SELECTION_REGION_PROJECTION_FAILED
-```
+- record actual PR #40 squash SHA；
+- update current-state authority docs；
+- add immutable post-merge handover；
+- replace design-candidate continuation with runtime continuation；
+- pass unchanged 219/30 CI。
 
-### 7B.9 Performance boundary
+禁止 runtime、API、package、geometry、interaction or test-behavior changes。
 
-First implementation uses MapLibre rendered index as broad phase。No second persistent spatial index before measured evidence。
+## 007B runtime implementation order
 
-Fixtures：
-
-```text
-100 / 1,000 / 10,000 features
-```
-
-Record hardware、browser、viewport/camera、feature mix、generated vertices、candidate count、query/narrow/total times、median and p95。No hard latency claim before results。
-
-## 007B implementation order after design merge
-
-1. pure ScreenPoint/box/lasso utilities；
-2. `SelectionController.applyMany()`；
-3. exact projected geometry predicates；
-4. MapLibre candidate resolver and Store ordering；
-5. replace immediate Shift capture with unified region adapter；
-6. DOM/SVG overlay and pointer lifecycle；
-7. explicit one-shot public box/lasso API；
-8. Playground controls/status；
-9. actual Chromium flows；
-10. benchmark report；
-11. documentation、handover、current-head CI and merge。
-
-Planned runtime branch：
+Planned branch：
 
 ```text
 agent/007b-box-lasso-selection
 ```
 
-## 007B required tests
+Binding order：
+
+1. pure ScreenPoint、box、lasso、RDP and simple-topology utilities；
+2. `SelectionController.applyMany()`；
+3. exact projected Point/Line/Polygon/Multi predicates；
+4. MapLibre broad-phase resolver and Store ordering；
+5. replace immediate Shift capture with unified region adapter；
+6. DOM/SVG overlay and pointer lifecycle；
+7. public one-shot box/lasso API；
+8. Playground controls/status；
+9. actual Chromium flows；
+10. benchmark report；
+11. documentation、handover、current-head CI and squash merge。
+
+## 007B runtime required tests
 
 ### Node
 
-- box every quadrant、threshold and degenerate behavior；
-- lasso sampling、area、RDP and simple topology；
-- repeated vertex、bow-tie、touch and overlap rejection；
+- box every direction、threshold and degenerate behavior；
+- lasso sampling、area、RDP and topology；
+- bow-tie、repeat、touch and overlap rejection；
 - Point/Line/MultiLine predicates；
 - Polygon containment/crossing/hole exclusion；
 - MultiPolygon/compound any-component hit；
@@ -273,15 +216,26 @@ agent/007b-box-lasso-selection
 
 ### Adapter/Chromium
 
-- Shift click remains additive without mousedown mutation；
-- Shift-empty drag additive box；
+- Shift click still adds without immediate mousedown mutation；
+- Shift-empty additive box；
 - explicit replace/toggle/subtract box；
-- lasso excludes bbox false positives；
+- exact lasso excludes bbox false positives；
 - invalid lasso changes nothing；
 - DOM overlay/pointer/camera cleanup；
 - no History mutation；
 - region selection followed by translation/delete/undo；
-- all historical 219/30 regressions。
+- all historical regressions。
+
+## 007B runtime non-goals
+
+- rotation or scale；
+- groups/locks/visibility/z-order；
+- snapping；
+- new symbols；
+- touch region gestures；
+- contain-only region selection；
+- persistent region tool mode；
+- unmeasured performance claims。
 
 ## Milestone 007C：Rotation and scale
 
@@ -307,16 +261,14 @@ MapLibre GL JS@v6.0.0 — BSD-3-Clause
 
 Code reuse：`none`。
 
-## 当前设计 PR 收尾顺序
+## Finalization merge order
 
-1. synchronize AGENTS、design/algorithm indices、reference matrix、interaction model and handover；
-2. add immutable 007B design handover；
-3. open Draft documentation-only PR；
-4. pass exact-head Node 20.19/22、219 Node、30 Chromium、build and handover；
-5. confirm zero unresolved threads；
-6. mark Ready and Squash and merge；
-7. finalize actual design squash state；
-8. create runtime branch from latest final `main`。
+1. update latest current-state docs and immutable post-merge handover；
+2. open Draft documentation-only PR；
+3. pass exact-head Node 20.19/22、219 Node、30 Chromium、build and handover；
+4. confirm zero unresolved threads；
+5. mark Ready and Squash and merge with expected head SHA；
+6. create runtime branch from the new final `main`。
 
 ## 跨阶段工程任务
 
