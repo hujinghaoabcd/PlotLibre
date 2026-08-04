@@ -24,6 +24,10 @@ import {
   type StartPlotDrawOptions,
 } from "./interaction.js";
 import { MapLibrePlotRenderer } from "./renderer.js";
+import {
+  MapLibreSelectionTranslation,
+  type SelectionTransformRejection,
+} from "./selection-translation.js";
 import type { MapLibreMapLike, PlotLibreRendererOptions } from "./types.js";
 
 export interface PlotLibreOptions
@@ -40,6 +44,7 @@ export class PlotLibre {
   public readonly history: CommandHistory;
   public readonly selection: SelectionController;
   public readonly renderer: MapLibrePlotRenderer;
+  public readonly translation: MapLibreSelectionTranslation;
   public readonly interaction: MapLibrePlotInteraction;
   readonly #unsubscribe: () => void;
 
@@ -61,6 +66,20 @@ export class PlotLibre {
     this.#unsubscribe = this.store.subscribe(() => {
       this.renderer.render(this.store.list(), this.registry);
     });
+
+    // Register body-translation listeners before the general interaction
+    // controller so Escape can cancel the preview before single-selection
+    // keyboard handling observes the same event.
+    this.translation = new MapLibreSelectionTranslation(
+      map,
+      this.registry,
+      this.store,
+      this.selection,
+      this.renderer,
+      {
+        replaceSelection: (features) => this.replaceSelected(features),
+      },
+    );
 
     this.interaction = new MapLibrePlotInteraction(
       map,
@@ -123,6 +142,55 @@ export class PlotLibre {
     return this.store.get(next.id);
   }
 
+  public replaceSelected(
+    features: readonly PlotFeature[],
+  ): readonly PlotFeature[] {
+    const selection = this.selection.snapshot();
+    if (selection.selectedIds.length === 0) {
+      throw new RangeError("Cannot replace an empty PlotLibre selection.");
+    }
+
+    const candidates = new Map<string, PlotFeature>();
+    for (const feature of features) {
+      if (candidates.has(feature.id)) {
+        throw new RangeError(
+          `Selection replacement contains duplicate id "${feature.id}".`,
+        );
+      }
+      candidates.set(feature.id, feature);
+    }
+    if (
+      candidates.size !== selection.selectedIds.length ||
+      selection.selectedIds.some((id) => !candidates.has(id))
+    ) {
+      throw new RangeError(
+        "Selection replacement must contain every selected feature exactly once.",
+      );
+    }
+
+    const before = selection.selectedIds.map((id) => this.store.get(id));
+    const next = before.map((current) => {
+      const candidate = candidates.get(current.id)!;
+      const materialized = this.registry.canonicalize(
+        createPlotFeature({
+          ...candidate,
+          revision: current.revision + 1,
+        }),
+      );
+      this.registry.generate(materialized);
+      return materialized;
+    });
+
+    this.history.execute(new BatchEditCommand(this.store, this.selection, {
+      label: "translate-selection",
+      execute: { replace: next },
+      undo: { replace: before },
+      beforeSelection: selection,
+      afterSelection: selection,
+    }));
+    return selection.selectedIds.map((id) => this.store.get(id));
+  }
+
   public remove(id: string): void {
     this.history.execute(new DeletePlotCommand(this.store, id));
   }
@@ -155,6 +223,7 @@ export class PlotLibre {
   }
 
   public draw(plotType: string, options: StartPlotDrawOptions = {}): string {
+    this.translation.cancel();
     return this.interaction.startDraw(plotType, options);
   }
 
@@ -175,15 +244,22 @@ export class PlotLibre {
     return this.selection.selectedIds;
   }
 
+  public get transformRejection(): SelectionTransformRejection | undefined {
+    return this.translation.rejection;
+  }
+
   public undo(): boolean {
+    this.translation.cancel();
     return this.history.undo();
   }
 
   public redo(): boolean {
+    this.translation.cancel();
     return this.history.redo();
   }
 
   public clear(): void {
+    this.translation.cancel();
     this.interaction.cancelDraw();
     this.interaction.select(undefined);
     this.store.clear();
@@ -219,6 +295,7 @@ export class PlotLibre {
       this.registry.generate(feature);
     }
 
+    this.translation.cancel();
     this.interaction.cancelDraw();
     this.interaction.select(undefined);
     this.store.clear();
@@ -234,6 +311,7 @@ export class PlotLibre {
   }
 
   public destroy(): void {
+    this.translation.destroy();
     this.interaction.destroy();
     this.selection.destroy();
     this.#unsubscribe();
