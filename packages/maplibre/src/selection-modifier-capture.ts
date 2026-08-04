@@ -4,31 +4,35 @@ import {
 } from "@plotlibre/interaction";
 import { MapLibrePlotRenderer } from "./renderer.js";
 import type {
-  MapCanvasPointerEventLike,
   MapLibreMapLike,
+  MapLibreMouseEventLike,
 } from "./types.js";
 
-type CaptureEventKind = "pointerdown" | "mousedown";
-
 /**
- * Handles selection modifiers in the canvas capture phase before MapLibre's
- * built-in pointer handlers can consume the DOM event. PlotLibre reserves Shift
- * for additive selection while installed, so MapLibre box zoom is restored only
- * when this adapter is destroyed.
+ * Reserves MapLibre modifier-mousedown gestures for PlotLibre selection.
+ *
+ * Box zoom is disabled while installed so MapLibre emits the regular mousedown
+ * event for Shift gestures. The adapter is registered before body translation
+ * and handle editing, and later modifier-click events are ignored by the general
+ * interaction controller to avoid applying toggle/subtract twice.
  */
 export class MapLibreSelectionModifierCapture {
   readonly #map: MapLibreMapLike;
   readonly #selection: SelectionController;
   readonly #renderer: MapLibrePlotRenderer;
   readonly #boxZoomWasEnabled: boolean;
-  #lastPointerSignature: string | undefined;
 
-  readonly #onPointerDown = (event: MapCanvasPointerEventLike): void => {
-    this.#handleModifierDown(event, "pointerdown");
-  };
+  readonly #onMouseDown = (event: unknown): void => {
+    const mouseEvent = asMouseEvent(event);
+    if (!mouseEvent?.point) return;
+    const intent = readModifierIntent(mouseEvent);
+    if (!intent) return;
 
-  readonly #onMouseDown = (event: MapCanvasPointerEventLike): void => {
-    this.#handleModifierDown(event, "mousedown");
+    const plotId = this.#queryPlotId(mouseEvent.point.x, mouseEvent.point.y);
+    this.#selection.applyIntent(plotId, intent);
+    mouseEvent.originalEvent?.preventDefault?.();
+    mouseEvent.originalEvent?.stopPropagation?.();
+    this.#map.getCanvas().focus?.();
   };
 
   public constructor(
@@ -41,76 +45,12 @@ export class MapLibreSelectionModifierCapture {
     this.#renderer = renderer;
     this.#boxZoomWasEnabled = this.#map.boxZoom?.isEnabled?.() ?? false;
     if (this.#boxZoomWasEnabled) this.#map.boxZoom?.disable();
-    const canvas = this.#map.getCanvas();
-    canvas.addEventListener("pointerdown", this.#onPointerDown, { capture: true });
-    canvas.addEventListener("mousedown", this.#onMouseDown, { capture: true });
+    this.#map.on("mousedown", this.#onMouseDown);
   }
 
   public destroy(): void {
-    const canvas = this.#map.getCanvas();
-    canvas.removeEventListener("pointerdown", this.#onPointerDown, {
-      capture: true,
-    });
-    canvas.removeEventListener("mousedown", this.#onMouseDown, {
-      capture: true,
-    });
+    this.#map.off("mousedown", this.#onMouseDown);
     if (this.#boxZoomWasEnabled) this.#map.boxZoom?.enable();
-  }
-
-  #handleModifierDown(
-    event: MapCanvasPointerEventLike,
-    kind: CaptureEventKind,
-  ): void {
-    const intent = readModifierIntent(event);
-    if (!intent) return;
-
-    const point = this.#readCanvasPoint(event);
-    const signature = point
-      ? `${intent}:${point.x.toFixed(3)}:${point.y.toFixed(3)}`
-      : `${intent}:unknown`;
-    const duplicateCompatibilityMouseEvent =
-      kind === "mousedown" && signature === this.#lastPointerSignature;
-
-    if (!duplicateCompatibilityMouseEvent) {
-      const plotId = point
-        ? this.#queryPlotId(point.x, point.y)
-        : undefined;
-      this.#selection.applyIntent(plotId, intent);
-    }
-
-    if (kind === "pointerdown") {
-      this.#lastPointerSignature = signature;
-    } else {
-      this.#lastPointerSignature = undefined;
-    }
-
-    event.preventDefault?.();
-    event.stopPropagation?.();
-    event.stopImmediatePropagation?.();
-    this.#map.getCanvas().focus?.();
-  }
-
-  #readCanvasPoint(
-    event: MapCanvasPointerEventLike,
-  ): { readonly x: number; readonly y: number } | undefined {
-    const bounds = this.#map.getCanvas().getBoundingClientRect?.();
-    if (
-      bounds &&
-      typeof event.clientX === "number" &&
-      typeof event.clientY === "number"
-    ) {
-      return {
-        x: event.clientX - bounds.left,
-        y: event.clientY - bounds.top,
-      };
-    }
-    if (
-      typeof event.offsetX === "number" &&
-      typeof event.offsetY === "number"
-    ) {
-      return { x: event.offsetX, y: event.offsetY };
-    }
-    return undefined;
   }
 
   #queryPlotId(x: number, y: number): string | undefined {
@@ -135,11 +75,22 @@ export class MapLibreSelectionModifierCapture {
   }
 }
 
+function asMouseEvent(event: unknown): MapLibreMouseEventLike | undefined {
+  if (typeof event !== "object" || event === null) return undefined;
+  const point = (event as { point?: unknown }).point;
+  if (typeof point !== "object" || point === null) return undefined;
+  const x = (point as { x?: unknown }).x;
+  const y = (point as { y?: unknown }).y;
+  if (typeof x !== "number" || typeof y !== "number") return undefined;
+  return event as MapLibreMouseEventLike;
+}
+
 function readModifierIntent(
-  event: MapCanvasPointerEventLike,
+  event: MapLibreMouseEventLike,
 ): SelectionIntent | undefined {
-  if (event.altKey === true) return "subtract";
-  if (event.ctrlKey === true || event.metaKey === true) return "toggle";
-  if (event.shiftKey === true) return "add";
+  const original = event.originalEvent;
+  if (original?.altKey === true) return "subtract";
+  if (original?.ctrlKey === true || original?.metaKey === true) return "toggle";
+  if (original?.shiftKey === true) return "add";
   return undefined;
 }
