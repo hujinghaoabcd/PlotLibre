@@ -64,13 +64,7 @@ candidate
 
 `PlotDefinition.deriveSemanticGuidePaths(feature)` returns transient WGS84 paths. Sector uses `center → end-bearing handle`.
 
-Guides:
-
-- do not enter committed RenderBundle, Store, History or PlotJSON;
-- are not authored controls;
-- are ignored when invalid/non-finite;
-- are styled by the map-engine adapter;
-- may appear for complete drafts, Primary selection and handle-drag preview.
+Guides do not enter committed RenderBundle, Store, History or PlotJSON; are not authored controls; are ignored when invalid/non-finite; and may appear for complete drafts, Primary selection and handle-drag preview.
 
 ## 5. SelectionController
 
@@ -81,8 +75,6 @@ interface SelectionSnapshot {
   readonly revision: number;
 }
 ```
-
-Invariants:
 
 - ids are unique existing Store ids;
 - order is acquisition order;
@@ -179,9 +171,7 @@ After commit, all listeners run. Listener exceptions are collected and passed to
 
 ## 10. BatchEditCommand
 
-The command stores exact before/after features, document order, selection snapshots and label.
-
-Execute/redo applies exact after-state; undo applies exact before-state. Revisions are replayed exactly and redo does not increment them. Automatic selection reconciliation is suspended during Store mutation, followed by one explicit final selection restoration.
+The command stores exact before/after features, document order, selection snapshots and label. Execute/redo applies exact after-state; undo applies exact before-state. Revisions are replayed exactly. Automatic selection reconciliation is suspended during Store mutation and followed by one explicit final selection restoration.
 
 One completed gesture or batch action creates one History entry.
 
@@ -234,8 +224,6 @@ active drawing
 > camera drag
 ```
 
-MapLibre adapter mapping:
-
 ```text
 click      drawing click or selection intent
 mousedown  Shift add, handle drag or body translation
@@ -252,9 +240,9 @@ After `map.setStyle()`, PlotLibre restores four Sources, ten Layers, committed f
 
 ## 15. Canonical-state rule
 
-All geometry samples, widths, centers, radii, sweeps, closures, inferred points, selection overlays, translation previews and guides are derived. Whole-object editing transforms authored controls rather than generated Polygon/LineString vertices.
+All geometry samples, widths, centers, radii, sweeps, closures, inferred points, selection overlays, translation previews and guides are derived. Whole-object editing transforms authored controls rather than generated vertices.
 
-## 16. Validation baseline
+## 16. Merged validation baseline
 
 ```text
 workspace:         0.0.21
@@ -262,14 +250,16 @@ Node tests:        219
 Chromium tests:    30
 Sources:           4
 Layers:            10
-runtime tested:    07449e7fda66069b148fa08c865b209d7dc365a3
-CI:                #398 / 30904843935
+validated head:    2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
+CI:                #409 / 30906467230
+merged PR:         #38
+squash SHA:        04dca0b120b1440afb49a300eeee92faf6644a7d
 ```
 
-The final documentation head of PR #38 must receive a new full current-head CI run before Ready or merge.
+The documentation-only post-merge finalization must pass the unchanged 219/30 baseline.
 
 ## 17. Current limitations and next slice
 
 007A does not include snapping, touch-specific multi-selection, point insertion/removal, box/lasso, rotation/scale, groups/locks/visibility/z-order, parameter handles, holes/MultiPolygon editing, geodesic circular/translation mode or a published large-document performance guarantee.
 
-After 007A merges, 007B designs screen-space box/lasso selection with deterministic Store ordering, `plotId` de-duplication, simple-lasso validation and spatial indexing before scale claims.
+After finalization, 007B designs screen-space box/lasso selection with deterministic Store ordering, `plotId` de-duplication, simple-lasso validation and spatial indexing before scale claims. Rotation/scale, groups/locks and snapping remain separate later slices.
