@@ -24,12 +24,21 @@ import {
   type StartPlotDrawOptions,
 } from "./interaction.js";
 import { MapLibrePlotRenderer } from "./renderer.js";
-import { MapLibreSelectionModifierCapture } from "./selection-modifier-capture.js";
+import {
+  MapLibreSelectionRegionInteraction,
+  type MapLibreSelectionRegionRejection,
+  type MapLibreSelectionRegionSnapshot,
+  type StartSelectionRegionOptions,
+} from "./selection-region-interaction.js";
 import {
   MapLibreSelectionTranslation,
   type SelectionTransformRejection,
 } from "./selection-translation.js";
-import type { MapLibreMapLike, PlotLibreRendererOptions } from "./types.js";
+import type {
+  MapCanvasLike,
+  MapLibreMapLike,
+  PlotLibreRendererOptions,
+} from "./types.js";
 
 export interface PlotLibreOptions
   extends PlotLibreRendererOptions,
@@ -45,7 +54,9 @@ export class PlotLibre {
   public readonly history: CommandHistory;
   public readonly selection: SelectionController;
   public readonly renderer: MapLibrePlotRenderer;
-  public readonly selectionModifiers: MapLibreSelectionModifierCapture;
+  public readonly regionSelection: MapLibreSelectionRegionInteraction;
+  /** @deprecated Use regionSelection. */
+  public readonly selectionModifiers: MapLibreSelectionRegionInteraction;
   public readonly translation: MapLibreSelectionTranslation;
   public readonly interaction: MapLibrePlotInteraction;
   readonly #unsubscribe: () => void;
@@ -69,11 +80,23 @@ export class PlotLibre {
       this.renderer.render(this.store.list(), this.registry);
     });
 
-    this.selectionModifiers = new MapLibreSelectionModifierCapture(
+    let translation: MapLibreSelectionTranslation | undefined;
+    let interaction: MapLibrePlotInteraction | undefined;
+    this.regionSelection = new MapLibreSelectionRegionInteraction(
       map,
+      this.registry,
+      this.store,
       this.selection,
       this.renderer,
+      {
+        callbacks: {
+          isDrawing: () => interaction?.isDrawing ?? false,
+          isTranslating: () => translation?.isTranslating ?? false,
+          suppressNextClick: () => armCanvasClickSuppression(map.getCanvas()),
+        },
+      },
     );
+    this.selectionModifiers = this.regionSelection;
 
     // Register body-translation listeners before the general interaction
     // controller so Escape can cancel the preview before single-selection
@@ -88,6 +111,7 @@ export class PlotLibre {
         replaceSelection: (features) => this.replaceSelected(features),
       },
     );
+    translation = this.translation;
 
     this.interaction = new MapLibrePlotInteraction(
       map,
@@ -104,6 +128,7 @@ export class PlotLibre {
         : {},
       this.selection,
     );
+    interaction = this.interaction;
   }
 
   public register(definition: PlotDefinition): this {
@@ -204,6 +229,7 @@ export class PlotLibre {
   }
 
   public removeSelected(): boolean {
+    this.regionSelection.cancel();
     const beforeSelection = this.selection.snapshot();
     if (beforeSelection.selectedIds.length === 0) return false;
 
@@ -231,6 +257,7 @@ export class PlotLibre {
   }
 
   public draw(plotType: string, options: StartPlotDrawOptions = {}): string {
+    this.regionSelection.cancel();
     this.translation.cancel();
     return this.interaction.startDraw(plotType, options);
   }
@@ -239,8 +266,29 @@ export class PlotLibre {
     return this.interaction.cancelDraw();
   }
 
+  public startBoxSelection(
+    options: StartSelectionRegionOptions = {},
+  ): MapLibreSelectionRegionSnapshot {
+    this.translation.cancel();
+    this.interaction.cancelDraw();
+    return this.regionSelection.start("box", options);
+  }
+
+  public startLassoSelection(
+    options: StartSelectionRegionOptions = {},
+  ): MapLibreSelectionRegionSnapshot {
+    this.translation.cancel();
+    this.interaction.cancelDraw();
+    return this.regionSelection.start("lasso", options);
+  }
+
+  public cancelRegionSelection(): boolean {
+    return this.regionSelection.cancel();
+  }
+
   /** Replaces the current selection with one feature for API compatibility. */
   public select(id: string | undefined): void {
+    this.regionSelection.cancel();
     this.interaction.select(id);
   }
 
@@ -252,21 +300,34 @@ export class PlotLibre {
     return this.selection.selectedIds;
   }
 
+  public get regionSelectionSnapshot(): MapLibreSelectionRegionSnapshot {
+    return this.regionSelection.snapshot;
+  }
+
+  public get regionSelectionRejection():
+    | MapLibreSelectionRegionRejection
+    | undefined {
+    return this.regionSelection.rejection;
+  }
+
   public get transformRejection(): SelectionTransformRejection | undefined {
     return this.translation.rejection;
   }
 
   public undo(): boolean {
+    this.regionSelection.cancel();
     this.translation.cancel();
     return this.history.undo();
   }
 
   public redo(): boolean {
+    this.regionSelection.cancel();
     this.translation.cancel();
     return this.history.redo();
   }
 
   public clear(): void {
+    this.regionSelection.cancel();
     this.translation.cancel();
     this.interaction.cancelDraw();
     this.interaction.select(undefined);
@@ -303,6 +364,7 @@ export class PlotLibre {
       this.registry.generate(feature);
     }
 
+    this.regionSelection.cancel();
     this.translation.cancel();
     this.interaction.cancelDraw();
     this.interaction.select(undefined);
@@ -319,11 +381,26 @@ export class PlotLibre {
   }
 
   public destroy(): void {
+    this.regionSelection.destroy();
     this.translation.destroy();
     this.interaction.destroy();
-    this.selectionModifiers.destroy();
     this.selection.destroy();
     this.#unsubscribe();
     this.renderer.destroy();
   }
+}
+
+function armCanvasClickSuppression(canvas: MapCanvasLike): void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const listener = (event: any): void => {
+    event.preventDefault?.();
+    event.stopPropagation?.();
+    event.stopImmediatePropagation?.();
+    canvas.removeEventListener("click", listener, { capture: true });
+    if (timer !== undefined) clearTimeout(timer);
+  };
+  canvas.addEventListener("click", listener, { capture: true });
+  timer = setTimeout(() => {
+    canvas.removeEventListener("click", listener, { capture: true });
+  }, 0);
 }
