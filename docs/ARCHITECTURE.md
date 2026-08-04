@@ -1,28 +1,181 @@
-# PlotLibre 完整架构设计
+# PlotLibre Architecture
 
-## 1. 项目目标
+## 1. Product boundary
 
-PlotLibre 的目标是构建一个以 MapLibre GL JS 为首要渲染引擎、但几何算法和业务模型不依赖地图引擎的完整态势标绘框架。
+PlotLibre is a MapLibre-native but engine-independent framework for semantic parametric situation plots and tactical graphics.
 
-项目最终应覆盖：
+Canonical authored state is:
 
-- 普通 GIS 几何绘制；
-- 直箭头、细箭头、攻击箭头、燕尾攻击箭头、双箭头、钳击箭头、分队战斗箭头等传统态势标绘；
-- 曲线、旗帜、集结地、扇形、弓形、走廊和区域控制措施；
-- 选择、多选、框选、套索、移动、旋转、缩放、复制、分组和锁定；
-- 顶点、线段、中点、交点、网格、角度、平行和垂直吸附；
-- 撤销、重做、事务和操作历史；
-- PlotJSON、GeoJSON、SVG、图片和标准军标数据交换；
-- MIL-STD-2525D/E 与 APP-6D 的可选扩展；
-- Vanilla、React、Vue 和后续协作扩展。
+```text
+PlotDefinition + authored controlPoints + parameters + style + metadata
+```
 
-## 2. 关键架构原则
+Generated GeoJSON, samples, local frames, pivots, handles, guides, selection overlays, region paths and transform previews are derived. They cannot replace authored controls or enter PlotJSON as canonical state.
 
-### 2.1 控制点是唯一事实来源
+Current baseline:
 
-态势标绘对象通常由少量控制点和参数生成复杂几何。最终 Polygon 只是渲染缓存，不是原始数据。
+```text
+workspace:          0.0.22
+PlotJSON:           PlotLibreDocument / 1.0.0
+public Definitions: 19 (14 Arrow + 1 Line + 4 Area)
+Node:               20.19+
+MapLibre:           6.0.0 in Playground
+renderer:           4 Sources / 10 Layers
+historical tests:   299 Node / 34 Chromium
+008A target:        324 Node / 34 Chromium
+```
 
-一个完整对象由以下内容定义：
+## 2. Dependency direction
+
+```text
+core <- geometry <- symbols
+core <- interaction
+core + interaction <- maplibre
+public packages <- playground / wrappers
+```
+
+Rules:
+
+- `core` cannot depend on geometry, MapLibre, DOM or UI;
+- `geometry` cannot depend on MapLibre, DOM or UI;
+- `symbols` owns pure parametric Definitions and uses geometry;
+- `interaction` owns engine-independent sessions, selection and commands;
+- `maplibre` owns projection, rendered queries, map events and browser overlays;
+- Playground consumes public package APIs and must not duplicate canonical algorithms.
+
+## 3. Packages
+
+### 3.1 `@plotlibre/core`
+
+Responsibilities:
+
+- `PlotFeature`, `PlotDefinition`, `RenderBundle` and JSON types;
+- `PlotRegistry` canonicalization, validation and generation;
+- transactional `PlotStore`;
+- reversible commands and `CommandHistory`;
+- PlotJSON document constructors, current parser and serializer;
+- PlotJSON version/error/JSON-safety/resource primitives;
+- engine-independent errors and invariants.
+
+Current key modules:
+
+```text
+commands.ts
+errors.ts
+history.ts
+plotjson.ts
+plotjson-error.ts
+plotjson-safety.ts
+plotjson-version.ts
+registry.ts
+store.ts
+types.ts
+```
+
+008A deliberately adds foundation primitives without connecting them to the historical parser. Migration registry, report-bearing reading and atomic document replacement remain 008B–008D.
+
+### 3.2 `@plotlibre/geometry`
+
+Responsibilities:
+
+- local-metre projection and geodesic helpers;
+- vectors, bearings and distances;
+- polyline metrics and sampling;
+- Catmull-Rom and Bezier curves;
+- variable-width offsets;
+- circular arcs, sectors and segments;
+- ring orientation and self-intersection checks;
+- arrow-head and ribbon construction;
+- antimeridian-aware utilities.
+
+All functions are pure and tested independently of map engines.
+
+### 3.3 `@plotlibre/symbols`
+
+Nineteen public Definitions:
+
+```text
+arrow.straight
+arrow.fine
+arrow.fine.tailed
+arrow.assault-direction
+arrow.curved
+arrow.attack
+arrow.attack.tailed
+arrow.double
+arrow.pincer
+arrow.squad-combat
+arrow.route
+arrow.corridor
+arrow.route.bidirectional
+arrow.route.double-head
+line.circular-arc
+area.closed-curve
+area.gathering-place
+area.circular-segment
+area.sector
+```
+
+Each Definition owns:
+
+```text
+stable plotType
+Definition version
+control schema and semantic roles
+default parameters and style
+canonicalization where permitted
+validation
+derived RenderBundle generation
+semantic guides where required
+```
+
+A Definition never owns browser input or Store mutation.
+
+### 3.4 `@plotlibre/interaction`
+
+Responsibilities:
+
+- fixed and variable-point draw sessions;
+- validation/rejection snapshots;
+- ordered multi-selection and Primary semantics;
+- screen-region geometry and lasso simplification;
+- batch commands;
+- local-metre selection translation;
+- shared-pivot rotation and positive uniform scale;
+- transform session state and stale-safe command creation.
+
+Interaction cannot reference MapLibre, DOM or WebGL.
+
+### 3.5 `@plotlibre/maplibre`
+
+Responsibilities:
+
+- derived GeoJSON renderer;
+- MapLibre Source/Layer lifecycle;
+- rendered broad-phase queries and exact projected region resolution;
+- map/canvas event normalization;
+- semantic handles and selected-body translation;
+- explicit region and transform controllers;
+- DOM/SVG region and transform overlays;
+- high-level `PlotLibre` facade;
+- style reload and lifecycle cancellation.
+
+MapLibre-specific code cannot become canonical model logic.
+
+### 3.6 `@plotlibre/playground`
+
+Responsibilities:
+
+- browser demonstration of all public Definitions;
+- toolbar and status presentation;
+- Nanjing sample data;
+- PlotJSON import/export UI;
+- real Chromium E2E;
+- GitHub Pages deployment.
+
+Playground is a consumer, not a second implementation of framework rules.
+
+## 4. Canonical data model
 
 ```text
 PlotFeature
@@ -36,50 +189,29 @@ PlotFeature
 └── revision
 ```
 
-因此，编辑箭头时必须移动控制点或参数控制柄，然后重新生成几何，不能直接编辑派生 Polygon 的全部顶点。
+Rules:
 
-### 2.2 几何算法不依赖 MapLibre
+- ids are stable and unique in a document;
+- `plotType` resolves one registered Definition;
+- `definitionVersion` describes authored symbol semantics;
+- controls are WGS84 positions with Definition-owned order/roles;
+- parameters and style are JSON state;
+- metadata is application data, not hidden core state;
+- effective authored edits increment revision exactly once;
+- generated geometry is discarded and regenerated as needed.
 
-`@plotlibre/geometry` 只能处理坐标、数学参数和几何结果。它不能引用：
+## 5. Registry pipeline
 
-- MapLibre `Map`；
-- MapLibre Source 或 Layer；
-- DOM Event；
-- React/Vue；
-- 浏览器渲染状态。
-
-这样可以进行纯单元测试，并为未来 OpenLayers、Leaflet、Cesium 或服务端渲染保留可能性。
-
-### 2.3 符号采用注册定义而不是大型继承树
-
-每个标绘类型由 `PlotDefinition` 描述：
-
-```ts
-interface PlotDefinition {
-  type: string;
-  title: string;
-  category: string;
-  version: string;
-  controlSchema: ControlSchema;
-  defaultParameters: Record<string, JsonValue>;
-  defaultStyle: PlotStyle;
-  generate(context: GenerateContext): RenderBundle;
-  validate?(context: GenerateContext): ValidationResult;
-}
+```text
+PlotFeature input
+→ Definition lookup by plotType
+→ Definition canonicalize if defined
+→ control/parameter/style validation
+→ Definition.generate
+→ RenderBundle
 ```
 
-该模式便于：
-
-- 插件注册；
-- 按需加载符号包；
-- 算法版本管理；
-- 自定义业务标绘；
-- 统一 UI 符号目录；
-- 避免大量相似子类。
-
-### 2.4 渲染结果允许多部件组合
-
-复杂态势标绘不应被强制表示为单个 Polygon。生成器返回 `RenderBundle`：
+`RenderBundle` may contain:
 
 ```text
 fills
@@ -89,114 +221,304 @@ labels
 hitAreas
 ```
 
-一个标准控制措施可同时包含填充区域、边界线、重复标记、文字和扩大后的点击区域。
+Complex plots are not forced into one Polygon.
 
-### 2.5 MapLibre 是 peer dependency
+Every programmatic create/replace, drawing completion, handle edit, batch translation and selection transform performs Registry generation before canonical Store mutation.
 
-应用程序决定其 MapLibre 版本。PlotLibre 适配器只依赖稳定的结构化地图接口，并在浏览器集成测试中验证 MapLibre 5.x 和 6.x。
+## 6. Store and history
 
-## 3. 总体分层
+`PlotStore` owns ordered canonical features.
+
+`applyTransaction()` stages additions, replacements, removals and optional exact ordering before one commit. Failure leaves state unchanged. Success emits one immutable batch event. Listener exceptions are isolated after commit.
+
+Commands capture exact values rather than recomputing:
 
 ```text
-┌──────────────────────────────────────────────┐
-│ Applications / React / Vue / Vanilla         │
-├──────────────────────────────────────────────┤
-│ @plotlibre/ui                                │
-│ toolbar · catalog · style panel · layer tree │
-├──────────────────────────────────────────────┤
-│ PlotLibre Controller                         │
-│ create · draw · edit · select · import       │
-├──────────────────────────────────────────────┤
-│ @plotlibre/core                              │
-│ registry · store · commands · history        │
-│ validation · transactions · PlotJSON         │
-├──────────────────────────────────────────────┤
-│ @plotlibre/interaction                       │
-│ draw sessions · semantic state machines      │
-├──────────────────────────────────────────────┤
-│ @plotlibre/symbols / @plotlibre/milstd       │
-│ declarative plot definitions                 │
-├──────────────────────────────────────────────┤
-│ @plotlibre/geometry                          │
-│ projection · vectors · curves · topology     │
-├──────────────────────────────────────────────┤
-│ @plotlibre/maplibre                          │
-│ renderer · sources · layers · hit testing    │
-├──────────────────────────────────────────────┤
-│ MapLibre GL JS                               │
-└──────────────────────────────────────────────┘
+CreatePlotCommand
+ReplacePlotCommand
+DeletePlotCommand
+BatchEditCommand
 ```
 
-## 4. 包设计
+`CommandHistory` records only successful effective mutations. Preview, rejection, cancellation, selection changes and no-op do not enter History.
 
-### 4.1 `@plotlibre/core`
+## 7. Selection architecture
 
-职责：
+Selection is transient and ordered:
 
-- `PlotFeature`、`PlotDefinition` 和 `RenderBundle` 类型；
-- `PlotRegistry`；
-- `PlotStore`；
-- Command 和 History；
-- PlotJSON 解析、序列化和迁移；
-- 事件和事务；
-- 通用验证和错误类型。
+```text
+selectedIds
+primaryId = final selected id
+selection revision
+```
 
-禁止依赖地图引擎、DOM 和 UI。
+It is excluded from PlotJSON and PlotFeature revision.
 
-当前已实现：基础类型、注册器、存储、三个命令、撤销重做和 PlotJSON 1.0。
+Operations:
 
-### 4.2 `@plotlibre/geometry`
+```text
+replace
+add
+subtract
+toggle
+make Primary
+clear
+restore exact snapshot
+```
 
-职责：
+Every selected feature receives a lightweight derived overlay. Only Primary exposes semantic authored handles and style editing.
 
-- 二维向量；
-- 局部投影和测地计算；
-- 曲线插值；
-- 箭头公共构造；
-- 面裁剪、布尔运算和拓扑验证；
-- 几何简化和平滑；
-- 反经线处理。
+## 8. Region selection
 
-当前已实现：向量工具、局部米制投影、距离计算和直箭头面生成。
+Input modes:
 
-### 4.3 `@plotlibre/symbols`
+```text
+neutral Shift-empty box
+explicit one-shot box
+explicit one-shot lasso
+```
 
-职责：
+Pipeline:
 
-- 基础几何符号包；
-- Arrow 符号包；
-- Tactical 区域与旗帜符号包；
-- 符号分类、默认参数和默认样式；
-- 控制点规则和自定义验证。
+```text
+CSS-pixel region
+→ committed-layer rendered broad phase
+→ plotId deduplication
+→ Store-order normalization
+→ one Registry.generate per candidate
+→ map.project semantic geometry
+→ exact point/line/polygon intersection
+→ one SelectionController.applyMany event
+```
 
-当前已实现：`arrow.straight`。
+MapLibre rendered bounds are never final hit truth. Labels, hit areas, handles, guides, drafts and overlays are excluded from semantic region geometry.
 
-### 4.4 `@plotlibre/interaction`
+Box/lasso guides are DOM/SVG overlays and add no MapLibre Source or Layer.
 
-职责：
+## 9. Selection transforms
 
-- engine-independent `DrawSession` 契约；
-- 状态快照和完成结果；
-- 两点、后续多点和参数化绘制会话；
-- 键盘行为；
-- 不依赖 MapLibre、DOM 或 WebGL。
+Translation:
 
-当前已实现：`TwoPointDrawSession`，支持 ready/drawing/completed/cancelled、pointer preview、Enter 完成、Escape 取消和 Backspace/Delete 重置。
+```text
+one order-independent local frame
+→ one pointer metre delta
+→ translate all selected authored controls
+→ complete Registry preflight
+→ one atomic command
+```
 
-### 4.5 `@plotlibre/maplibre`
+Rotation/scale:
 
-职责：
+```text
+all selected authored controls
+→ one order-independent local frame
+→ fixed authored-control AABB-centre pivot
+→ positive clockwise angle or positive uniform factor
+→ complete Registry preflight
+→ one stale-safe atomic command
+```
 
-- 创建和维护 committed、draft、handles GeoJSON Source；
-- 创建 fill、line、circle 和 handles 图层；
-- 把 `RenderBundle` 转换为 MapLibre 数据；
-- 把 MapLibre 点击、移动、拖动、键盘和 style 事件转换为语义交互；
-- 高层 `PlotLibre` 控制器；
-- hit testing、选择和控制点编辑。
+Uniform scale range is `[0.01,100]`. Reflection, negative scale, non-uniform scale, skew and snapping are excluded.
 
-当前已实现：三套 Source、七个图层、两点交互绘制、动态预览、对象选择、语义控制点拖动、单命令撤销、`style.load` 恢复和 PlotJSON 导入导出。
+Store remains unchanged during previews. Last-valid complete preview survives structured rejection. One invalid member rejects the complete batch.
 
-### 4.6 计划包
+## 10. Renderer resources
+
+Sources:
+
+```text
+plotlibre-committed
+plotlibre-selection
+plotlibre-draft
+plotlibre-handles
+```
+
+Layers:
+
+```text
+plotlibre-fill
+plotlibre-line
+plotlibre-point
+plotlibre-selection-line
+plotlibre-selection-point
+plotlibre-draft-fill
+plotlibre-draft-line
+plotlibre-draft-point
+plotlibre-handle-guide
+plotlibre-handle
+```
+
+DOM/SVG region and transform overlays are outside MapLibre resources.
+
+`style.load` reconstructs all derived Source/Layer data from Store, selection and active interaction state. Active unsafe gestures cancel according to lifecycle contracts.
+
+## 11. PlotJSON version domains
+
+Document `schemaVersion` owns:
+
+```text
+document structure
+required/optional schema fields
+ordering and references
+future groups/locks/visibility/z-order
+extension containers
+```
+
+Feature `definitionVersion` owns:
+
+```text
+control roles
+parameter semantics
+Definition-specific authored behavior
+```
+
+They are independent. Future read order is:
+
+```text
+JSON boundary
+→ document schema migration
+→ current document decode
+→ Definition migration for every feature
+→ final Definition-version equality
+→ Registry preflight
+→ atomic Store replacement
+```
+
+## 12. PlotJSON 008A foundation
+
+### Version primitives
+
+```text
+PLOTJSON_DOCUMENT_TYPE = PlotLibreDocument
+CURRENT_PLOTJSON_SCHEMA_VERSION = 1.0.0
+```
+
+Persisted versions use canonical numeric `MAJOR.MINOR.PATCH`. Components are non-negative safe integers. Comparison is numeric tuple comparison.
+
+### JSON-safe boundary
+
+Accepted direct values:
+
+```text
+null / string / boolean / finite number
+dense arrays
+plain or null-prototype objects
+```
+
+Rejected:
+
+```text
+non-JSON primitives
+Date / Map / Set / RegExp / typed arrays / class instances
+custom prototypes
+accessors / hidden properties / symbol keys
+sparse/custom arrays
+cycles
+```
+
+Traversal is iterative and descriptor-based. It does not invoke getters. Object keys are lexicographically ordered for deterministic failure paths. Repeated non-cyclic references become independent JSON-tree values.
+
+Own `__proto__` and `constructor` keys are installed with data descriptors and cannot pollute target prototypes.
+
+### Resource ceilings
+
+```text
+input bytes:             16 MiB UTF-8
+depth:                   128
+value nodes:             1,000,000
+object keys:             250,000
+string/key length:       1,000,000 UTF-16 code units
+features:                100,000
+controls per feature:    10,000
+total authored controls: 1,000,000
+```
+
+These are finite untrusted-input ceilings, not product-size recommendations or performance SLAs.
+
+008A exports primitives only. Existing `parsePlotDocument()` and import behavior remain unchanged until 008C/008D.
+
+## 13. PlotJSON runtime roadmap
+
+```text
+008A version / errors / JSON safety / limits
+008B migration registry / graph planner / report records
+008C report-bearing reader / 1.0 compatibility / invariants
+008D Registry-aware preparation / atomic document import
+008E documentation / compatibility fixtures / finalization
+```
+
+Migration code remains in core and separate from `PlotDefinition.generate()`.
+
+The migration graph is deliberately linear per scope/source version: one strictly increasing outgoing step, no cycle and no branch ambiguity.
+
+## 14. Import atomicity target
+
+Current import performs complete Registry generation before mutation, then uses `store.clear()` and repeated `store.add()`. Duplicate ids can fail after partial replacement.
+
+008D target:
+
+```text
+parse and migrate completely in memory
+→ validate document-wide ids/references/order
+→ migrate and preflight every Definition
+→ stage one complete ordered Store replacement
+→ one batch event
+→ clear selection and History after success
+```
+
+Every expected input failure must preserve old Store, order, selection, History and active interaction state.
+
+## 15. Interaction priority and lifecycle
+
+Priority:
+
+```text
+active drawing
+> authored-handle drag
+> active selection transform
+> active region gesture
+> armed transform handle
+> armed region mode
+> neutral Shift-empty box
+> selected-body translation
+> click selection
+> camera gesture
+```
+
+Cancellation sources include Escape, pointer cancellation, unexpected capture loss, style load, resize, active-drag camera movement, external Store/selection changes, document lifecycle actions and destroy.
+
+Map interactions such as dragPan, boxZoom and doubleClickZoom are restored exactly once.
+
+## 16. Validation strategy
+
+Every runtime exact head runs:
+
+```text
+Node 20.19
+Node 22
+all Node unit/integration tests
+Playground typecheck/build
+handover contract
+region-selection benchmark
+selection-transform benchmark
+Chromium E2E
+zero unresolved review threads before merge
+```
+
+Test layers:
+
+- deterministic golden geometry;
+- property and boundary tests;
+- Store/History atomicity;
+- interaction state-machine tests;
+- MapLibre adapter tests with fake maps;
+- real browser pointer/DOM flows;
+- exact-head benchmark artifacts;
+- immutable handovers and post-merge synchronization.
+
+## 17. Future packages and deferred work
+
+Potential packages:
 
 ```text
 @plotlibre/ui
@@ -207,410 +529,42 @@ hitAreas
 @plotlibre/collab
 ```
 
-交互内核已经确认独立为 `@plotlibre/interaction`。MapLibre 包只保留地图事件、命中测试、cursor、dragPan 和 Source/Layer 生命周期适配。
-
-## 5. 数据流
-
-### 5.1 创建流程
+Deferred until prerequisites are complete:
 
 ```text
-用户输入控制点
-→ DrawSession 更新草图状态
-→ PlotDefinition.validate
-→ PlotDefinition.generate
-→ RenderBundle
-→ Draft Source
-→ 完成命令
-→ PlotStore
-→ Committed Source
-→ History
+PlotJSON production migration to a newer schema
+groups / locks / visibility / z-order
+snapping and constraints
+touch-specific transforms
+copy/paste and duplication
+unresolved Definition preservation
+downgrade and future-version best effort
+coordinated npm release
 ```
 
-### 5.2 编辑流程
+007D groups/locks/visibility/z-order remains blocked until 008D/E establishes migration infrastructure, reference validation and atomic import.
+
+## 18. Authority documents
 
 ```text
-选择 PlotFeature
-→ 根据 PlotDefinition 创建语义控制柄
-→ 拖动控制柄
-→ 修改 controlPoints 或 parameters
-→ 重新生成 RenderBundle
-→ Draft preview
-→ pointerup 提交单个 ReplacePlotCommand
+README.md
+AGENTS.md
+docs/ARCHITECTURE.md
+docs/PLOTJSON_SPEC.md
+docs/DEVELOPMENT_PLAN.md
+
+docs/design/region-selection.md
+docs/design/rotation-uniform-scale.md
+docs/design/rotation-uniform-scale-runtime.md
+docs/design/plotjson-migrations.md
+docs/design/plotjson-compatibility-matrix.md
+docs/design/plotjson-version-json-safety-runtime.md
+
+docs/algorithms/selection-local-transform.md
+docs/algorithms/plotjson-migration-pipeline.md
+
+docs/performance/region-selection-benchmark.md
+docs/performance/selection-transform-benchmark.md
+
+docs/handover/LATEST.md
 ```
-
-拖动期间不得产生数百条历史命令。一次 pointerdown 到 pointerup 是一个事务。
-
-### 5.3 导入流程
-
-```text
-PlotJSON
-→ schema validation
-→ version migration
-→ definition availability check
-→ semantic validation
-→ PlotStore
-→ renderer regeneration
-```
-
-缺失 definition 时，默认不猜测算法。后续可提供 unresolved feature 状态，允许保留数据但不渲染。
-
-## 6. 交互状态机
-
-完整状态计划：
-
-```text
-idle
-preparing
-collecting-control-points
-previewing
-completing
-selected
-editing-control-point
-editing-parameter
-translating
-rotating
-scaling
-committing
-cancelled
-```
-
-每个 `DrawSession` 必须定义：
-
-- 开始条件；
-- 最少和最多控制点；
-- 单击、双击、Enter、Escape、Backspace 行为；
-- 动态预览；
-- 完成条件；
-- 取消后的清理；
-- 地图平移手势冲突策略；
-- 触摸长按和拖动策略。
-
-## 7. 控制柄模型
-
-计划控制柄类型：
-
-```text
-vertex
-midpoint
-width
-head-length
-neck-width
-tail-depth
-curve
-radius
-rotation
-scale
-virtual
-```
-
-控制柄本身也是语义对象：
-
-```ts
-interface PlotHandle {
-  id: string;
-  plotId: string;
-  kind: PlotHandleKind;
-  coordinate: Position;
-  cursor: string;
-  apply(context: HandleDragContext): PlotFeature;
-}
-```
-
-攻击箭头应只展示有意义的控制柄，而不是暴露派生面上的每一个顶点。
-
-## 8. 吸附系统
-
-吸附候选类型：
-
-- vertex；
-- segment；
-- midpoint；
-- intersection；
-- grid；
-- angle；
-- bearing；
-- parallel；
-- perpendicular；
-- external source。
-
-设计要求：
-
-- 使用屏幕像素容差；
-- 空间索引筛选候选；
-- 可配置优先级；
-- 支持 Alt 临时禁用；
-- 支持 Shift 角度约束；
-- 返回吸附原因和辅助线；
-- 不直接修改数据，由交互会话决定是否采用候选。
-
-## 9. MapLibre 渲染
-
-### 9.1 Source 规划
-
-完整版本计划：
-
-```text
-plotlibre-committed
-plotlibre-draft
-plotlibre-handles
-plotlibre-guides
-plotlibre-labels
-plotlibre-hitareas
-```
-
-当前已经实现前三套 Source：`committed` 保存 Store 派生结果，`draft` 承担高频预览，`handles` 显示语义控制点。`guides`、独立标签和扩大命中区域将在后续里程碑增加。
-
-### 9.2 图层顺序
-
-```text
-fill
-main line
-outline
-dashed line
-symbol
-text
-hover
-selection
-hit area
-guides
-handles
-```
-
-选择态和 hover 态尽量使用 feature-state 或独立 overlay source，避免重建全部数据。
-
-### 9.3 Style reload
-
-MapLibre `setStyle()` 会删除自定义 source/layer。适配器监听 `style.load`，幂等恢复三套 Source、七个图层、Store 数据、活动 draft 和选择 handles。
-
-### 9.4 增量更新
-
-大量标绘对象时，应保持稳定的 Feature ID，优先更新变化对象。当前 `setData()` 全量更新适用于基础阶段，后续评估 MapLibre `updateData()`、分块 Source 和 dirty-feature 更新。
-
-## 10. 坐标和尺寸模式
-
-### 10.1 坐标模式
-
-```text
-local
-geodesic
-```
-
-短距离态势图形在局部切平面中计算。长距离、跨区域和高纬度对象必须使用测地算法。
-
-### 10.2 尺寸模式
-
-```text
-ground
-screen
-relative
-```
-
-- `ground`：宽度和半径以米表示；
-- `screen`：视觉宽度以像素近似保持；
-- `relative`：宽度由控制线长度比例计算。
-
-当前直箭头使用 `relative`，并以米制最小/最大宽度限制。
-
-## 11. 符号目录
-
-### 11.1 基础几何
-
-```text
-point
-text
-polyline
-polygon
-freehand-line
-freehand-polygon
-rectangle
-rotated-rectangle
-circle
-ellipse
-arc
-sector
-lune
-bezier
-spline
-closed-curve
-corridor
-buffer
-```
-
-### 11.2 箭头
-
-```text
-arrow.straight
-arrow.fine
-arrow.fine.tailed
-arrow.assault-direction
-arrow.curved
-arrow.attack
-arrow.attack.tailed
-arrow.squad-combat
-arrow.squad-combat.tailed
-arrow.double
-arrow.pincer
-arrow.route
-arrow.corridor
-arrow.multi-head
-```
-
-### 11.3 旗帜和注记
-
-```text
-flag.triangle
-flag.rectangle
-flag.curve
-flag.swallowtail
-annotation.callout
-annotation.leader-label
-annotation.image
-annotation.svg
-```
-
-### 11.4 区域和控制措施
-
-```text
-area.gathering
-area.assembly
-area.search
-area.warning
-area.restricted
-area.evacuation
-area.safe
-route.control
-boundary
-phase-line
-axis
-obstacle
-minefield
-bridgehead
-air-corridor
-```
-
-## 12. 命令和事务
-
-当前命令：
-
-- `CreatePlotCommand`；
-- `DeletePlotCommand`；
-- `ReplacePlotCommand`。
-
-计划命令：
-
-- MoveControlPoint；
-- InsertControlPoint；
-- RemoveControlPoint；
-- UpdateParameters；
-- UpdateStyle；
-- TransformSelection；
-- Group/Ungroup；
-- ImportDocument。
-
-事务要求：
-
-- 多对象移动只生成一个撤销步骤；
-- 连续拖动可合并；
-- redo 后执行新命令必须清空 redo 栈；
-- 命令必须保存足够的前后状态；
-- 命令执行失败不得污染历史栈。
-
-## 13. 性能目标
-
-v1.0 目标：
-
-| 场景 | 目标 |
-|---|---:|
-| 可浏览普通标绘 | 10,000 个 |
-| 屏幕内复杂标绘 | 2,000 个 |
-| 当前对象拖动 | 接近 60 FPS |
-| 指针预览主线程计算 | 通常小于 8 ms |
-| Undo/Redo | 至少 200 步 |
-| PlotJSON 导入 | 10,000 对象可接受时间完成 |
-
-实现措施：
-
-- requestAnimationFrame 合并 pointermove；
-- draft source 与 committed source 分离；
-- RBush 空间索引；
-- geometry worker；
-- 算法缓存；
-- 增量更新；
-- 缩放级别相关简化；
-- 军标符号按需加载。
-
-## 14. 测试体系
-
-### 14.1 数值测试
-
-检查：
-
-- 输出有限；
-- Polygon 闭合；
-- 参数边界；
-- 退化输入；
-- 面积和方向；
-- 平移、旋转和缩放不变量。
-
-### 14.2 黄金几何和视觉快照
-
-每种符号保存固定控制点及基准输出。浏览器阶段增加 SVG/PNG 快照，避免数值变化不明显但形状退化。
-
-### 14.3 性质测试
-
-随机生成控制点，验证不出现 NaN、Infinity、非闭合环和异常全球环绕面。
-
-### 14.4 浏览器测试
-
-计划使用 Playwright 覆盖 Chromium、Firefox、WebKit，并验证 MapLibre 5.x 和 6.x。
-
-## 15. 版本策略
-
-- `0.0.x`：基础架构可能快速调整；
-- `0.1.x`：核心和首批箭头可用；
-- `0.2.x`：传统态势符号完整；
-- `0.3.x`：专业编辑和吸附；
-- `0.4.x`：MIL-STD/APP-6；
-- `1.0.0`：稳定 API、迁移策略和完整文档。
-
-PlotJSON 的 `schemaVersion` 与各符号的 `definitionVersion` 独立。算法变化若会改变同一控制点的几何结果，必须提升 definition version 并提供迁移说明。
-
-## 16. 当前实现与下一步
-
-当前已完成两个纵向里程碑：
-
-```text
-PlotFeature
-→ Registry
-→ StraightArrow geometry
-→ RenderBundle
-→ committed / draft / handles sources
-→ engine-independent TwoPointDrawSession
-→ MapLibre event adapter
-→ semantic handle editing
-→ Store / CommandHistory
-→ PlotJSON
-→ 15 tests
-```
-
-当前交互保证：
-
-1. 首次点击只采集起点，不生成无效几何；
-2. pointermove 只更新 draft，不写 Store；
-3. 第二次点击或 Enter 只提交一个 CreatePlotCommand；
-4. Escape 取消并清理 draft；
-5. 拖动控制点期间只渲染 preview；
-6. mouseup 只提交一个 ReplacePlotCommand；
-7. undo/redo 后 handles 跟随 Store；
-8. `style.load` 后幂等恢复全部 PlotLibre 图层和状态。
-
-下一里程碑是浏览器示例与 GitHub Pages：
-
-1. 建立 `apps/playground`；
-2. 使用真实 MapLibre GL JS 6 ESM 构建；
-3. 增加工具栏、状态提示和 JSON 导入导出；
-4. 加入 Playwright Chromium 测试；
-5. 建立 MapLibre 5/6 测试矩阵；
-6. 建立 GitHub Pages 构建与部署；
-7. 示例应用仅调用公开 API；
-8. 完成后再进入箭头公共几何基础和攻击箭头系列。
