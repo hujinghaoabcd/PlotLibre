@@ -1,13 +1,11 @@
-# PlotLibre Development Handover — Milestone 006J Merged / Milestone 007 Design Next
+# PlotLibre Development Handover — Milestone 007 Professional Editing Design Active
 
 日期：2026-08-04  
 仓库：`hujinghaoabcd/PlotLibre`  
-当前 `main`：`297d0a644eaa3427f8fd59b82b7bc3582221d49e`  
-已合并 PR：`#34 Add circular arc family`  
-合并方式：squash  
-Post-merge 分支：`agent/006j-post-merge-finalization`  
+设计基线：`main@4ce59d189b65c8257bf49beabc308a4020249cd0`  
+活跃分支：`agent/007-professional-editing-design`  
 Workspace：`0.0.20`  
-状态：Milestone 006J 已合并到 `main`；当前只同步合并事实，下一开发阶段为 Milestone 007 professional editing semantic design
+状态：006J implementation 与 post-merge finalization 已合并；007 正在冻结 selection、batch transaction 和 transform 语义，尚无 runtime changes
 
 ## Current state
 
@@ -21,107 +19,108 @@ Line Definitions:   1
 Area Definitions:   4
 Node tests:         184
 Chromium tests:     28
-main SHA:           297d0a644eaa3427f8fd59b82b7bc3582221d49e
-merged PR:          #34
-next milestone:     007 professional editing semantic design
+base main SHA:      4ce59d189b65c8257bf49beabc308a4020249cd0
+active branch:      agent/007-professional-editing-design
+active phase:       documentation, state and transaction design only
 ```
 
-新增并已合并的 Definitions：
+Current runtime remains single-selection and single-feature command oriented. The design branch does not change code, tests, package versions, Playground or public runtime APIs.
+
+Frozen implementation staging candidate：
 
 ```text
-line.circular-arc@1.0.0
-area.circular-segment@1.0.0
-area.sector@1.0.0
+007A selection + atomic batch commands + local translation
+007B box/lasso selection
+007C local rotation + positive uniform scale
+007D groups/locks/visibility/z-order after PlotJSON migration design
 ```
-
-延期：
-
-```text
-area.lune
-```
-
-Canonical state 保持：
-
-```text
-plot definition + authored controls + parameters + style + metadata
-```
-
-Circumcenter、radius、angles、sweeps、samples、derived endpoints、rings 和 semantic guide paths 均为派生状态。
 
 ## Completed in this milestone
 
-- PR #33 合并 circular family 设计与数学契约；
-- PR #34 实现 local-metre three-point circular frame；
-- 实现 exact minor/major directed arc sampling；
-- 实现 `line.circular-arc`、`area.circular-segment` 和 `area.sector`；
-- 实现 strict coordinate、radius、sweep 和 topology preflight；
-- 保留 authored controls 与 PlotJSON 边界；
-- 新增 `lineSymbols`，公共目录扩展为 19；
-- 新增 Definition-driven `deriveSemanticGuidePaths`；
-- Sector 增加 transient center-to-bearing guide；
-- MapLibre 增加 `plotlibre-handle-guide`，完整 layer 数为 8；
-- guide 不进入 committed output、Store、History 或 PlotJSON；
-- production Playground 扩展到 19 selectors / 19 samples；
-- Node tests 从 163 增至 184；
-- Chromium tests 从 23 增至 28；
-- workspace 提升为 `0.0.20`；
-- README、AGENTS、roadmap、Playground、interaction、design/algorithm indexes 和 immutable handover 全部同步；
-- 最终 PR head 在完整 current-head CI 和 0 个 unresolved threads 后标记 Ready；
-- PR #34 使用 expected validated head squash merge；
-- 实际 squash SHA 为 `297d0a644eaa3427f8fd59b82b7bc3582221d49e`。
+- inspected current single `selectedId` interaction model；
+- inspected single-operation PlotStore events and commands；
+- identified Store-listener exception risk that can mutate state without a history entry；
+- froze engine-independent ordered `SelectionSnapshot`；
+- froze acquisition order and primary-selection invariant；
+- froze replace/add/subtract/toggle/clear/reconcile semantics；
+- froze backward-compatible `selectedId` as primary-selection alias；
+- froze selection as transient and excluded from PlotJSON；
+- froze primary-only authored handles and secondary selection overlays；
+- froze staged atomic `PlotStore.applyTransaction`；
+- froze one immutable batch event and exact document-order restoration；
+- froze listener-error isolation through `onListenerError`；
+- froze selection-aware `BatchEditCommand` before/after snapshots；
+- froze batch delete execute/undo/redo behavior；
+- froze 007A local-metre whole-object translation over authored controls；
+- froze one projection/delta for the complete selection；
+- froze all-feature Registry preflight and all-or-nothing mutation；
+- froze transform drag arbitration、threshold、Escape and zero-movement behavior；
+- froze structured transform rejection codes；
+- froze 007B intersection box selection and simple-lasso boundary；
+- froze 007C deterministic bounds-center pivot and positive uniform scale；
+- deferred canonical groups/locks/visibility/z-order until formal PlotJSON schema/migration；
+- fixed professional-editing reference revisions and licenses；
+- declared code reuse as `none`；
+- added `docs/design/professional-editing.md`；
+- added `docs/algorithms/batch-edit-transaction.md`；
+- updated design/algorithm indexes、reference matrix、AGENTS and roadmap。
 
 ## Validation
 
-最终 PR head 验证：
+This branch is documentation-only and must preserve the merged runtime baseline：
 
 ```text
-GitHub Actions run: 30893450723 (#337)
-validated head:     608567d4f8f662242b0356c54742a2ffcb087c66
-Node 20.19:         success
-Node 22:            success
-TypeScript:         success
-Node tests:         184 passed / 0 failed
-Playground typecheck: success
-Playground build:   success
-handover contract:  success
-Chromium tests:     28 passed / 0 failed
+Node 20.19:        success
+Node 22:           success
+Node tests:        184 passed
+Chromium tests:    28 passed
+Playground build: success
+handover contract: success
 unresolved threads: 0
 ```
 
-候选浏览器日志：
+Design review gates：
 
-```text
-Running 28 tests using 1 worker
-28 passed (1.9m)
-```
-
-本 post-merge finalization 只修改 current-state Markdown 并增加合并记录，不修改 runtime、geometry、Definitions、interaction、Playground source、tests 或 configuration。该 finalization 仍需独立完整 CI 后进入 `main`。
+- selection ordering and primary fallback are unambiguous；
+- selection persistence boundary is explicit；
+- Store transaction ordering and no-partial-mutation are explicit；
+- listener exceptions cannot create untracked history state；
+- batch delete undo restores exact document order；
+- translation transforms authored controls only；
+- one invalid member rejects the complete batch；
+- one gesture creates one history entry；
+- box/lasso and rotate/scale are separated from 007A runtime；
+- canonical groups are not hidden in metadata；
+- references、licenses and no-code-reuse declaration are complete。
 
 ## Next tasks
 
-1. 完成 `agent/006j-post-merge-finalization` 的 documentation-only 同步；
-2. 创建 Draft finalization PR；
-3. 通过 Node 20.19、Node 22、184 Node、28 Chromium、build 和 handover contract；
-4. 全绿且 0 unresolved threads 后 squash merge finalization；
-5. 从最终 `main` 创建 Milestone 007 design branch；
-6. 先冻结 multi-selection canonical model；
-7. 冻结 box/lasso hit policy；
-8. 冻结 whole-object translate/rotate/scale 对 authored controls 的变换规则；
-9. 冻结 group、lock、z-order、multi-object command transaction 与 atomic rollback；
-10. 设计未合并前不写 Milestone 007 runtime。
+1. add immutable Milestone 007 design handover；
+2. create documentation-only Draft design PR；
+3. run Node 20.19、Node 22、184 Node、28 Chromium、build and handover；
+4. address design review threads without adding runtime；
+5. confirm zero unresolved threads；
+6. squash merge design PR using validated expected head；
+7. create `agent/007a-selection-batch-translation` from final `main`；
+8. implement SelectionController and Node tests first；
+9. implement Store transaction/listener isolation second；
+10. implement BatchEditCommand and exact ordered undo third；
+11. only then add MapLibre overlays、batch delete and local translation；
+12. keep box/lasso、rotation/scale、groups and new symbols outside 007A。
 
 ## Risks and decisions
 
-- `deriveSemanticGuidePaths` 已成为 public Definition extension，必须保持 backward compatibility；
-- renderer 当前有 3 Sources 和 8 Layers；
-- circular version 1.0 不支持 antimeridian、polar、large-extent 或 geodesic small circles；
-- true two-arc lune 仍未实现；
-- packages 仍为 `UNLICENSED`；
-- root workspace 与 public package versions 尚未统一；
-- PlotJSON 尚缺正式 JSON Schema 和 migration framework；
-- Store/History 尚无 multi-object transaction、persistence 或 general rollback；
-- production JS bundle 约 1,081 kB，需要后续 code splitting；
-- connector 无法删除 merged branches；
-- Pages workflow deployment 与 live manual verification 是独立状态。
+- selection is transient and not PlotJSON canonical state；
+- undo selection restoration requires selection-aware batch commands；
+- Store listener errors cannot safely roll back after observable commit and therefore must be isolated；
+- exact order restoration requires ordered transaction state, not append-on-undo；
+- local translation initially rejects antimeridian、high-latitude and large-extent selections；
+- selection overlay introduces additional MapLibre Source/Layers in 007A；
+- rotation/scale parameter semantics are not yet runtime-ready；
+- groups/locks/z-order require formal PlotJSON migration；
+- packages remain `UNLICENSED`；
+- root workspace and public package versions are not coordinated；
+- production bundle still needs code splitting；
+- performance targets require measured reference hardware and feature mixes。
 
-Continuation：完成 006J post-merge finalization 后，只进入 Milestone 007 设计。不要在 finalization PR 中加入 runtime changes。
+Continuation：continue only documentation and design review on `agent/007-professional-editing-design`. Do not create SelectionController、Store transaction or MapLibre overlays on this branch。
