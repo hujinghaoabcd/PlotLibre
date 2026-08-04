@@ -280,7 +280,7 @@ test("rejected scale preserves Store and retries directly in the same explicit m
     )
     .toEqual({
       status: "rejected",
-      code: "SELECTION_TRANSFORM_POINTER_RADIUS_TOO_SMALL",
+      code: "SELECTION_TRANSFORM_SCALE_OUT_OF_RANGE",
       history: 0,
     });
   expect(await capturedState(page)).toEqual(before);
@@ -308,8 +308,8 @@ test("rejected scale preserves Store and retries directly in the same explicit m
     before.features.map((feature) => feature.style),
   );
   expect(after.features.map((feature) => feature.metadata)).toEqual(
-    before.features.map((feature) => feature.metadata),
-  );
+    before.features.map((feature) => feature.metadata,
+  ));
   await expect
     .poll(() =>
       page.evaluate(() =>
