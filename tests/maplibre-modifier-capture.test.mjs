@@ -138,7 +138,7 @@ function mouseEvent(modifiers) {
   };
 }
 
-test("MapLibre mousedown reserves Shift and restores box zoom on destroy", () => {
+test("Shift feature selection commits on click and restores box zoom on destroy", () => {
   const map = new FakeMap();
   const plot = new PlotLibre(map, {
     definitions: [straightArrowDefinition],
@@ -153,15 +153,17 @@ test("MapLibre mousedown reserves Shift and restores box zoom on destroy", () =>
   const event = mouseEvent({ shiftKey: true });
   map.fire("mousedown", event);
 
+  // A pre-click hit query is allowed, but selection mutation must remain owned
+  // by the normal click path so Shift-empty drag can still become box select.
+  assert.deepEqual(map.queryPoint, { x: 10, y: 20 });
+  assert.deepEqual(plot.selectedIds, ["a"]);
+  assert.equal(event.originalEvent.prevented, false);
+  assert.equal(event.originalEvent.stopped, false);
+
+  map.fire("click", mouseEvent({ shiftKey: true }));
   assert.deepEqual(map.queryPoint, { x: 10, y: 20 });
   assert.deepEqual(plot.selectedIds, ["a", "b"]);
   assert.equal(plot.selectedId, "b");
-  assert.equal(event.originalEvent.prevented, true);
-  assert.equal(event.originalEvent.stopped, true);
-
-  // A later Shift click remains idempotent.
-  map.fire("click", mouseEvent({ shiftKey: true }));
-  assert.deepEqual(plot.selectedIds, ["a", "b"]);
 
   plot.destroy();
   assert.equal(map.boxZoomEnabled, true);

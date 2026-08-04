@@ -4,6 +4,7 @@ import {
 } from "@plotlibre/core";
 
 export type SelectionIntent = "replace" | "add" | "subtract" | "toggle";
+export type SelectionRegionChangeReason = "box" | "lasso";
 
 export type SelectionChangeReason =
   | "replace"
@@ -15,7 +16,8 @@ export type SelectionChangeReason =
   | "store-reconcile"
   | "history-execute"
   | "history-undo"
-  | "history-redo";
+  | "history-redo"
+  | SelectionRegionChangeReason;
 
 export interface SelectionSnapshot {
   readonly selectedIds: readonly string[];
@@ -101,6 +103,44 @@ export class SelectionController {
     }
   }
 
+  /**
+   * Applies one ordered multi-id box/lasso intent and emits at most one change.
+   * The adapter is responsible for supplying ids in deterministic Store order.
+   */
+  public applyMany(
+    ids: readonly string[],
+    intent: SelectionIntent,
+    reason: SelectionRegionChangeReason,
+  ): SelectionSnapshot {
+    const normalized = this.#normalizeExistingIds(ids);
+    const currentSet = new Set(this.#selectedIds);
+
+    switch (intent) {
+      case "replace":
+        return this.#commit(normalized, reason);
+      case "add": {
+        const additions = normalized.filter((id) => !currentSet.has(id));
+        if (additions.length === 0) return this.snapshot();
+        return this.#commit([...this.#selectedIds, ...additions], reason);
+      }
+      case "subtract": {
+        if (normalized.length === 0) return this.snapshot();
+        const removals = new Set(normalized);
+        return this.#commit(
+          this.#selectedIds.filter((id) => !removals.has(id)),
+          reason,
+        );
+      }
+      case "toggle": {
+        if (normalized.length === 0) return this.snapshot();
+        const toggles = new Set(normalized);
+        const survivors = this.#selectedIds.filter((id) => !toggles.has(id));
+        const additions = normalized.filter((id) => !currentSet.has(id));
+        return this.#commit([...survivors, ...additions], reason);
+      }
+    }
+  }
+
   public replace(
     ids: readonly string[],
     primaryId?: string,
@@ -127,7 +167,8 @@ export class SelectionController {
     for (const id of normalized) {
       if (!next.includes(id)) next.push(id);
     }
-    // The final requested id becomes primary even when it was already selected.
+    // Click-add preserves the merged 007A behavior: the final requested id
+    // becomes primary even when it was already selected.
     return this.#commit(moveToEnd(next, normalized.at(-1)!), "add");
   }
 
