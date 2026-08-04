@@ -13,6 +13,14 @@ export const DEFAULT_ARROW_STYLE: PlotStyle = {
   lineWidth: 2,
 };
 
+export const DEFAULT_AREA_STYLE: PlotStyle = {
+  fillColor: "#1976d2",
+  fillOpacity: 0.3,
+  lineColor: "#0d47a1",
+  lineOpacity: 1,
+  lineWidth: 2,
+};
+
 export function createRenderProperties(
   feature: PlotFeature,
   role: PlotRenderRole,
