@@ -15,16 +15,18 @@ Generated GeoJSON, samples, local frames, pivots, handles, guides, selection ove
 Current baseline:
 
 ```text
-main:               c77c5c50ea5976f7afd40f0e48bc712515a99cd5
+main:               409786f6a55aeab6e810651410954d78123e32d3
 workspace:          0.0.22
 PlotJSON:           PlotLibreDocument / 1.0.0
 production migrations: none
 public Definitions: 19 (14 Arrow + 1 Line + 4 Area)
 Node:               20.19+
-merged tests:       324 Node / 34 Chromium
-008B expected:      348 Node / 34 Chromium
+merged tests:       348 Node / 34 Chromium
 MapLibre:           6.0.0 in Playground
 renderer:           4 Sources / 10 Layers
+008A:               merged PR #53/#54
+008B:               merged PR #55
+next:               008C safe reader and migration execution
 ```
 
 ## 2. Dependency direction
@@ -59,7 +61,7 @@ Responsibilities:
 - persisted-version parsing and comparison;
 - descriptor-safe JSON cloning and resource limits;
 - migration graph registration and deterministic planning;
-- migration report record types;
+- immutable migration report record types;
 - engine-independent errors and invariants.
 
 Current key modules:
@@ -145,7 +147,7 @@ Rules:
 - ids are stable and document-unique;
 - `plotType` resolves one registered Definition;
 - `definitionVersion` identifies authored symbol semantics;
-- controls are WGS84 positions with Definition-owned order/roles;
+- controls are WGS84 positions with Definition-owned order and roles;
 - metadata is application data, not hidden core state;
 - effective authored edits increment revision exactly once;
 - generated geometry is discarded and regenerated as needed.
@@ -237,7 +239,7 @@ DOM/SVG region and transform overlays are outside MapLibre resources. `style.loa
 
 ## 9. PlotJSON version domains
 
-Document `schemaVersion` owns document structure, fields, order, references, extensions and future groups/locks/visibility/z-order.
+Document `schemaVersion` owns document structure, fields, order, references, extensions and future groups, locks, visibility and z-order.
 
 Feature `definitionVersion` owns one symbol's control roles, parameters and authored semantics.
 
@@ -253,7 +255,7 @@ JSON boundary
 → atomic Store replacement
 ```
 
-## 10. 008A safety foundation
+## 10. Merged 008A safety foundation
 
 Persisted versions use canonical numeric `MAJOR.MINOR.PATCH` triples and numeric tuple comparison.
 
@@ -274,9 +276,9 @@ Default finite ceilings:
 
 They are security limits, not performance SLAs.
 
-## 11. 008B migration registry architecture
+## 11. Merged 008B migration registry
 
-### 11.1 Separate graphs
+### 11.1 Separate graph domains
 
 ```text
 Document graph node:   schemaVersion
@@ -337,50 +339,66 @@ validate exact source/target
 → return frozen ordered plan
 ```
 
-No shortest path, nearest version, alias inference or best effort exists.
+No shortest path, nearest version, alias inference or best effort exists. Planning never invokes migration functions.
 
-### 11.5 Immutability
+### 11.5 Immutability and reports
 
 Registry snapshots are fresh frozen sorted arrays containing stable frozen step objects. Definition references are copied and frozen. Caller mutation after registration cannot alter stored history.
 
-### 11.6 Report records
-
 `PlotJsonMigrationReport` contains source/target schema versions, document steps, per-feature Definition steps, normalizations and warnings. `createPlotJsonMigrationReport()` copies and deeply freezes the structural envelope and stores no complete document or executable function.
 
-## 12. PlotJSON runtime roadmap
+## 12. 008C reader architecture
+
+008C is the next runtime slice. It will connect the existing safety and planning layers without touching Store or MapLibre.
+
+Required pure read pipeline:
+
+```text
+string byte guard or direct-object clone
+→ JSON syntax parse when needed
+→ JSON safety/resource scan
+→ minimal type/schema envelope
+→ document plan and execution
+→ safety/resource scan after every step
+→ current 1.0.0 decode and compatibility normalization records
+→ document invariants and duplicate ids
+→ Definition plan and execution for every feature
+→ final Definition-version equality
+→ immutable document + report result
+```
+
+`readPlotDocument()` becomes the report-bearing API. `parsePlotDocument()` remains a compatibility wrapper returning only the document.
+
+Every expected failure exposes no partial result and does not mutate caller input.
+
+## 13. 008D atomic import target
+
+Current import performs complete Registry generation before mutation, then uses `store.clear()` and repeated `store.add()`. Duplicate ids can fail after partial replacement.
+
+008D target:
+
+```text
+read and migrate completely in memory
+→ Registry canonicalize/generate every feature
+→ validate complete ordered candidate
+→ stage one Store replacement transaction
+→ one Store batch event
+→ clear selection and History only after success
+```
+
+Every expected failure must preserve old Store, order, selection, History and active interaction state.
+
+## 14. Runtime roadmap
 
 ```text
 008A version / errors / JSON safety / limits — merged
-008B migration registry / planner / report records — PR #55
-008C safe reader / execution / 1.0 compatibility / invariants
+008B migration registry / planner / report records — merged
+008C safe reader / execution / 1.0 compatibility / invariants — next
 008D Registry-aware preparation / atomic Store import
-008E fixtures / docs / finalization
+008E compatibility fixtures / docs / finalization
 ```
 
-008C will execute plans in memory, scan every output, decode current schema, preserve/report historical `1.0.0` normalizations and enforce document/Definition invariants.
-
-008D will replace current `store.clear()` plus repeated `store.add()` with one complete ordered transaction. Every expected failure must preserve Store, order, selection, History and active interactions.
-
-## 13. Interaction lifecycle
-
-Priority:
-
-```text
-active drawing
-> authored-handle drag
-> active selection transform
-> active region gesture
-> armed transform handle
-> armed region mode
-> neutral Shift-empty box
-> selected-body translation
-> click selection
-> camera gesture
-```
-
-Escape, pointer cancellation, unexpected capture loss, style load, resize, camera movement, external Store/selection changes, document lifecycle actions and destroy cancel unsafe transient state. Map interactions are restored exactly once.
-
-## 14. Validation strategy
+## 15. Validation strategy
 
 Every runtime exact head runs:
 
@@ -395,13 +413,13 @@ selection-transform benchmark
 zero unresolved review threads
 ```
 
-008B adds deterministic graph, branch/error, rename, immutability, no-execution, 256-step planning and report-freeze tests. The expected final Node total is 348.
+Current merged baseline is 348 Node and 34 Chromium tests. PR #55 validated head `c86bcc02…` in CI #541 and squash-merged as `409786f6…`.
 
-## 15. Deferred work
+## 16. Deferred work
 
 ```text
-migration execution and current reader
-production schema/Definition migrations
+safe reader and migration execution
+production schema and Definition migrations
 atomic import
 PlotJSON 1.1.0 shape
 groups / locks / visibility / z-order
@@ -415,7 +433,7 @@ coordinated npm release
 
 007D remains blocked until 008D/E establishes real migration, reference validation and atomic import.
 
-## 16. Authority documents
+## 17. Authority documents
 
 ```text
 README.md
@@ -439,5 +457,5 @@ docs/performance/region-selection-benchmark.md
 docs/performance/selection-transform-benchmark.md
 
 docs/handover/LATEST.md
-docs/handover/2026-08-05-milestone-008b-migration-planning.md
+docs/handover/2026-08-05-milestone-008b-post-merge-finalization.md
 ```
