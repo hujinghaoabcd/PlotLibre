@@ -1,12 +1,13 @@
-# PlotLibre Development Handover — Milestone 006J Ready Candidate
+# PlotLibre Development Handover — Milestone 006J Merged / Milestone 007 Design Next
 
 日期：2026-08-04  
 仓库：`hujinghaoabcd/PlotLibre`  
-实现基线：`main@0cae0efe7e4877ade23028a7224c6c6daee16b9b`  
-活跃分支：`agent/006j-circular-arc-family`  
-活跃 PR：`#34 Add circular arc family`  
+当前 `main`：`297d0a644eaa3427f8fd59b82b7bc3582221d49e`  
+已合并 PR：`#34 Add circular arc family`  
+合并方式：squash  
+Post-merge 分支：`agent/006j-post-merge-finalization`  
 Workspace：`0.0.20`  
-状态：006J runtime、19 类 Playground、Sector semantic guide、权威文档和 immutable handover 已完成；候选 run #335 全绿，等待包含 immutable handover 的最终 current-head CI
+状态：Milestone 006J 已合并到 `main`；当前只同步合并事实，下一开发阶段为 Milestone 007 professional editing semantic design
 
 ## Current state
 
@@ -20,12 +21,12 @@ Line Definitions:   1
 Area Definitions:   4
 Node tests:         184
 Chromium tests:     28
-base main SHA:      0cae0efe7e4877ade23028a7224c6c6daee16b9b
-active branch:      agent/006j-circular-arc-family
-active PR:          #34
+main SHA:           297d0a644eaa3427f8fd59b82b7bc3582221d49e
+merged PR:          #34
+next milestone:     007 professional editing semantic design
 ```
 
-新增公共 Definitions：
+新增并已合并的 Definitions：
 
 ```text
 line.circular-arc@1.0.0
@@ -39,53 +40,43 @@ area.sector@1.0.0
 area.lune
 ```
 
-Canonical state 仍为：
+Canonical state 保持：
 
 ```text
 plot definition + authored controls + parameters + style + metadata
 ```
 
-Circumcenter、radius、angles、sweep、arc samples、sector derived endpoint、closing chord/ring 和 semantic guide paths 均为派生状态。
+Circumcenter、radius、angles、sweeps、samples、derived endpoints、rings 和 semantic guide paths 均为派生状态。
 
 ## Completed in this milestone
 
-- 设计通过 PR #33 合并；
-- 实现 local-metre three-point circular frame；
-- 实现 scale-aware circumcircle 与 maximum-radius policy；
-- 实现 exact `start → through → end` 双子弧采样；
-- 支持 minor/major、clockwise/counterclockwise、crossing 0° 和 reversal；
-- 实现 `line.circular-arc@1.0.0` open LineString；
-- 实现 `area.circular-segment@1.0.0` arc+chord Polygon；
-- 实现 `area.sector@1.0.0` center/radius-start/end-bearing model；
-- Sector 第三控制点距离不改变半径；
-- 实现 explicit `sweepDirection`；
-- 实现 local-only coordinate-mode gate；
-- duplicate、collinear、unstable、excessive-radius、unsupported extent 和 invalid topology fail closed；
-- 无 two-point fallback、singular degradation、hidden control movement 或 silent geodesic switch；
-- 新增 `lineSymbols` 并保持现有 catalog arrays；
-- `builtInSymbols` 扩展为 19；
-- Registry、PlotJSON 和 create/replace/import preflight 完整；
-- Playground 新增三类 selector、samples 和 fixed-three instructions；
-- production / `basemap=none` 加载 19 类 samples；
-- base `?e2e=1` 保持原九类 compatibility surface；
-- full E2E 增加 `circular=1`；
-- 新增通用 `PlotDefinition.deriveSemanticGuidePaths(feature)`；
-- Sector 声明 `center → end-bearing handle` guide；
-- MapLibre 新增 `plotlibre-handle-guide` dashed layer；
-- guide 在 complete draft、selection 和 handle drag 显示；
-- guide 不进入 committed source、Store、History、PlotJSON 或 committed RenderBundle；
-- style reload 恢复 3 Sources、8 Layers、committed features、handles 和 guides；
-- workspace 提升到 `0.0.20`；
-- README、AGENTS、路线图、Playground、interaction、design/algorithm indexes 已同步；
-- 新增 immutable handover：`2026-08-04-milestone-006j-circular-arc-family.md`。
+- PR #33 合并 circular family 设计与数学契约；
+- PR #34 实现 local-metre three-point circular frame；
+- 实现 exact minor/major directed arc sampling；
+- 实现 `line.circular-arc`、`area.circular-segment` 和 `area.sector`；
+- 实现 strict coordinate、radius、sweep 和 topology preflight；
+- 保留 authored controls 与 PlotJSON 边界；
+- 新增 `lineSymbols`，公共目录扩展为 19；
+- 新增 Definition-driven `deriveSemanticGuidePaths`；
+- Sector 增加 transient center-to-bearing guide；
+- MapLibre 增加 `plotlibre-handle-guide`，完整 layer 数为 8；
+- guide 不进入 committed output、Store、History 或 PlotJSON；
+- production Playground 扩展到 19 selectors / 19 samples；
+- Node tests 从 163 增至 184；
+- Chromium tests 从 23 增至 28；
+- workspace 提升为 `0.0.20`；
+- README、AGENTS、roadmap、Playground、interaction、design/algorithm indexes 和 immutable handover 全部同步；
+- 最终 PR head 在完整 current-head CI 和 0 个 unresolved threads 后标记 Ready；
+- PR #34 使用 expected validated head squash merge；
+- 实际 squash SHA 为 `297d0a644eaa3427f8fd59b82b7bc3582221d49e`。
 
 ## Validation
 
-权威候选 run：
+最终 PR head 验证：
 
 ```text
-GitHub Actions run: 30892995606 (#335)
-validated head:     941bf399620200959a5958137c8d0e3a7b1db0f2
+GitHub Actions run: 30893450723 (#337)
+validated head:     608567d4f8f662242b0356c54742a2ffcb087c66
 Node 20.19:         success
 Node 22:            success
 TypeScript:         success
@@ -94,59 +85,43 @@ Playground typecheck: success
 Playground build:   success
 handover contract:  success
 Chromium tests:     28 passed / 0 failed
+unresolved threads: 0
 ```
 
-Chromium 日志：
+候选浏览器日志：
 
 ```text
 Running 28 tests using 1 worker
 28 passed (1.9m)
 ```
 
-该 run 验证了完整 runtime、guide API、workspace 0.0.20、19 类生产 samples 和当时全部权威文档。随后只新增 immutable handover 并更新本 current-state 文件，没有扩大 runtime scope。
-
-最终 merge gate 仍要求对包含 immutable handover 的 current head 再执行：
-
-```text
-Node 20.19:        success
-Node 22:           success
-Node tests:        184 passed
-Chromium tests:    28 passed
-Playground build: success
-handover contract: success
-unresolved threads: 0
-```
-
-PR #34 在最终文档 head 全绿前保持 Draft。
+本 post-merge finalization 只修改 current-state Markdown 并增加合并记录，不修改 runtime、geometry、Definitions、interaction、Playground source、tests 或 configuration。该 finalization 仍需独立完整 CI 后进入 `main`。
 
 ## Next tasks
 
-1. 触发包含 immutable handover 与本 `LATEST.md` 的最终 CI；
-2. 确认 184 Node、28 Chromium、build 和 handover contract 全绿；
-3. 确认 unresolved review threads = 0；
-4. 更新 PR #34 body 为完整纵向切片和最终 run；
-5. 标记 Ready；
-6. 使用 validated expected head SHA squash merge；
-7. 记录真实 squash SHA；
-8. 需要时创建 documentation-only post-merge finalization；
-9. 从最终 `main` 创建 Milestone 007 professional editing design branch；
-10. 不在 PR #34 中增加 true lune、geodesic circular fallback、pincer hardening 或 route-head variants。
+1. 完成 `agent/006j-post-merge-finalization` 的 documentation-only 同步；
+2. 创建 Draft finalization PR；
+3. 通过 Node 20.19、Node 22、184 Node、28 Chromium、build 和 handover contract；
+4. 全绿且 0 unresolved threads 后 squash merge finalization；
+5. 从最终 `main` 创建 Milestone 007 design branch；
+6. 先冻结 multi-selection canonical model；
+7. 冻结 box/lasso hit policy；
+8. 冻结 whole-object translate/rotate/scale 对 authored controls 的变换规则；
+9. 冻结 group、lock、z-order、multi-object command transaction 与 atomic rollback；
+10. 设计未合并前不写 Milestone 007 runtime。
 
 ## Risks and decisions
 
-- `line.circular-arc` 是首个非 Arrow open LineString public Definition；
-- Sector authored bearing handle 通常不位于 rendered endpoint，guide 是必要语义解释；
-- `deriveSemanticGuidePaths` 是新增 public Definition hook，必须保持 backward compatible；
-- renderer layer count 从 7 增至 8；
-- circular 1.0 不支持 antimeridian、polar、large-extent 或 geodesic small-circle behavior；
-- near-collinear controls 通过 determinant 和 circumradius policy fail closed；
-- true mathematical lune 不能与 circular segment 混同；
+- `deriveSemanticGuidePaths` 已成为 public Definition extension，必须保持 backward compatibility；
+- renderer 当前有 3 Sources 和 8 Layers；
+- circular version 1.0 不支持 antimeridian、polar、large-extent 或 geodesic small circles；
+- true two-arc lune 仍未实现；
 - packages 仍为 `UNLICENSED`；
 - root workspace 与 public package versions 尚未统一；
 - PlotJSON 尚缺正式 JSON Schema 和 migration framework；
 - Store/History 尚无 multi-object transaction、persistence 或 general rollback；
 - production JS bundle 约 1,081 kB，需要后续 code splitting；
 - connector 无法删除 merged branches；
-- Pages deployment 与 live manual verification 必须分别确认。
+- Pages workflow deployment 与 live manual verification 是独立状态。
 
-Continuation：继续在 `agent/006j-circular-arc-family` / PR #34 完成最终 head CI、Ready 和 squash merge。不要扩大范围。
+Continuation：完成 006J post-merge finalization 后，只进入 Milestone 007 设计。不要在 finalization PR 中加入 runtime changes。
