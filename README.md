@@ -2,7 +2,7 @@
 
 **PlotLibre** is a MapLibre-native, engine-independent framework for drawing, editing, rendering and exchanging semantic parametric situation plots and tactical graphics.
 
-> PlotLibre 保存“符号类型 + authored controls + 参数 + 样式 + 元数据”。地图中的 LineString、Polygon、采样点、选择轮廓、区域选择路径、平移/旋转/缩放预览、变换框和语义引导线均为可重新生成的派生结果。
+> PlotLibre 保存“符号类型 + authored controls + 参数 + 样式 + 元数据”。地图中的 LineString、Polygon、采样点、选择轮廓、平移/旋转/缩放预览和交互框均为可重新生成的派生结果。
 
 ## Live Playground
 
@@ -11,66 +11,66 @@
 The Playground includes nineteen public Definitions:
 
 ```text
-arrow.straight
-arrow.fine
-arrow.fine.tailed
-arrow.assault-direction
-arrow.curved
-arrow.attack
-arrow.attack.tailed
-arrow.double
-arrow.pincer
-arrow.squad-combat
-arrow.route
-arrow.corridor
-arrow.route.bidirectional
-arrow.route.double-head
+arrow.straight             arrow.fine
+arrow.fine.tailed          arrow.assault-direction
+arrow.curved               arrow.attack
+arrow.attack.tailed        arrow.double
+arrow.pincer               arrow.squad-combat
+arrow.route                arrow.corridor
+arrow.route.bidirectional  arrow.route.double-head
 line.circular-arc
-area.closed-curve
-area.gathering-place
-area.circular-segment
-area.sector
+area.closed-curve          area.gathering-place
+area.circular-segment      area.sector
 ```
 
-It supports exact fixed-point and variable-point drawing, live preview, structured rejection feedback, semantic handle editing, ordered multi-selection, box/lasso selection, atomic batch delete, whole-selection local-metre translation, clockwise rotation, positive uniform scale, undo/redo, style editing, nineteen Nanjing samples and PlotJSON import/export.
+It supports fixed/variable-point drawing, live preview, semantic handles, ordered multi-selection, box/lasso selection, atomic batch delete, whole-selection translation, clockwise rotation, positive uniform scale, undo/redo, style editing, nineteen Nanjing samples and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-main SHA:          2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0
-workspace version: 0.0.22
-MapLibre GL JS:    6.0.0
-Node.js:           20.19+
-Node tests:        299
-Chromium tests:    34
-public symbols:    19 (14 Arrow + 1 Line + 4 Area)
-MapLibre sources:  4
-MapLibre layers:   10
-benchmark jobs:    region selection + selection transform
-007C status:       merged through PR #49
+main SHA:           add70f52eb252b1167f7abfb4ecf4b93370bfbdf
+workspace version:  0.0.22
+MapLibre GL JS:     6.0.0
+Node.js:            20.19+
+historical tests:   299 Node / 34 Chromium
+008A target:        324 Node / 34 Chromium
+public symbols:     19 (14 Arrow + 1 Line + 4 Area)
+MapLibre resources: 4 Sources / 10 Layers
+benchmark jobs:     region selection + selection transform
+007C:               merged PR #47–#50
+008 design:         merged PR #51/#52
+008A runtime:       PR #53
 ```
 
-Milestone 007C is merged on `main`: complete ordered selections can be rotated clockwise or scaled positively and uniformly through the public `PlotLibre` facade, with complete Registry preflight, one atomic history command and exact undo/redo.
+The root version is a development baseline, not yet a coordinated npm release across all public packages.
 
-The root workspace version is a development baseline, not yet a coordinated npm release across all public packages.
+## Canonical model
+
+```text
+PlotDefinition + authored controlPoints + parameters + style + metadata
+```
+
+Generated geometry, samples, local frames, pivots, selection overlays, region paths, handles, guides and previews are derived. They are not persisted as authored state.
+
+```text
+core <- geometry <- symbols
+core <- interaction
+core + interaction <- maplibre
+public packages <- playground / wrappers
+```
+
+- `@plotlibre/core`: domain types, PlotJSON foundations, Registry, transactional Store, commands and History;
+- `@plotlibre/geometry`: pure planar, circular, closed-area and geodesic geometry;
+- `@plotlibre/symbols`: nineteen built-in parametric Definitions;
+- `@plotlibre/interaction`: drawing, ordered selection, region algorithms, batch commands and local transforms;
+- `@plotlibre/maplibre`: rendering, exact projected hit resolution, handles and DOM/SVG interaction overlays;
+- `@plotlibre/playground`: browser demo, E2E and GitHub Pages site.
 
 ## Professional editing
 
 ### Ordered selection and Primary
 
-`SelectionController` owns transient ordered selection:
-
-```ts
-interface SelectionSnapshot {
-  readonly selectedIds: readonly string[];
-  readonly primaryId?: string;
-  readonly revision: number;
-}
-```
-
-The final selected id is Primary. Every selected plot receives a lightweight derived selection overlay; only Primary exposes authored handles, Definition guides and style editing.
-
-Click semantics:
+Selection is transient, ordered and excluded from PlotJSON. The final selected id is Primary.
 
 ```text
 plain click       replace / make Primary
@@ -80,8 +80,6 @@ Alt + click       subtract
 empty plain click clear
 ```
 
-Compatibility APIs remain:
-
 ```ts
 plot.select(id | undefined)
 plot.selectedId
@@ -89,119 +87,45 @@ plot.selectedIds
 plot.selection
 ```
 
-Selection is not document state. It does not change PlotFeature revisions and is excluded from PlotJSON.
+Every selected plot receives a derived overlay. Only Primary exposes authored handles, Definition guides and style editing.
 
 ### Box and lasso selection
-
-Milestone 007B adds screen-space region selection.
-
-Entry paths:
-
-```text
-Shift + empty drag       one-shot additive box
-plot.startBoxSelection() explicit one-shot box, default replace
-plot.startLassoSelection() explicit one-shot lasso, default replace
-```
-
-Public APIs:
 
 ```ts
 plot.regionSelection
 plot.regionSelectionSnapshot
 plot.regionSelectionRejection
-plot.startBoxSelection({ intent?: "replace" | "add" | "toggle" | "subtract" })
-plot.startLassoSelection({ intent?: "replace" | "add" | "toggle" | "subtract" })
+plot.startBoxSelection({ intent })
+plot.startLassoSelection({ intent })
 plot.cancelRegionSelection()
 ```
 
-Modifier priority at pointerdown is:
+Intent is `replace | add | toggle | subtract`; pointer modifier priority is `Alt > Ctrl/Cmd > Shift > configured intent`.
 
-```text
-Alt > Ctrl/Cmd > Shift > configured/default intent
-```
+Region coordinates use CSS pixels. MapLibre's rendered query is broad phase only; candidates are normalized to Store order, regenerated through the Registry, projected and tested against exact semantic point/line/polygon geometry. Labels, hit areas, handles and overlays are not selectable semantic geometry.
 
-The Playground exposes `框选`、`套索` and `取消区域` controls and reports armed, active, rejected, retry and completion states.
+Invalid region completion preserves selection and explicit mode can retry. Region selection creates no History entry and adds no MapLibre Source or Layer.
 
-#### Region geometry
+### Atomic Store and commands
 
-All region coordinates use CSS pixels:
+`PlotStore.applyTransaction()` stages complete mutations before one commit. `BatchEditCommand` captures exact before/after features, document order and selection.
 
-```text
-box threshold:       4 px Euclidean distance
-lasso spacing:       2 px
-minimum points:      3
-minimum area:        16 px²
-RDP tolerance:       1.5 px
-boundary:            inclusive
-```
-
-Raw and simplified lasso paths must both be simple. Repeated non-consecutive vertices, non-adjacent crossings, touches and collinear overlaps reject. Invalid completion preserves the current selection and an explicit mode can be retried directly.
-
-#### Exact semantic hit testing
-
-MapLibre's rendered index is broad phase only:
-
-```text
-region bounds
-→ queryRenderedFeatures(committed fill/line/point layers)
-→ plotId deduplication
-→ PlotStore-order normalization
-→ Registry.generate once per candidate
-→ map.project semantic geometry
-→ exact screen intersection
-```
-
-Point centers, line segments, polygon crossing/containment, Multi geometries and Polygon holes are supported. CSS line width, point radius, labels, hit areas, drafts, handles, guides and selection overlays are not semantic region geometry.
-
-A query, generation or projection failure rejects the whole operation. Partial selection is prohibited.
-
-#### One-event mutation
-
-`SelectionController.applyMany()` applies replace/add/subtract/toggle once. Result ordering follows PlotStore order, one effective completion emits one immutable selection event, and region selection never creates a History entry.
-
-#### Overlay and lifecycle
-
-The region guide is a DOM/SVG screen overlay, not geographic GeoJSON. No new Source or Layer was added; the 4-source/10-layer renderer baseline remains unchanged.
-
-Escape, pointer cancellation, unexpected lost capture, style reload, resize, camera movement, Store mutation, external selection revision and document lifecycle operations cancel active region state safely. MapLibre boxZoom, dragPan and pointer capture are restored exactly once.
-
-Real Chromium exposed that intentional `releasePointerCapture()` emits `lostpointercapture`. The final controller ignores that event after intentional ownership release, preserving a newly created rejected state while still cancelling unexpected pointer loss.
-
-### Atomic Store transactions
-
-`PlotStore.applyTransaction()` stages additions, replacements, removals and optional exact document ordering before one commit. Every precondition and candidate is validated against the staged state. Failure leaves the Store unchanged and no listener sees partial state.
-
-Post-commit listener exceptions are isolated and reported through the configured listener-error hook. A listener failure cannot create changed Store state without a corresponding History entry.
-
-### Batch commands and delete
-
-`BatchEditCommand` captures exact before/after feature values, document order and selection snapshots. Execute, undo and redo each use one Store transaction and one selection restoration.
-
-Delete/Backspace and the Playground batch-delete button remove the complete selection with one history entry. Undo restores document order, feature values, selected ids and Primary.
+Batch delete, translation, rotation and scale use one atomic command. Preview, rejection, cancellation and no-op never enter Store or History. Listener failures are isolated after commit.
 
 ### Whole-selection translation
 
-Dragging the body of any selected plot translates every selected plot by one common local-metre vector:
-
 ```text
 ordered authored controls
-→ one order-independent local projection origin
-→ pointer start/end in that frame
+→ one order-independent local projection
 → one metre delta
-→ same delta for every control
-→ canonicalize and generate every candidate
-→ one atomic BatchEditCommand on release
+→ translate every selected control
+→ canonicalize/generate every candidate
+→ one atomic command
 ```
 
-The Store remains unchanged during preview. Escape cancels the gesture. If any member is invalid, the complete batch rejects and History remains unchanged. Parameters, style and metadata are preserved.
-
-Handle drag retains priority over body translation. PlotLibre reserves Shift for selection and temporarily disables MapLibre box zoom while the region controller is installed.
+Store is unchanged during preview. One invalid member rejects the complete batch.
 
 ### Whole-selection rotation and positive uniform scale
-
-Milestone 007C transforms the complete ordered selection in one shared local-metre frame. The fixed pivot is the center of the authored-control local AABB; it is not a rendered centroid, Primary center or persisted object.
-
-Public APIs:
 
 ```ts
 plot.selectionTransform
@@ -212,97 +136,95 @@ plot.startSelectionScale()
 plot.cancelSelectionTransform()
 ```
 
-Canonical behavior:
-
 ```text
 all selected authored controls
-→ one order-independent local frame
-→ one fixed AABB-center pivot
+→ one shared local-metre frame
+→ fixed authored-control AABB-centre pivot
 → clockwise rotation or positive uniform scale
-→ revision +1 candidates
-→ canonicalize and Registry.generate every member
-→ complete transient preview or complete rejection
+→ canonicalize/generate every member
+→ complete preview or rejection
 → one stale-safe BatchEditCommand
 ```
 
-Rotation uses positive clockwise angles. Uniform scale accepts only `[0.01, 100]`; out-of-range values reject instead of clamping, and radial scale cannot reflect across the pivot. Parameters, style, metadata, Store order, selection order and Primary remain unchanged.
+Uniform scale accepts `[0.01, 100]`; reflection and non-uniform scale are excluded. Parameters, style, metadata, document order, selection order and Primary are preserved.
 
-The Playground exposes `旋转`、`缩放` and `取消变换`. Explicit transform and region modes are mutually exclusive. A successful transform exits the mode; invalid pointerup preserves canonical Store state and leaves the mode available for direct retry.
+The derived DOM/SVG overlay uses a 4 CSS-pixel minimum start radius and a 24 CSS-pixel minimum visual frame for tiny selections. It adds no MapLibre resource.
 
-The DOM/SVG overlay contains a projected frame, pivot, scale handle, rotation guide/handle and transient value label. Tiny selections receive a minimum 24 CSS-pixel visual frame without changing canonical math. A gesture must start at least four CSS pixels from the projected pivot. The overlay adds no MapLibre Source or Layer.
+## PlotJSON
 
-Preview, rejection, cancel and no-op never enter Store or History. Undo and redo restore exact captured values and never recompute the transform.
+Current production envelope:
+
+```text
+PlotLibreDocument / schemaVersion 1.0.0
+```
+
+Document `schemaVersion` owns document structure. Feature `definitionVersion` owns one symbol's authored semantics. They are independent migration domains.
+
+### 008A public foundations
+
+```ts
+PLOTJSON_DOCUMENT_TYPE
+CURRENT_PLOTJSON_SCHEMA_VERSION
+parsePlotJsonVersion(...)
+comparePlotJsonVersions(...)
+isCanonicalPlotJsonVersion(...)
+
+PlotJsonError
+DEFAULT_PLOTJSON_LIMITS
+resolvePlotJsonLimits(...)
+assertPlotJsonInputSize(...)
+clonePlotJsonValue(...)
+scanPlotJsonValue(...)
+```
+
+Persisted versions use canonical numeric `MAJOR.MINOR.PATCH` triples. Components are non-negative safe integers. Prefixes, missing components, leading zeros, prerelease/build suffixes and unsafe numbers reject. Comparison is numeric rather than lexical.
+
+Direct-object JSON safety accepts only null, strings, booleans, finite numbers, dense arrays and plain/null-prototype objects. It rejects non-JSON values, custom prototypes, accessors, hidden/symbol properties, sparse/custom arrays and cycles without invoking getters.
+
+Traversal is iterative and deterministic. Repeated non-cyclic references are cloned independently. Own `__proto__` and `constructor` keys remain safe data properties and cannot pollute prototypes.
+
+### Default safety ceilings
+
+```text
+UTF-8 input:             16 MiB
+maximum depth:           128
+value nodes:             1,000,000
+object keys:             250,000
+string or key length:    1,000,000 UTF-16 code units
+features:                100,000
+controls per feature:    10,000
+total authored controls: 1,000,000
+```
+
+These are finite untrusted-input ceilings, not recommended document sizes, memory guarantees or latency SLAs. Overrides must be finite positive safe integers.
+
+008A does **not** connect these primitives to the existing parser or import path. Historical PlotJSON `1.0.0` normalization remains unchanged. Migration registry, report-bearing reading, Definition-version enforcement and atomic document replacement are delivered in 008B–008D.
 
 ## Rendering resources
 
-Four derived GeoJSON sources:
-
 ```text
-plotlibre-committed
-plotlibre-selection
-plotlibre-draft
-plotlibre-handles
+Sources
+  plotlibre-committed
+  plotlibre-selection
+  plotlibre-draft
+  plotlibre-handles
+
+Layers
+  plotlibre-fill
+  plotlibre-line
+  plotlibre-point
+  plotlibre-selection-line
+  plotlibre-selection-point
+  plotlibre-draft-fill
+  plotlibre-draft-line
+  plotlibre-draft-point
+  plotlibre-handle-guide
+  plotlibre-handle
 ```
 
-Ten layers:
+Region and transform DOM/SVG overlays are outside these resources. Style reload rebuilds derived map state from canonical Store and selection state.
 
-```text
-plotlibre-fill
-plotlibre-line
-plotlibre-point
-plotlibre-selection-line
-plotlibre-selection-point
-plotlibre-draft-fill
-plotlibre-draft-line
-plotlibre-draft-point
-plotlibre-handle-guide
-plotlibre-handle
-```
-
-The DOM/SVG region and selection-transform overlays are outside these resources. Style reload reconstructs committed geometry, selection overlays, drafts, handles and guides from canonical state and cancels active transient modes safely.
-
-## Architecture
-
-```text
-core <- geometry <- symbols
-core <- interaction
-core + interaction <- maplibre
-public packages <- playground / wrappers
-```
-
-- `@plotlibre/core`: domain types, Registry, transactional Store, commands, History and PlotJSON;
-- `@plotlibre/geometry`: pure planar, circular, closed-area and geodesic geometry;
-- `@plotlibre/symbols`: built-in parametric Definitions;
-- `@plotlibre/interaction`: draw sessions, ordered selection, screen-region algorithms, batch commands, local translation and engine-independent selection transforms;
-- `@plotlibre/maplibre`: rendering, broad-phase queries, exact projected region resolution, DOM/SVG overlays, handles and gesture adapters;
-- `@plotlibre/playground`: browser demo, E2E and GitHub Pages site.
-
-Canonical state remains engine-independent. Rendered geometry, region paths, transform frames and interaction overlays cannot become authored state.
-
-## Symbol families
-
-### Circular family
-
-- `line.circular-arc@1.0.0`: exact start/through/end controls define a directed minor or major arc;
-- `area.circular-segment@1.0.0`: the same arc closed by its endpoint chord;
-- `area.sector@1.0.0`: center, radius/start and end-bearing handle; bearing-handle distance does not define a second radius.
-
-Circular v1 is local-metre only and fails closed for invalid WGS84 positions, duplicate/collinear controls, unstable or excessive circles, ambiguous sweeps, invalid parameters and invalid Polygon topology.
-
-### Closed action areas
-
-- `area.closed-curve@1.0.0`: 3–64 ordered boundary waypoints with periodic interpolating closure;
-- `area.gathering-place@1.0.0`: flank A, front crown and flank B with only deterministic flank permutation allowed.
-
-### Arrow and path families
-
-PlotLibre includes exact two-point arrows, curved and attack-path arrows, flat and tailed attack closures, four-control double arrow, five-control pincer, center-path squad combat, route/corridor ribbons, bidirectional exact-two-tip route and a route with a derived secondary emphasis head.
-
-Widths, heads, necks, notches, bridges, mirrored points and samples are derived; authored semantic roles are preserved.
-
-## Validation and performance
-
-Root validation:
+## Validation
 
 ```bash
 npm run check
@@ -312,23 +234,32 @@ npm run benchmark:selection-transform
 npm run handover:check
 ```
 
-The transform benchmark records reproducible `1/100/1,000` complete-selection cases and uploads JSON/Markdown artifacts. It is observational and defines no browser latency SLA. Exact measured evidence and limitations are documented in:
+Current performance benchmarks are observational and define no browser latency SLA.
+
+## Documentation authority
 
 ```text
-docs/performance/selection-transform-benchmark.md
-```
+README.md
+AGENTS.md
+docs/ARCHITECTURE.md
+docs/PLOTJSON_SPEC.md
+docs/DEVELOPMENT_PLAN.md
 
-007C architecture and runtime boundaries are documented in:
-
-```text
+docs/design/region-selection.md
 docs/design/rotation-uniform-scale.md
 docs/design/rotation-uniform-scale-runtime.md
+docs/design/plotjson-migrations.md
+docs/design/plotjson-compatibility-matrix.md
+docs/design/plotjson-version-json-safety-runtime.md
+
 docs/algorithms/selection-local-transform.md
+docs/algorithms/plotjson-migration-pipeline.md
+
+docs/performance/region-selection-benchmark.md
+docs/performance/selection-transform-benchmark.md
+
+docs/handover/LATEST.md
+docs/handover/2026-08-05-milestone-008a-plotjson-foundations.md
 ```
 
-The next design milestone freezes PlotJSON migration and compatibility semantics before groups, locks, visibility or z-order can enter runtime:
-
-```text
-docs/handover/2026-08-05-milestone-007c-runtime-post-merge-finalization.md
-agent/008-plotjson-migrations-design
-```
+The next runtime slice is `agent/008b-plotjson-migration-registry-runtime`: migration step types, graph validation, deterministic linear planning and immutable report record types only. Parser, Registry, Store and MapLibre integration remain later milestones.
