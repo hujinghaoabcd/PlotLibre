@@ -48,6 +48,8 @@ jobs:
 
   benchmark:
     uses: ./.github/workflows/region-selection-benchmark.yml
+    with:
+      source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
   browser:
     runs-on: ubuntu-latest
