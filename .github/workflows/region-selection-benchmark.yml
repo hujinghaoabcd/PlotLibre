@@ -1,0 +1,48 @@
+name: Region Selection Benchmark
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/region-selection-benchmark.yml"
+      - "package.json"
+      - "scripts/benchmark-region-selection.mjs"
+      - "packages/core/**"
+      - "packages/geometry/**"
+      - "packages/interaction/**"
+      - "packages/maplibre/**"
+      - "packages/symbols/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run resolver benchmark
+        env:
+          PLOTLIBRE_BENCHMARK_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: npm run benchmark:region-selection
+
+      - name: Publish benchmark summary
+        run: cat artifacts/region-selection-benchmark/results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: region-selection-benchmark-${{ github.run_id }}
+          path: artifacts/region-selection-benchmark
+          if-no-files-found: error
+          retention-days: 14
