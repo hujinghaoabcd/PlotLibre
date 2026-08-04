@@ -33,7 +33,7 @@ public packages <- playground / wrappers
 ## 3. Current merged baseline
 
 ```text
-main SHA:           f98483d3504ce464c93e5a03a49f7f856d1cc1a0
+main SHA:           012d17ac8a8f7e71264ef375511b764cb398d111
 workspace:          0.0.22
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 Node baseline:      264
@@ -43,26 +43,31 @@ MapLibre Layers:    10
 Milestone 007A:     merged through PR #38/#39
 Milestone 007B design: merged through PR #40/#41
 Milestone 007B runtime: merged through PR #42/#43
+Milestone 007B finalization: merged through PR #44
 ```
 
-Current finalization branch:
+Current branch:
 
 ```text
-agent/007b-docs-benchmark-finalization
-scope: version, authority docs and immutable handover
-runtime: prohibited except correction of documentation-owned demo text
+agent/007b-region-selection-benchmark
+scope: reproducible resolver benchmark, frozen evidence and indexing decision
+selection runtime changes: prohibited
 ```
 
 Final 007B evidence:
 
 ```text
-PR #42 head: 812183a47413bdac554fbd6ca75e1443026ac474
-PR #42 CI:   #437 / 30920263173 — 264 Node / 30 Chromium
-PR #42 merge:e18183df5be4b98c38ba177e8440b28e859c2c90
+PR #42 head:  812183a47413bdac554fbd6ca75e1443026ac474
+PR #42 CI:    #437 / 30920263173 — 264 Node / 30 Chromium
+PR #42 merge: e18183df5be4b98c38ba177e8440b28e859c2c90
 
-PR #43 head: f7d9e107221d4ee3fc4278f697a7c0ba84d95a59
-PR #43 CI:   #445 / 30924648279 — 264 Node / 32 Chromium
-PR #43 merge:f98483d3504ce464c93e5a03a49f7f856d1cc1a0
+PR #43 head:  f7d9e107221d4ee3fc4278f697a7c0ba84d95a59
+PR #43 CI:    #445 / 30924648279 — 264 Node / 32 Chromium
+PR #43 merge: f98483d3504ce464c93e5a03a49f7f856d1cc1a0
+
+PR #44 head:  49b6bd6e6d99d08c8fae0617a9bf0fb1586b1b8b
+PR #44 CI:    #448 / 30927338756 — 264 Node / 32 Chromium
+PR #44 merge: 012d17ac8a8f7e71264ef375511b764cb398d111
 ```
 
 Never use old-head validation as evidence for a newer head.
@@ -275,7 +280,7 @@ region screen bounds
 
 Exclude selection, draft, handle, guide and label layers. Query order and tile duplicates never define semantics.
 
-No persistent second spatial index may be added before measured evidence and an invalidation design.
+The first measured resolver benchmark does not justify a persistent second spatial index. Any future index proposal requires real-browser query evidence plus a complete invalidation design.
 
 ## 12. Exact screen narrow phase
 
@@ -346,21 +351,42 @@ Entering or cancelling explicit mode preserves existing selection membership. Ex
 
 Region selection is not a document command.
 
-## 16. Performance boundary
+## 16. Measured performance boundary
 
-The resolver exposes candidate/projection metrics and must generate only unique broad-phase candidates.
+Reproducible entry:
 
-Required future measured fixtures:
-
-```text
-100
-1,000
-10,000 features
+```bash
+npm run benchmark:region-selection
 ```
 
-Record hardware, OS, browser/runtime, viewport/camera, feature mix, generated vertices, Store size, candidate count, query time, generation/projection time, exact-intersection time, total latency, median and p95.
+Authoritative evidence:
 
-No hard latency guarantee is currently published. Do not add a persistent spatial index or claim scale performance without this evidence.
+```text
+docs/performance/region-selection-resolver-benchmark.md
+docs/performance/data/2026-08-04-region-selection-resolver-ci.json
+```
+
+Measured run:
+
+```text
+CI:                    #457 / 30933193884
+source head:           2fca8812e206f799c3580380f4e1cd3ed3a73aa8
+Node:                  v22.23.1
+profile:               arrow.straight / all-candidates / all-hits
+100 candidates:        2.399 ms median / 5.308 ms p95
+1,000 candidates:      10.961 ms median / 18.246 ms p95
+10,000 candidates:     109.308 ms median / 119.182 ms p95
+```
+
+Binding interpretation:
+
+- headline totals are uninstrumented resolver calls;
+- diagnostic phases are collected separately and are not additive decomposition;
+- real MapLibre tile/style query latency is not measured;
+- the fixture deliberately uses a 100% candidate ratio and cannot be treated as normal viewport behavior;
+- no hard latency SLA is published;
+- the current decision is to retain MapLibre rendered-index broad phase and not add a persistent custom index;
+- a future index proposal requires real Chromium/MapLibre measurements, candidate-ratio fixtures and explicit invalidation semantics.
 
 ## 17. Validation baseline
 
@@ -372,9 +398,12 @@ Node 22
 all Node tests (current baseline 264)
 Playground /PlotLibre/ build
 handover contract
+region-selection benchmark job and artifact
 all Chromium E2E (current baseline 32)
 zero unresolved review threads
 ```
+
+Benchmark success means the script executes, validates result counts and produces JSON/Markdown. It does not enforce a latency threshold.
 
 Functional coverage includes box/lasso math, topology, Point/Line/Polygon/Multi/hole predicates, applyMany ordering, broad-phase normalization, fail-closed behavior, region lifecycle, rejected retry and all historical symbol/editing regressions.
 
@@ -392,7 +421,6 @@ Observed only public/observable mode lifecycle, Shift box behavior, DOM region U
 ## 19. Merge discipline
 
 - design, runtime and finalization use separate branches/PRs;
-- finalization branches contain documentation/version/demo-copy changes only;
 - keep PR Draft until exact current-head CI is green;
 - report every failure immediately;
 - resolve every actionable review thread;
@@ -404,14 +432,13 @@ Observed only public/observable mode lifecycle, Shift box behavior, DOM region U
 
 ## 20. Continuation order
 
-1. finish the 0.0.22 documentation-only 007B finalization;
-2. pass unchanged 264/32 exact-head CI;
+1. finish PR #45 benchmark infrastructure, evidence and handover;
+2. pass exact-head Node 20.19/22, 264 Node, benchmark artifact, 32 Chromium and handover checks;
 3. merge with zero unresolved threads and verify `main`;
-4. create a separate benchmark branch for measured 100/1,000/10,000 evidence;
-5. decide whether a persistent index is justified only after measurement;
-6. begin 007C rotation/positive-uniform-scale as design-only work;
-7. keep groups/locks/visibility/z-order deferred until formal PlotJSON schema and migration design;
-8. keep snapping, touch region gestures and new symbols outside these slices.
+4. begin 007C rotation/positive-uniform-scale as a separate design-only branch;
+5. add real-browser candidate-ratio performance work only as a separate performance slice;
+6. keep groups/locks/visibility/z-order deferred until formal PlotJSON schema and migration design;
+7. keep snapping, touch region gestures and new symbols outside these slices.
 
 ## 21. Cross-stage engineering tasks
 
@@ -419,7 +446,7 @@ Observed only public/observable mode lifecycle, Shift box behavior, DOM region U
 2. coordinate workspace/public package versions and release workflow;
 3. formalize PlotJSON JSON Schema and migrations;
 4. automate docs/Registry/test baseline consistency;
-5. add reproducible performance benchmark infrastructure;
+5. add real Chromium/MapLibre performance profiles with varied candidate ratios;
 6. review npm package boundaries;
 7. split the large Playground production chunk;
 8. distinguish source, build, deployment and live-site verification;

@@ -1,106 +1,92 @@
-# PlotLibre Development Handover — Milestone 007B Runtime Merged
+# PlotLibre Development Handover — Milestone 007B-P Benchmark
 
-日期：2026-08-04  
+日期：2026-08-05  
 仓库：`hujinghaoabcd/PlotLibre`  
-完整不可变交接：`docs/handover/2026-08-04-milestone-007b-box-lasso-runtime.md`
+当前工作：PR #45 `Add reproducible region-selection benchmark`
 
 ## Current state
 
 ```text
-main:                f98483d3504ce464c93e5a03a49f7f856d1cc1a0
-workspace:           0.0.22
-public symbols:      19 (14 Arrow + 1 Line + 4 Area)
-Node.js:             20.19+
-Node tests:          264
-Chromium tests:      32
-MapLibre GL JS:      6.0.0
-MapLibre Sources:    4
-MapLibre Layers:     10
-007A:                merged through PR #38/#39
-007B design:         merged through PR #40/#41
-007B runtime:        merged through PR #42/#43
-current finalization: PR #44, documentation/version only
+main:               012d17ac8a8f7e71264ef375511b764cb398d111
+workspace:          0.0.22
+public symbols:     19 (14 Arrow + 1 Line + 4 Area)
+Node tests:         264
+Chromium tests:     32
+MapLibre Sources:   4
+MapLibre Layers:    10
+branch:             agent/007b-region-selection-benchmark
+PR:                 #45 Draft
+selection runtime:  unchanged
 ```
 
-Box/lasso runtime、Playground controls、real-browser acceptance and the pointer-capture lifecycle correction are already synchronized to `main`. PR #44 changes authority documents, the root development version and Playground help copy only; it does not change region-selection algorithms.
+007B design、runtime、Playground、browser correction、0.0.22 documentation 均已合并。当前分支只增加可复现 benchmark infrastructure、冻结原始证据和性能决策。
 
 ## Completed in this milestone
 
-Milestone 007B now includes:
+已完成：
 
-- CSS-pixel box and lasso selection;
-- Shift-empty additive box after a 4 CSS px threshold;
-- explicit one-shot box/lasso modes, default replace;
-- replace/add/toggle/subtract intent support;
-- one-event `SelectionController.applyMany()`;
-- MapLibre rendered index used only as broad phase;
-- candidate deduplication and PlotStore-order normalization;
-- canonical Registry generation and exact projected semantic-geometry intersection;
-- Point、LineString、Polygon、MultiLineString and MultiPolygon support;
-- Polygon-hole-aware hit testing;
-- fail-closed query、generation and projection behavior without partial selection;
-- DOM/SVG region overlay with no new geographic Source or Layer;
-- Escape、camera、style、resize、Store、selection and pointer lifecycle cancellation;
-- direct retry after invalid explicit lasso;
-- Playground `框选`、`套索` and `取消区域` controls;
-- armed、active、rejected、retry and completion status feedback;
-- real Chromium explicit-box and invalid-lasso retry flows.
+- `npm run benchmark:region-selection`；
+- 100 / 1,000 / 10,000 feature fixtures；
+- actual PlotStore、PlotRegistry generation、projection 和 exact intersection；
+- duplicate rendered rows 与 Store-order result validation；
+- headline uninstrumented total、median、p95、throughput 和 RSS；
+- separate instrumented diagnostic profile；
+- reusable benchmark workflow、CI job summary 和 artifact；
+- frozen raw JSON and permanent Markdown report；
+- explicit indexing decision：retain MapLibre broad phase，暂不增加 persistent custom index。
 
-Selection remains transient and outside PlotJSON and CommandHistory. Region paths、projected candidates、query results、rejections and overlays remain derived interaction state.
+权威文件：
 
-### Browser-discovered correction
-
-Chromium emits `lostpointercapture` after intentional `releasePointerCapture()`. The final controller clears its owned pointer id before release and ignores the resulting event, so a newly created rejected lasso state is preserved. Unexpected pointer loss while ownership remains active still cancels safely.
+```text
+scripts/benchmark-region-selection.mjs
+.github/workflows/region-selection-benchmark.yml
+docs/performance/README.md
+docs/performance/region-selection-resolver-benchmark.md
+docs/performance/data/2026-08-04-region-selection-resolver-ci.json
+```
 
 ## Validation
 
-### PR #42 — runtime foundation
+Frozen corrected measurement：
 
 ```text
-validated head: 812183a47413bdac554fbd6ca75e1443026ac474
-CI:             #437 / 30920263173
-Node 20.19/22:  success
-Node tests:     264 passed
-Chromium:       30 passed
-threads:        0 unresolved
-squash SHA:     e18183df5be4b98c38ba177e8440b28e859c2c90
+CI:                    #457 / 30933193884
+benchmark job:         92072709871
+source head:           2fca8812e206f799c3580380f4e1cd3ed3a73aa8
+workflow checkout:     5a0678fdf6e8e8497e977ffc522292652bc0d4e7
+Node:                  v22.23.1
+CPU:                   AMD EPYC 7763, 4 logical CPUs
+artifact id:           8901993992
+artifact digest:       baedae5c338698903f06c5cbb58ce07bd9f96e7bc6e2468ba76cd28a925ba52a
 ```
-
-### PR #43 — Playground/browser finalization
 
 ```text
-validated head: f7d9e107221d4ee3fc4278f697a7c0ba84d95a59
-CI:             #445 / 30924648279
-Node 20.19/22:  success
-Node tests:     264 passed
-Chromium:       32 passed
-threads:        0 unresolved
-squash SHA:     f98483d3504ce464c93e5a03a49f7f856d1cc1a0
+100 candidates:       2.399 ms median / 5.308 ms p95
+1,000 candidates:     10.961 ms median / 18.246 ms p95
+10,000 candidates:    109.308 ms median / 119.182 ms p95
 ```
 
-After PR #43, `main` and `f98483d...` were explicitly compared and were identical.
+This is an all-candidate/all-hit Node/CI pressure profile. It does not measure real MapLibre tile/style query latency、browser frame time、GPU or DOM overlay.
 
-### PR #44 — documentation/version finalization
-
-CI #447 confirmed that strict TypeScript、264 Node tests and the Playground production build passed. The first run stopped only because this `LATEST.md` file did not preserve the five required handover headings. The heading contract is now restored; PR #44 must obtain a new exact-head run with Node 20.19/22、handover check and all 32 Chromium tests before Ready or merge.
+PR #45 must still pass its final exact-head gate：Node 20.19/22、264 Node、Playground build、handover、benchmark artifact、32 Chromium and zero unresolved threads.
 
 ## Next tasks
 
-1. pass PR #44 exact-current-head CI with unchanged 264 Node and 32 Chromium tests;
-2. confirm zero unresolved review threads;
-3. squash merge PR #44 using its exact expected head SHA and verify `main` equals the returned squash SHA;
-4. create a separate benchmark branch from that final `main`;
-5. measure 100、1,000 and 10,000 feature fixtures before considering a persistent spatial index;
-6. begin Milestone 007C rotation and positive-uniform-scale as a separate design-only branch;
-7. keep groups、locks、visibility and z-order deferred until formal PlotJSON schema and migration design.
+1. add immutable 007B-P handover；
+2. run final exact-head CI for PR #45；
+3. record final head、CI and benchmark artifact in the PR；
+4. confirm zero unresolved review threads；
+5. mark Ready and squash merge with expected head SHA；
+6. verify `main` equals the returned squash SHA；
+7. begin 007C rotation/positive-uniform-scale as a separate design-only branch from latest `main`。
 
 ## Risks and decisions
 
-- No hard region-selection latency guarantee is published; scale evidence is still pending.
-- No persistent custom spatial index may be added before the 100 / 1,000 / 10,000 benchmark and an explicit invalidation design.
-- The geographic renderer remains four Sources and ten Layers; region UI stays in DOM/SVG.
-- Root `0.0.22` is a development baseline, not a coordinated npm release across public packages.
-- The Playground production bundle remains larger than 500 kB and still needs a separate code-splitting task.
-- GitHub Actions reports a non-blocking Node 20 deprecation warning for `actions/upload-artifact@v4`.
-- Touch region gestures、contain-only policy、persistent region tools、snapping and new symbols remain out of 007B scope.
-- Rotation/scale belongs to 007C; groups/locks/visibility/z-order require PlotJSON migration design first.
+- Headline timings are uninstrumented resolver totals；diagnostic phases are separate and not additive。
+- The fixture uses only `arrow.straight` and a 100% candidate/hit ratio。
+- GitHub-hosted runner results are observational, not a hard latency SLA。
+- Current evidence shows candidate count is the important scale variable but does not justify a second persistent index。
+- A future index requires real Chromium/MapLibre measurements、candidate-ratio fixtures and explicit invalidation semantics。
+- Benchmark success validates reproducibility and artifact production, not a latency threshold。
+- Production Playground bundle still has a known non-blocking >500 kB warning。
+- Branch deletion may require manual cleanup because the current connector does not expose delete-ref。

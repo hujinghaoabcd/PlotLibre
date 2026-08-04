@@ -14,6 +14,7 @@
     "typecheck": "tsc -b --pretty false",
     "test": "npm run build && node scripts/link-workspaces.mjs && node --test tests/*.test.mjs",
     "check": "npm run typecheck && npm test && npm run playground:typecheck && npm run playground:build",
+    "benchmark:region-selection": "npm run build && node scripts/link-workspaces.mjs && node --expose-gc scripts/benchmark-region-selection.mjs",
     "playground:dev": "npm run build && npm run dev --workspace @plotlibre/playground",
     "playground:typecheck": "npm run typecheck --workspace @plotlibre/playground",
     "playground:build": "npm run build && npm run build --workspace @plotlibre/playground -- --base /PlotLibre/",

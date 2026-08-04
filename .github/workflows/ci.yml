@@ -46,9 +46,14 @@ jobs:
       - name: Verify handover contract
         run: npm run handover:check
 
+  benchmark:
+    uses: ./.github/workflows/region-selection-benchmark.yml
+    with:
+      source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+
   browser:
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [validate, benchmark]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
