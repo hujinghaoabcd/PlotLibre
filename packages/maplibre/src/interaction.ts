@@ -365,6 +365,7 @@ export class MapLibrePlotInteraction {
     this.#map.off("style.load", this.#onStyleLoad);
     this.#map.getCanvas().removeEventListener("keydown", this.#onKeyDown);
     this.#clearClickSuppression();
+    this.#renderer.clearSelection();
     this.#renderer.clearHandles();
   }
 
@@ -554,25 +555,41 @@ export class MapLibrePlotInteraction {
   }
 
   #syncSelection(): void {
-    const selectedId = this.#selection.primaryId;
-    if (!selectedId) {
+    const selectedFeatures = this.#selection.selectedIds
+      .map((id) => this.#store.find(id))
+      .filter((feature): feature is PlotFeature => feature !== undefined);
+    const primaryId = this.#selection.primaryId;
+
+    this.#renderer.renderSelection(
+      selectedFeatures,
+      primaryId,
+      this.#registry,
+    );
+
+    if (!primaryId) {
       this.#renderer.clearHandles();
       return;
     }
 
-    const selected = this.#store.find(selectedId);
-    if (!selected) {
+    const primary = selectedFeatures.find((feature) => feature.id === primaryId);
+    if (!primary) {
       this.#renderer.clearHandles();
       return;
     }
 
-    this.#renderer.renderHandles(selected);
+    this.#renderer.renderHandles(primary);
   }
 
   #queryPlotId(event: MapLibreMouseEventLike): string | undefined {
     if (!event.point || !this.#map.queryRenderedFeatures) return undefined;
     const features = this.#map.queryRenderedFeatures(event.point, {
-      layers: [this.#renderer.layerIds.fill, this.#renderer.layerIds.line],
+      layers: [
+        this.#renderer.layerIds.selectionPoint,
+        this.#renderer.layerIds.selectionLine,
+        this.#renderer.layerIds.point,
+        this.#renderer.layerIds.line,
+        this.#renderer.layerIds.fill,
+      ],
     });
     for (const feature of features) {
       const plotId = readString(feature.properties?.plotId);
