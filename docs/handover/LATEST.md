@@ -1,183 +1,106 @@
-# PlotLibre Development Handover — Milestone 007B Design Merged / Runtime Next
+# PlotLibre Development Handover — Milestone 007B Runtime Merged
 
 日期：2026-08-04  
 仓库：`hujinghaoabcd/PlotLibre`  
-当前 `main`：`a9b9efc090c01f45133f3f136a0049a97ee52b90`  
-已合并 PR：`#40 Freeze box and lasso selection semantics`  
-合并方式：Squash and merge  
-最终设计 head：`4a8ee1102bb923801ada95c648a258225ccb9ec4`  
-最终 CI：`#413 / 30912109618`  
-Post-merge 分支：`agent/007b-design-post-merge-finalization`  
-Workspace：`0.0.21`  
-状态：Milestone 007B screen-space box/lasso design 已合并；当前仅同步真实合并状态，下一阶段为独立 runtime implementation
+完整不可变交接：`docs/handover/2026-08-04-milestone-007b-box-lasso-runtime.md`
 
 ## Current state
 
 ```text
-workspace:          0.0.21
-MapLibre GL JS:     6.0.0
-Node.js:            20.19+
-public symbols:     19 (14 Arrow + 1 Line + 4 Area)
-Node tests:         219
-Chromium tests:     30
-MapLibre Sources:   4
-MapLibre Layers:    10
-main SHA:           a9b9efc090c01f45133f3f136a0049a97ee52b90
-007A runtime/docs:  PR #38 / PR #39
-007B design PR:     #40
-007B design head:   4a8ee1102bb923801ada95c648a258225ccb9ec4
-007B design CI:     #413 / 30912109618
-planned runtime:    agent/007b-box-lasso-selection
+main:                f98483d3504ce464c93e5a03a49f7f856d1cc1a0
+workspace:           0.0.22
+public symbols:      19 (14 Arrow + 1 Line + 4 Area)
+Node.js:             20.19+
+Node tests:          264
+Chromium tests:      32
+MapLibre GL JS:      6.0.0
+MapLibre Sources:    4
+MapLibre Layers:     10
+007A:                merged through PR #38/#39
+007B design:         merged through PR #40/#41
+007B runtime:        merged through PR #42/#43
+current finalization: PR #44, documentation/version only
 ```
 
-Milestone staging：
-
-```text
-007A ordered selection + atomic Store + batch delete + local translation — merged
-007B box/lasso design — merged; runtime next
-007C local rotation + positive uniform scale — deferred
-007D groups/locks/visibility/z-order after PlotJSON migration design — deferred
-```
+Box/lasso runtime、Playground controls、real-browser acceptance and the pointer-capture lifecycle correction are already synchronized to `main`. PR #44 changes authority documents, the root development version and Playground help copy only; it does not change region-selection algorithms.
 
 ## Completed in this milestone
 
-### Design merge discipline
+Milestone 007B now includes:
 
-- design branch started from exact `main@d08c56b...`；
-- changed exactly 10 Markdown files and no runtime；
-- PR #40 remained Draft until exact-head CI completed；
-- Node 20.19/22、219 Node、build、handover and 30 Chromium passed；
-- unresolved review threads were zero；
-- PR was marked Ready only after validation；
-- squash merge used expected head SHA；
-- actual squash SHA is `a9b9efc090c01f45133f3f136a0049a97ee52b90`。
+- CSS-pixel box and lasso selection;
+- Shift-empty additive box after a 4 CSS px threshold;
+- explicit one-shot box/lasso modes, default replace;
+- replace/add/toggle/subtract intent support;
+- one-event `SelectionController.applyMany()`;
+- MapLibre rendered index used only as broad phase;
+- candidate deduplication and PlotStore-order normalization;
+- canonical Registry generation and exact projected semantic-geometry intersection;
+- Point、LineString、Polygon、MultiLineString and MultiPolygon support;
+- Polygon-hole-aware hit testing;
+- fail-closed query、generation and projection behavior without partial selection;
+- DOM/SVG region overlay with no new geographic Source or Layer;
+- Escape、camera、style、resize、Store、selection and pointer lifecycle cancellation;
+- direct retry after invalid explicit lasso;
+- Playground `框选`、`套索` and `取消区域` controls;
+- armed、active、rejected、retry and completion status feedback;
+- real Chromium explicit-box and invalid-lasso retry flows.
 
-### Frozen region input
+Selection remains transient and outside PlotJSON and CommandHistory. Region paths、projected candidates、query results、rejections and overlays remain derived interaction state.
 
-- current immediate Shift-mousedown mutation must be replaced；
-- one unified region adapter owns click-versus-box arbitration；
-- neutral `Shift + empty drag` performs additive box；
-- explicit one-shot box/lasso modes support replace/add/toggle/subtract；
-- modifier intent is captured on pointer down；
-- drawing、handle drag and translation retain priority；
-- touch is deferred。
+### Browser-discovered correction
 
-### Frozen box/lasso mathematics
-
-```text
-box threshold:        4 CSS px
-lasso sample spacing: 2 CSS px
-minimum lasso points: 3
-minimum lasso area:   16 CSS px²
-RDP tolerance:        1.5 CSS px
-```
-
-- raw and simplified lasso rings are both validated；
-- repeated non-consecutive vertices reject；
-- non-adjacent crossing、touch and collinear overlap reject；
-- invalid lasso preserves selection and permits one retry。
-
-### Frozen selection semantics
-
-- one `SelectionController.applyMany()` operation per region completion；
-- candidates are deduplicated and ordered by Store/document order；
-- replace/add/subtract/toggle algorithms are deterministic；
-- one effective completion emits one immutable selection event；
-- no-op emits nothing；
-- region selection remains outside History and PlotJSON。
-
-### Frozen hit pipeline
-
-```text
-queryRenderedFeatures on committed fill/line/point layers
-→ plotId dedup
-→ Store-order normalization
-→ Registry.generate once per unique candidate
-→ map.project semantic geometry
-→ exact screen intersection
-```
-
-- MapLibre query is broad phase only；
-- query order and tile duplicates are non-semantic；
-- selection、draft、handle、guide and label layers are excluded；
-- Point、Line、Polygon、Multi and compound predicates are frozen；
-- Polygon holes are respected；
-- CSS stroke/radius is ignored；
-- query/generation/projection failures reject the whole completion。
-
-### Frozen overlay/lifecycle/performance
-
-- region guides use DOM/SVG screen overlay；
-- no new MapLibre Source/Layer in 007B v1；
-- active region cancels on pointer、camera、style、resize、Store、selection and programmatic lifecycle changes；
-- dragPan、boxZoom and pointer capture restore exactly once；
-- synthetic click is suppressed；
-- MapLibre rendered index is initial broad phase；
-- custom persistent index and hard latency claims wait for measured 100/1,000/10,000-feature evidence。
-
-### Documentation and provenance
-
-- added `docs/design/box-lasso-selection.md`；
-- added `docs/algorithms/screen-region-selection.md`；
-- added immutable design and post-merge handovers；
-- synchronized AGENTS、development plan、interaction model、reference matrix and indices；
-- fixed Terra Draw、MapLibre-Geoman、Mapbox GL Draw and MapLibre GL JS revisions/licenses；
-- code reuse declared `none`。
+Chromium emits `lostpointercapture` after intentional `releasePointerCapture()`. The final controller clears its owned pointer id before release and ignores the resulting event, so a newly created rejected lasso state is preserved. Unexpected pointer loss while ownership remains active still cancels safely.
 
 ## Validation
 
-Design PR final validation：
+### PR #42 — runtime foundation
 
 ```text
-GitHub Actions run: 30912109618 (#413)
-validated head:     4a8ee1102bb923801ada95c648a258225ccb9ec4
-Node 20.19:         success
-Node 22:            success
-Node tests:         219 passed / 0 failed
-Playground build:   success
-handover contract:  success
-Chromium tests:     30 passed / 0 failed
-unresolved threads: 0
-changed files:      10 Markdown / 0 runtime
-merge method:       squash
-squash SHA:         a9b9efc090c01f45133f3f136a0049a97ee52b90
+validated head: 812183a47413bdac554fbd6ca75e1443026ac474
+CI:             #437 / 30920263173
+Node 20.19/22:  success
+Node tests:     264 passed
+Chromium:       30 passed
+threads:        0 unresolved
+squash SHA:     e18183df5be4b98c38ba177e8440b28e859c2c90
 ```
 
-This post-merge finalization changes documentation only and must independently pass the unchanged 219/30 baseline before merge.
+### PR #43 — Playground/browser finalization
+
+```text
+validated head: f7d9e107221d4ee3fc4278f697a7c0ba84d95a59
+CI:             #445 / 30924648279
+Node 20.19/22:  success
+Node tests:     264 passed
+Chromium:       32 passed
+threads:        0 unresolved
+squash SHA:     f98483d3504ce464c93e5a03a49f7f856d1cc1a0
+```
+
+After PR #43, `main` and `f98483d...` were explicitly compared and were identical.
+
+### PR #44 — documentation/version finalization
+
+CI #447 confirmed that strict TypeScript、264 Node tests and the Playground production build passed. The first run stopped only because this `LATEST.md` file did not preserve the five required handover headings. The heading contract is now restored; PR #44 must obtain a new exact-head run with Node 20.19/22、handover check and all 32 Chromium tests before Ready or merge.
 
 ## Next tasks
 
-1. complete this documentation-only post-merge synchronization；
-2. open a Draft finalization PR；
-3. pass exact-head Node 20.19、Node 22、219 Node、30 Chromium、build and handover checks；
-4. confirm zero unresolved review threads；
-5. mark Ready and Squash and merge with expected head SHA；
-6. create `agent/007b-box-lasso-selection` from the latest final `main`；
-7. implement pure screen point、box、lasso、RDP and topology utilities；
-8. implement `SelectionController.applyMany()`；
-9. implement exact projected Point/Line/Polygon/Multi predicates；
-10. implement MapLibre broad-phase resolver and Store ordering；
-11. replace immediate Shift capture with unified region adapter；
-12. add DOM/SVG overlay and public one-shot APIs；
-13. add Playground、actual Chromium and measured benchmark report；
-14. preserve the 4 Source / 10 Layer baseline unless a later measured design explicitly changes it；
-15. keep rotation/scale、groups/locks、snapping and new symbols outside 007B。
+1. pass PR #44 exact-current-head CI with unchanged 264 Node and 32 Chromium tests;
+2. confirm zero unresolved review threads;
+3. squash merge PR #44 using its exact expected head SHA and verify `main` equals the returned squash SHA;
+4. create a separate benchmark branch from that final `main`;
+5. measure 100、1,000 and 10,000 feature fixtures before considering a persistent spatial index;
+6. begin Milestone 007C rotation and positive-uniform-scale as a separate design-only branch;
+7. keep groups、locks、visibility and z-order deferred until formal PlotJSON schema and migration design.
 
 ## Risks and decisions
 
-- screen regions are transient UI geometry, not geographic document geometry；
-- generated geometry is used for exact hit testing but never becomes authored state；
-- Store order determines region result order；
-- valid empty replace clears, other empty intents no-op；
-- selection changes once and remains outside History；
-- query/generation/projection failures fail closed；
-- current Shift-mousedown implementation must be replaced rather than supplemented；
-- DOM/SVG overlay avoids geographic Source/Layer misuse；
-- custom persistent indexing、touch、contain-only selection and persistent region modes are deferred；
-- packages remain `UNLICENSED`；
-- workspace/package versions remain uncoordinated；
-- production bundle still needs code splitting；
-- source/build/deploy/live verification remain separate claims；
-- branch deletion may require manual cleanup because the connector does not expose delete-ref here。
-
-Continuation：finish the 007B design post-merge finalization, then implement runtime from the latest final `main`. Do not add runtime to the finalization branch。
+- No hard region-selection latency guarantee is published; scale evidence is still pending.
+- No persistent custom spatial index may be added before the 100 / 1,000 / 10,000 benchmark and an explicit invalidation design.
+- The geographic renderer remains four Sources and ten Layers; region UI stays in DOM/SVG.
+- Root `0.0.22` is a development baseline, not a coordinated npm release across public packages.
+- The Playground production bundle remains larger than 500 kB and still needs a separate code-splitting task.
+- GitHub Actions reports a non-blocking Node 20 deprecation warning for `actions/upload-artifact@v4`.
+- Touch region gestures、contain-only policy、persistent region tools、snapping and new symbols remain out of 007B scope.
+- Rotation/scale belongs to 007C; groups/locks/visibility/z-order require PlotJSON migration design first.

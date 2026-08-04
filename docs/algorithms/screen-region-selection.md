@@ -1,12 +1,13 @@
 # Screen-Region Selection Algorithm Record
 
 Milestone: 007B  
-Status: design freeze candidate; no runtime on `agent/007b-box-lasso-design`  
-Canonical document mutation: none
+Status: implemented and merged through PR #42/#43  
+Canonical document mutation: none  
+Merged `main`: `f98483d3504ce464c93e5a03a49f7f856d1cc1a0`
 
 ## 1. Purpose
 
-This record freezes the independent algorithms for:
+This record defines the implemented algorithms for:
 
 ```text
 screen box capture
@@ -17,11 +18,11 @@ exact projected geometry intersection
 deterministic multi-id SelectionController application
 ```
 
-Region selection changes transient selection only. It never edits PlotFeature authored controls, Store order, revisions, History or PlotJSON.
+Region selection changes transient selection only. It never edits authored controls, Store order, feature revisions, History or PlotJSON.
 
 ## 2. Coordinate domain
 
-All region capture and exact intersection predicates use CSS-pixel screen coordinates relative to the MapLibre canvas container.
+All capture and exact-intersection predicates use finite CSS-pixel screen coordinates relative to the MapLibre canvas.
 
 ```ts
 interface ScreenPoint {
@@ -30,22 +31,22 @@ interface ScreenPoint {
 }
 ```
 
-Required validity:
+Validation:
 
 ```text
 Number.isFinite(x)
 Number.isFinite(y)
 ```
 
-Map projection occurs only through the adapter:
+Projection occurs in the adapter only:
 
 ```text
 WGS84 generated coordinate
-→ map.project
+→ map.project([lng, lat])
 → finite ScreenPoint
 ```
 
-Core and PlotJSON never depend on ScreenPoint.
+Core and PlotJSON do not depend on ScreenPoint.
 
 ## 3. Numeric conventions
 
@@ -54,18 +55,18 @@ pointer activation threshold: 4 CSS px
 lasso sample spacing:          2 CSS px
 lasso RDP tolerance:           1.5 CSS px
 minimum lasso area:            16 CSS px²
-predicate epsilon:             1e-9 in screen-coordinate arithmetic
+predicate epsilon:             1e-9
 ```
 
-Threshold comparisons use squared Euclidean distance where possible.
+Distance thresholds use squared Euclidean distance:
 
 ```text
-distance²(a,b) = (a.x-b.x)² + (a.y-b.y)²
+d²(a,b) = (a.x-b.x)² + (a.y-b.y)²
 ```
 
 ## 4. Box construction
 
-Given start `s` and current/end `e`:
+For start `s` and end `e`:
 
 ```text
 minX = min(s.x, e.x)
@@ -74,7 +75,20 @@ maxX = max(s.x, e.x)
 maxY = max(s.y, e.y)
 ```
 
-The closed rectangle ring is derived clockwise or counterclockwise consistently:
+Activation:
+
+```text
+d²(s,e) >= 4²
+```
+
+A valid box also requires:
+
+```text
+maxX > minX
+maxY > minY
+```
+
+Closed ring:
 
 ```text
 (minX,minY)
@@ -84,471 +98,295 @@ The closed rectangle ring is derived clockwise or counterclockwise consistently:
 (minX,minY)
 ```
 
-A box becomes active when:
-
-```text
-distance²(s,e) >= 16
-```
-
-Completion is valid only when:
-
-```text
-maxX > minX
-maxY > minY
-```
-
-A degenerate or sub-threshold box is a no-op, not a rejection event.
+Every drag direction normalizes to the same bounds. Sub-threshold and zero-area boxes are no-op.
 
 ## 5. Lasso sampling
 
-Raw lasso path `P = [p0, p1, ...]`:
+The first point is always retained. A later sample is appended only when its distance from the previous retained sample is at least 2 CSS px.
 
-1. accept `p0` exactly;
-2. for each pointer move candidate `q`, append only when:
+Consecutive duplicates are removed with epsilon comparison. A final point equal to the first is removed before validation because closure is implicit.
 
-```text
-distance²(lastAccepted,q) >= 4
-```
+## 6. Signed area
 
-3. on pointer up, append the final point when it differs from the latest accepted point beyond epsilon;
-4. remove consecutive duplicate points;
-5. keep the stored path open; closing point is derived during validation/rendering.
-
-Sampling is deterministic for the same event stream.
-
-## 6. Lasso minimum validity
-
-Before simplification:
+For open ring vertices `p_i=(x_i,y_i)`:
 
 ```text
-unique distinct points >= 3
-abs(signedArea(rawClosedRing)) >= 16
+A = 1/2 Σ (x_i y_(i+1) - x_(i+1) y_i)
 ```
 
-Signed area:
+The final edge connects the last point to the first. Valid lasso area requires:
 
 ```text
-A = 1/2 Σ(x_i y_{i+1} - x_{i+1} y_i)
+abs(A) >= 16
 ```
 
-Orientation does not change selection semantics. The implementation may normalize the derived ring to counterclockwise for predicates, but must not reorder the raw capture path exposed by snapshots.
+Area is not used before topology when doing so could let a self-intersecting path cancel to zero and hide the more specific rejection.
 
-## 7. Segment primitives
+## 7. Ramer–Douglas–Peucker simplification
 
-For points `a`, `b`, `c`:
+RDP operates on the cleaned open sample path with tolerance 1.5 CSS px.
+
+- endpoints are preserved;
+- maximum perpendicular distance determines recursion;
+- a segment is collapsed only when the maximum distance is within tolerance;
+- simplification does not authorize an invalid raw path.
+
+Both raw and simplified paths are validated independently.
+
+## 8. Simple-ring validation
+
+A lasso ring is simple only when:
+
+- it has at least three distinct vertices;
+- no two non-consecutive vertices are epsilon-equal;
+- no edge is zero length;
+- non-adjacent edges do not cross;
+- non-adjacent edges do not touch;
+- non-adjacent collinear edges do not overlap.
+
+Adjacent edges may share their common endpoint. The first and last edges are adjacent through implicit closure.
+
+Validation order:
 
 ```text
-orient(a,b,c)
-= (b.x-a.x)(c.y-a.y) - (b.y-a.y)(c.x-a.x)
+clean raw path
+→ point-count validation
+→ raw simple-ring validation
+→ raw area validation
+→ RDP simplify
+→ simplified point-count validation
+→ simplified simple-ring validation
+→ simplified area validation
+→ implicit closure
 ```
 
-`signε(v)` returns zero when `|v| <= ε`.
+Invalid result returns one stable rejection and no region is resolved.
 
-A point lies on segment `[a,b]` when:
+## 9. Segment primitives
+
+Orientation:
 
 ```text
-orient(a,b,p) == 0 within ε
-and
-p.x within [min(a.x,b.x)-ε, max(a.x,b.x)+ε]
-p.y within [min(a.y,b.y)-ε, max(a.y,b.y)+ε]
+orient(a,b,c) = (b.x-a.x)(c.y-a.y) - (b.y-a.y)(c.x-a.x)
 ```
 
-Two closed segments intersect when:
+The sign is reduced with epsilon to `-1 | 0 | 1`.
 
-- their orientation signs straddle; or
-- one endpoint lies on the other segment.
+Boundary-inclusive segment intersection returns true for:
 
-Collinear overlap is intersection.
+- proper crossing;
+- endpoint touch;
+- collinear endpoint contact;
+- collinear overlap.
 
-## 8. Simple lasso validation
+Simple-ring validation excludes adjacent edge pairs before using this inclusive predicate.
 
-The raw closed ring is rejected when:
+## 10. Point in ring
 
-- a non-consecutive vertex repeats within epsilon;
-- any pair of non-adjacent segments intersects or overlaps;
-- any zero-length segment remains after consecutive duplicate removal.
-
-Adjacency exemptions:
+Point-in-ring uses boundary testing first, then even–odd ray crossing.
 
 ```text
-segment i and i+1 share one endpoint
-first and final segment share the first point
+boundary → boundary
+odd crossings → inside
+even crossings → outside
 ```
 
-No other touch is permitted. A bow-tie, spike returning to an older vertex, tangent touch or collinear overlap is invalid.
+Region selection treats boundary as a hit.
 
-Validation runs twice:
-
-```text
-raw sampled ring
-→ validate simple
-→ simplify open path
-→ close simplified path
-→ validate simple again
-```
-
-Therefore simplification cannot erase an invalid raw loop.
-
-## 9. Ramer–Douglas–Peucker simplification
-
-Version 1 uses RDP tolerance `1.5 CSS px` on the open lasso path.
-
-For subpath from first `a` to last `b`:
-
-1. compute perpendicular distance of every interior point to segment `[a,b]`;
-2. choose the maximum-distance point `m`;
-3. when `distance(m,[a,b]) > 1.5`, recursively simplify `[a..m]` and `[m..b]`;
-4. otherwise retain only `a` and `b`.
-
-The first and final captured points are always retained. After simplification, consecutive duplicates are removed and the ring is revalidated.
-
-## 10. Point-in-ring
-
-Boundary is inclusive.
-
-Algorithm:
-
-1. if point lies on any ring segment, return `boundary`;
-2. otherwise use an even-odd horizontal ray crossing test;
-3. process each edge with a half-open y-interval to avoid double-counting vertices.
-
-Result:
-
-```text
-outside
-inside
-boundary
-```
-
-`inside` and `boundary` both count as region intersection.
-
-## 11. Point-in-polygon with holes
+## 11. Polygon fill with holes
 
 For Polygon rings:
 
+1. point must be inside or on the exterior;
+2. point inside a hole is excluded;
+3. point on exterior or hole boundary is a boundary hit.
+
+A region intersects a polygon when any of these is true:
+
+- a region edge intersects any polygon ring boundary;
+- a region vertex lies in polygon fill;
+- an exterior polygon vertex lies inside/on the region.
+
+A region entirely inside a Polygon hole is not a hit. Crossing a hole boundary is a hit because it intersects polygon boundary geometry.
+
+## 12. Geometry predicates
+
+Supported projected semantic geometry:
+
 ```text
-ring 0 = exterior
-rings 1..n = holes
+Point
+LineString
+Polygon
+MultiLineString
+MultiPolygon
 ```
 
-A point lies in the polygon fill when:
+Semantics:
 
-1. it is inside/on the exterior; and
-2. it is not strictly inside a hole.
+- Point: projected center inside/on region;
+- LineString: any vertex inside/on or any segment crossing/touching region;
+- Polygon: boundary intersection or either containment direction, respecting holes;
+- Multi: any component hit;
+- compound PlotFeature: any selectable generated geometry hit, feature id returned once.
 
-Hole boundary is still polygon boundary and therefore counts as geometric intersection when a selection-region segment touches/crosses it.
+CSS stroke width, point radius, labels, hit areas, guides, drafts, handles and selection overlays are ignored.
 
-For point containment only, a point on a hole boundary returns boundary, not fill interior.
+## 13. Broad phase
 
-## 12. Region versus Point
-
-Projected Point `p` intersects region ring `R` when:
+Input is the region's normalized screen bounds.
 
 ```text
-pointInRing(p,R) != outside
+queryRenderedFeatures(bounds, committed fill/line/point layers)
+→ read properties.plotId
+→ discard absent/unknown ids
+→ deduplicate tile and layer duplicates
+→ order by PlotStore ids
 ```
 
-Point style radius is intentionally ignored.
+MapLibre result order is not semantic. The query is only candidate pruning.
 
-## 13. Region versus LineString
+## 14. Candidate generation and projection
 
-Line `L = [l0...ln]` intersects region `R` when any condition is true:
-
-1. any line vertex is inside/on `R`;
-2. any line segment intersects any region boundary segment.
-
-For MultiLineString, any member line may intersect.
-
-Line style width and dash pattern are ignored.
-
-## 14. Region versus Polygon
-
-For polygon `G` and region ring `R`, intersection is true when any condition is true:
-
-1. any segment of any polygon ring intersects any segment of `R`;
-2. any region vertex lies in polygon fill, respecting holes;
-3. any exterior polygon vertex lies inside/on `R`.
-
-This covers:
+For each unique candidate in Store order:
 
 ```text
-boundary crossing
-polygon fully inside region
-region fully inside polygon fill
-```
-
-A region fully inside a polygon hole returns false because:
-
-- no boundary crosses;
-- region vertices are not in polygon fill;
-- exterior polygon vertices are outside the region.
-
-For MultiPolygon, any polygon member may intersect.
-
-## 15. RenderBundle selectable geometry
-
-For each canonical PlotFeature:
-
-```text
+feature = Store.get(id)
 bundle = Registry.generate(feature)
-selectable components = fills + lines + points
+select semantic Point/LineString/Polygon/Multi output
+project every coordinate exactly once for that generated geometry
+perform exact intersection
 ```
 
-Ignore:
+The resolver reports metrics including rendered feature count, unique rendered ids, candidate count, generated candidate count and projected geometry count.
+
+Failures are fail-closed:
 
 ```text
-labels
-semantic guides
-selection overlays
-draft geometry
-DOM region overlay
+query failure      → SELECTION_REGION_QUERY_FAILED
+generation failure → SELECTION_REGION_CANDIDATE_GENERATION_FAILED
+projection failure → SELECTION_REGION_PROJECTION_FAILED
 ```
 
-Each component is projected and tested according to its geometry type. A PlotFeature contributes its id at most once when any component intersects.
+No partial result is returned.
 
-Generated sampling is authoritative for curved screen paths. The algorithm does not infer additional geodesic curvature between generated vertices.
+## 15. Deterministic selection mutation
 
-## 16. Broad-phase candidate algorithm
+```ts
+selection.applyMany(ids, intent, reason)
+```
 
-Input: region screen bounding box.
+Input ids are validated and deduplicated before any mutation.
+
+Algorithms:
 
 ```text
-rendered = map.queryRenderedFeatures(
-  [[minX,minY],[maxX,maxY]],
-  { layers: committed fill/line/point layers }
-)
+replace:
+  result = candidates
+
+add:
+  result = current + candidates not already selected
+
+subtract:
+  result = current excluding candidate set
+
+toggle:
+  result = current excluding candidates already selected
+         + candidates not previously selected
 ```
 
-Then:
+Candidate order is Store order. Existing survivor order is preserved. The final result id is Primary.
+
+One effective result emits one immutable SelectionChange. Equal before/after state emits nothing. Region selection does not enter History.
+
+## 16. Session transitions
+
+### Box
 
 ```text
-candidateSet = unique valid string properties.plotId
-orderedCandidates = store.list()
-  .filter(feature => candidateSet.has(feature.id))
+armed
+→ pointerdown stores start
+→ movement below threshold remains armed
+→ movement at/above threshold becomes active
+→ pointerup returns completed ring or no-op
+→ session resets for one-shot use
 ```
 
-Properties:
-
-- renderer/tile duplicates collapse by `plotId`;
-- MapLibre return order is ignored;
-- missing Store ids are filtered;
-- only currently rendered visible committed layers participate;
-- selected-overlay thickness cannot add candidates;
-- broad phase may return false positives; narrow phase removes them.
-
-## 17. Exact resolution transaction
-
-Pseudo-code:
+### Lasso
 
 ```text
-function resolveRegion(region): ids
-  broadIds = broadPhase(region.bounds)
-  resolved = []
-
-  for id in broadIds ordered by Store
-    feature = Store.get(id)
-    bundle = Registry.generate(feature)
-    projected = project selectable bundle geometry
-
-    if projection has non-finite point
-      reject whole completion
-
-    if any projected component intersects region
-      resolved.push(id)
-
-  return resolved
+armed
+→ pointerdown starts active path
+→ pointermove samples
+→ pointerup validates
+→ valid returns completed ring and resets
+→ invalid becomes rejected and retains points/rejection
+→ next pointerdown clears rejection and starts direct retry
 ```
 
-Generation/query/projection failure rejects the whole completion. Partial result application is prohibited.
+## 17. Adapter lifecycle
 
-Registry generation occurs once per unique candidate PlotFeature, not once per rendered component.
+The MapLibre controller owns:
 
-## 18. Deterministic batch selection
+- feature-hit preflight for Shift-empty arbitration;
+- pointer capture;
+- dragPan while active;
+- MapLibre boxZoom reservation;
+- DOM/SVG overlay;
+- synthetic click suppression;
+- cancellation on Escape, camera/style/resize, Store/selection and document lifecycle.
 
-Let current ordered selection be `S` and candidate ids in Store order be `C`.
+Intentional release clears the owned pointer id before `releasePointerCapture()`. Chromium's resulting `lostpointercapture` is ignored. An unexpected pointercancel/lost-capture while an id remains owned cancels.
 
-### Replace
-
-```text
-next = C
-```
-
-### Add
-
-```text
-A = [id in C where id not in S]
-next = S + A
-```
-
-If `A` is empty, no-op. Otherwise final `A` id is Primary.
-
-### Subtract
-
-```text
-next = [id in S where id not in C]
-```
-
-### Toggle
-
-```text
-survivors = [id in S where id not in C]
-added = [id in C where id not in S]
-next = survivors + added
-```
-
-Every input id is validated before mutation. One completion produces at most one SelectionChange.
-
-## 19. Gesture state machine
-
-### Box convenience
-
-```text
-idle
-→ Shift pointerdown on empty: armed
-→ move <4px: armed
-→ move >=4px: active
-→ pointerup valid: resolve/apply/idle
-→ pointerup degenerate: idle no-op
-→ Escape/cancel/lifecycle change: idle no-op
-```
-
-### Explicit box/lasso
-
-```text
-mode armed
-→ pointerdown: active gesture
-→ pointermove: update overlay
-→ pointerup valid: resolve/apply/exit mode
-→ lasso invalid: rejected, mode remains armed for retry
-→ Escape: exit mode
-```
-
-Selection state is captured/observed but not mutated until successful completion.
-
-## 20. Camera and Store consistency
-
-An active region is valid only for one stable frame.
-
-Cancel on:
-
-```text
-style.load
-resize
-movestart/zoomstart/rotatestart/pitchstart
-Store change
-external SelectionController revision change
-pointercancel/lost capture
-```
-
-Camera movement after completion is irrelevant because selection ids, not screen regions, are retained.
-
-## 21. DOM/SVG overlay algorithm
-
-One overlay root is positioned over `map.getContainer()`.
-
-Box:
-
-```text
-left = minX
-top = minY
-width = maxX-minX
-height = maxY-minY
-```
-
-Lasso:
-
-```text
-SVG polyline points = raw accepted path
-optional derived closing segment during active/rejected display
-```
-
-The overlay is presentation only:
-
-```text
-pointer-events:none
-aria-hidden:true
-no Store/History/PlotJSON identity
-```
-
-It is removed idempotently on every terminal/cancel/destroy path.
-
-## 22. Complexity
+## 18. Complexity
 
 Let:
 
 ```text
-N = Store feature count
-R = rendered broad-phase results including duplicates
-C = unique candidate PlotFeatures
-V = total generated vertices for candidates
-L = lasso sampled points
+R = retained lasso samples
+C = unique broad-phase candidates
+V = total generated projected vertices for C
 ```
 
-Expected costs:
+Approximate costs:
 
 ```text
-broad query: engine index dependent
-id dedup: O(R)
-Store-order filtering: O(N) in first implementation
-lasso validation: O(L²) segment-pair check
-narrow phase: O(C × regionSegments × candidateSegments)
+box construction:          O(1)
+lasso sampling:            O(R)
+RDP worst case:            O(R²)
+simple-ring validation:    O(R²)
+broad-phase normalization: O(query results + Store size ordering)
+exact projection/testing:  O(V × region-edge checks)
+selection application:     O(current selection + C)
 ```
 
-RDP average behavior is implementation dependent; worst case can be quadratic.
+The current design relies on MapLibre's rendered index to keep `C` smaller than Store size. No persistent custom index is implemented.
 
-The first runtime must avoid `Registry.generate` over all `N` when `C << N`. Future optimization may maintain a Store order index and use sweep-line/topology acceleration, but these are not required before measured evidence.
+## 19. Performance evidence boundary
 
-## 23. Deterministic fixture set
+Functional correctness is validated. A scale latency report is still pending.
 
-Required fixtures include:
+Required future fixtures:
 
 ```text
-box every drag quadrant
-box thin positive extent
-lasso triangle
-lasso concave U shape
-lasso bow-tie
-lasso repeated non-consecutive vertex
-lasso collinear overlapping edge
-RDP-valid simple path
-RDP path requiring second validation
-point on boundary
-line crossing without contained vertex
-line tangent at one point
-polygon contains region
-region contains polygon
-region inside polygon hole
-region crossing hole boundary
-MultiLineString one-component hit
-MultiPolygon one-component hit
-compound RenderBundle duplicate geometry
-broad-phase duplicate plotIds
-query order opposite Store order
-one candidate generation failure
-one candidate projection failure
+100
+1,000
+10,000 features
 ```
 
-## 24. Provenance and clean-room declaration
+Record environment, camera/viewport, feature mix, generated vertices, Store size, unique candidate count, query time, generation/projection time, exact-intersection time, total latency, warmup/repetitions, median and p95.
 
-Observed reference behavior:
+No hard latency claim or indexing requirement is inferred before measurement.
+
+## 20. Validation evidence
 
 ```text
-mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52
-- boxSelect enabled option
-- Shift-mousedown box arm
-- dragPan disable/restore
-- transient DOM rectangle
-- bounding-box feature query
-- feature-id de-duplication
+PR #42 exact head: 812183a47413bdac554fbd6ca75e1443026ac474
+CI #437:          264 Node / 30 Chromium
+squash:           e18183df5be4b98c38ba177e8440b28e859c2c90
 
-JamesLMilner/terra-draw@26d7ec91f071ab5d2bdeab774d14763746cd798b
-- explicit selection-mode lifecycle
-- adapter/mode separation
-
-geoman-io/maplibre-geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c
-- explicit toolbar/edit-mode separation
+PR #43 exact head: f7d9e107221d4ee3fc4278f697a7c0ba84d95a59
+CI #445:          264 Node / 32 Chromium
+squash:           f98483d3504ce464c93e5a03a49f7f856d1cc1a0
 ```
 
-Code reuse: `none`.
-
-PlotLibre's screen topology, exact semantic-geometry narrow phase, Store-order selection, one-event batch intent and authored-state boundaries are independently specified here.
+Final Chromium acceptance includes explicit box replace, DOM overlay cleanup, invalid lasso rejection persistence and direct retry.

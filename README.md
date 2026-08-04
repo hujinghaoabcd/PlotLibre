@@ -2,7 +2,7 @@
 
 **PlotLibre** is a MapLibre-native, engine-independent framework for drawing, editing, rendering and exchanging semantic parametric situation plots and tactical graphics.
 
-> PlotLibre 是面向 MapLibre GL JS 的参数化态势标绘框架。它保存“符号类型 + authored controls + 参数 + 样式 + 元数据”，而地图中的 LineString、Polygon、采样点、选择轮廓、平移预览和语义引导线均为可重新生成的派生结果。
+> PlotLibre 保存“符号类型 + authored controls + 参数 + 样式 + 元数据”。地图中的 LineString、Polygon、采样点、选择轮廓、区域选择路径、平移预览和语义引导线均为可重新生成的派生结果。
 
 ## Live Playground
 
@@ -32,30 +32,28 @@ area.circular-segment
 area.sector
 ```
 
-It supports exact fixed-point and variable-point drawing, live preview, structured rejection feedback, Definition-driven guides, semantic handle editing, ordered multi-selection, atomic batch delete, whole-selection local-metre translation, undo/redo, style editing, nineteen Nanjing samples and PlotJSON import/export.
+It supports exact fixed-point and variable-point drawing, live preview, structured rejection feedback, semantic handle editing, ordered multi-selection, box/lasso selection, atomic batch delete, whole-selection local-metre translation, undo/redo, style editing, nineteen Nanjing samples and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.21
+workspace version: 0.0.22
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
-Node tests:        219
-Chromium tests:    30
+Node tests:        264
+Chromium tests:    32
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
 MapLibre sources:  4
 MapLibre layers:   10
 ```
 
-Public package versions remain independent development placeholders; the root workspace version is not yet a coordinated npm release.
+The root workspace version is a development baseline, not yet a coordinated npm release across all public packages.
 
 ## Professional editing
 
-Milestone 007A adds an engine-independent selection and atomic batch-editing foundation.
-
 ### Ordered selection and Primary
 
-`SelectionController` stores transient interaction state:
+`SelectionController` owns transient ordered selection:
 
 ```ts
 interface SelectionSnapshot {
@@ -65,25 +63,108 @@ interface SelectionSnapshot {
 }
 ```
 
-Selection order is acquisition order and the final id is Primary. Only Primary exposes authored semantic handles and Definition guides; every selected object receives a lightweight derived overlay.
+The final selected id is Primary. Every selected plot receives a lightweight derived selection overlay; only Primary exposes authored handles, Definition guides and style editing.
 
-MapLibre input semantics:
+Click semantics:
 
 ```text
-plain click       replace selection or make the hit object Primary
+plain click       replace / make Primary
 Shift + click     add
 Ctrl/Cmd + click  toggle
 Alt + click       subtract
 empty plain click clear
 ```
 
-The compatibility APIs `plot.select(id | undefined)` and `plot.selectedId` remain available. `plot.selectedIds` exposes the complete ordered selection.
+Compatibility APIs remain:
 
-Selection is not document state: it does not increment feature revisions and is excluded from PlotJSON.
+```ts
+plot.select(id | undefined)
+plot.selectedId
+plot.selectedIds
+plot.selection
+```
+
+Selection is not document state. It does not change PlotFeature revisions and is excluded from PlotJSON.
+
+### Box and lasso selection
+
+Milestone 007B adds screen-space region selection.
+
+Entry paths:
+
+```text
+Shift + empty drag       one-shot additive box
+plot.startBoxSelection() explicit one-shot box, default replace
+plot.startLassoSelection() explicit one-shot lasso, default replace
+```
+
+Public APIs:
+
+```ts
+plot.regionSelection
+plot.regionSelectionSnapshot
+plot.regionSelectionRejection
+plot.startBoxSelection({ intent?: "replace" | "add" | "toggle" | "subtract" })
+plot.startLassoSelection({ intent?: "replace" | "add" | "toggle" | "subtract" })
+plot.cancelRegionSelection()
+```
+
+Modifier priority at pointerdown is:
+
+```text
+Alt > Ctrl/Cmd > Shift > configured/default intent
+```
+
+The Playground exposes `框选`、`套索` and `取消区域` controls and reports armed, active, rejected, retry and completion states.
+
+#### Region geometry
+
+All region coordinates use CSS pixels:
+
+```text
+box threshold:       4 px Euclidean distance
+lasso spacing:       2 px
+minimum points:      3
+minimum area:        16 px²
+RDP tolerance:       1.5 px
+boundary:            inclusive
+```
+
+Raw and simplified lasso paths must both be simple. Repeated non-consecutive vertices, non-adjacent crossings, touches and collinear overlaps reject. Invalid completion preserves the current selection and an explicit mode can be retried directly.
+
+#### Exact semantic hit testing
+
+MapLibre's rendered index is broad phase only:
+
+```text
+region bounds
+→ queryRenderedFeatures(committed fill/line/point layers)
+→ plotId deduplication
+→ PlotStore-order normalization
+→ Registry.generate once per candidate
+→ map.project semantic geometry
+→ exact screen intersection
+```
+
+Point centers, line segments, polygon crossing/containment, Multi geometries and Polygon holes are supported. CSS line width, point radius, labels, hit areas, drafts, handles, guides and selection overlays are not semantic region geometry.
+
+A query, generation or projection failure rejects the whole operation. Partial selection is prohibited.
+
+#### One-event mutation
+
+`SelectionController.applyMany()` applies replace/add/subtract/toggle once. Result ordering follows PlotStore order, one effective completion emits one immutable selection event, and region selection never creates a History entry.
+
+#### Overlay and lifecycle
+
+The region guide is a DOM/SVG screen overlay, not geographic GeoJSON. No new Source or Layer was added; the 4-source/10-layer renderer baseline remains unchanged.
+
+Escape, pointer cancellation, unexpected lost capture, style reload, resize, camera movement, Store mutation, external selection revision and document lifecycle operations cancel active region state safely. MapLibre boxZoom, dragPan and pointer capture are restored exactly once.
+
+Real Chromium exposed that intentional `releasePointerCapture()` emits `lostpointercapture`. The final controller ignores that event after intentional ownership release, preserving a newly created rejected state while still cancelling unexpected pointer loss.
 
 ### Atomic Store transactions
 
-`PlotStore.applyTransaction()` stages additions, replacements, removals and optional exact document ordering before one commit. Every precondition and candidate is validated against the staged state. A failure leaves the Store unchanged and no listener observes partial state.
+`PlotStore.applyTransaction()` stages additions, replacements, removals and optional exact document ordering before one commit. Every precondition and candidate is validated against the staged state. Failure leaves the Store unchanged and no listener sees partial state.
 
 Post-commit listener exceptions are isolated and reported through the configured listener-error hook. A listener failure cannot create changed Store state without a corresponding History entry.
 
@@ -91,29 +172,29 @@ Post-commit listener exceptions are isolated and reported through the configured
 
 `BatchEditCommand` captures exact before/after feature values, document order and selection snapshots. Execute, undo and redo each use one Store transaction and one selection restoration.
 
-Delete/Backspace and the Playground batch-delete button remove the complete selection with one history entry. Undo restores the original feature order, values, selected ids and Primary; redo replays the exact after-state without incrementing revisions again.
+Delete/Backspace and the Playground batch-delete button remove the complete selection with one history entry. Undo restores document order, feature values, selected ids and Primary.
 
 ### Whole-selection translation
 
 Dragging the body of any selected plot translates every selected plot by one common local-metre vector:
 
 ```text
-selection authored controls
+ordered authored controls
 → one order-independent local projection origin
 → pointer start/end in that frame
 → one metre delta
-→ same delta applied to every authored control
+→ same delta for every control
 → canonicalize and generate every candidate
-→ one atomic BatchEditCommand on pointer release
+→ one atomic BatchEditCommand on release
 ```
 
-The Store remains unchanged during preview. Escape cancels the complete gesture. If any member is invalid, high-latitude, antimeridian-crossing, excessively large or otherwise non-renderable, the full batch is rejected and History is unchanged. Parameters, style and metadata are preserved.
+The Store remains unchanged during preview. Escape cancels the gesture. If any member is invalid, the complete batch rejects and History remains unchanged. Parameters, style and metadata are preserved.
 
-Control-handle drag retains priority over body translation. PlotLibre reserves Shift for additive selection while installed, temporarily disables MapLibre box zoom and restores its previous state on destroy.
+Handle drag retains priority over body translation. PlotLibre reserves Shift for selection and temporarily disables MapLibre box zoom while the region controller is installed.
 
-## MapLibre rendering resources
+## Rendering resources
 
-The adapter owns four derived GeoJSON sources:
+Four derived GeoJSON sources:
 
 ```text
 plotlibre-committed
@@ -122,7 +203,7 @@ plotlibre-draft
 plotlibre-handles
 ```
 
-and ten layers:
+Ten layers:
 
 ```text
 plotlibre-fill
@@ -137,78 +218,48 @@ plotlibre-handle-guide
 plotlibre-handle
 ```
 
-The selection source is independent from semantic handles. Polygon selections are rendered as boundaries, LineStrings as line highlights and Points as point highlights. Primary is carried as derived overlay metadata. Style reload reconstructs committed geometry, selection overlays, drafts, handles and guides from canonical state.
+The DOM/SVG box/lasso overlay is outside these resources. Style reload reconstructs committed geometry, selection overlays, drafts, handles and guides from canonical state.
 
-## Architecture foundations
-
-- engine-independent `PlotDefinition`, Registry, transactional Store and CommandHistory;
-- PlotJSON 1.0 semantic serialization;
-- schema-driven `TwoPointDrawSession` and `MultiPointDrawSession`;
-- ordered `SelectionController` with Primary semantics and immutable events;
-- atomic `BatchEditCommand` with exact document-order restoration;
-- variable-count and fixed-count completion without symbol-ID-specific state machines;
-- Definition-level canonicalization limited to deterministic authored-coordinate permutations;
-- full Registry generation preflight before interactive completion, create, replace, import or batch mutation changes Store;
-- structured completion rejection and last-valid-draft retention;
-- transient Definition-driven draft controls and semantic guide paths;
-- MapLibre committed, selection, draft, semantic-handle and handle-guide resources;
-- semantic handle editing and whole-selection translation with one command per completed gesture;
-- local-metre, geodesic, topology and coordinate-mode foundations;
-- deterministic geometry fixtures and actual-rendered-feature Chromium tests;
-- browser coverage for every public symbol family plus real multi-selection, translation and batch-delete flows.
-
-## Circular arc family
-
-Milestone 006J introduced a three-control circular foundation shared by one open line and two area Definitions.
-
-### Circular arc
-
-`line.circular-arc@1.0.0` stores exact start, through and end controls. The three controls define a stable local-metre circumcircle. The through-point selects the exact minor or major directed sweep. Sampling is split into `start → through` and `through → end`, so every authored control remains exact. The output is one open LineString.
-
-### Circular segment
-
-`area.circular-segment@1.0.0` uses the same exact arc and closes it with the straight chord between the authored endpoints. Minor and major segments are supported when the derived ring is finite, counterclockwise and simple.
-
-The identifier is deliberately not `area.lune`: the legacy plotting type often named `Lune/弓形` is one circular arc plus one chord, while a mathematical lune is bounded by two arcs and requires a separate semantic model.
-
-### Sector
-
-`area.sector@1.0.0` stores center, exact radius/start point and end-bearing handle. The bearing handle defines direction only; its distance from the center does not define a second radius. The rendered end-boundary point is derived at the first radius.
+## Architecture
 
 ```text
-sweepDirection: "clockwise" | "counterclockwise"
+core <- geometry <- symbols
+core <- interaction
+core + interaction <- maplibre
+public packages <- playground / wrappers
 ```
 
-supports crossing 0° and sweeps above 180°. A transient center-to-bearing radial guide is visible during complete drafts, selection and handle dragging but never enters committed geometry, Store, History or PlotJSON.
+- `@plotlibre/core`: domain types, Registry, transactional Store, commands, History and PlotJSON;
+- `@plotlibre/geometry`: pure planar, circular, closed-area and geodesic geometry;
+- `@plotlibre/symbols`: built-in parametric Definitions;
+- `@plotlibre/interaction`: draw sessions, ordered selection, screen-region algorithms, batch commands and local translation;
+- `@plotlibre/maplibre`: rendering, broad-phase queries, exact projected region resolution, overlays, handles and gesture adapters;
+- `@plotlibre/playground`: browser demo, E2E and GitHub Pages site.
 
-### Circular failure policy
+Canonical state remains engine-independent. Rendered geometry, region paths and interaction overlays cannot become authored state.
 
-Version 1.0 is local-metre only and rejects invalid WGS84 positions, duplicate or collinear controls, unstable or excessive circles, antimeridian/high-latitude/large-extent input, ambiguous sweeps, zero/full sector sweeps, invalid parameters and invalid Polygon topology. There is no silent fallback or authored-control movement.
+## Symbol families
 
-## Closed action areas
+### Circular family
 
-`area.closed-curve@1.0.0` stores 3–64 ordered boundary waypoints. A periodic Hermite/Catmull–Rom curve interpolates every authored control and closes the derived Polygon ring.
+- `line.circular-arc@1.0.0`: exact start/through/end controls define a directed minor or major arc;
+- `area.circular-segment@1.0.0`: the same arc closed by its endpoint chord;
+- `area.sector@1.0.0`: center, radius/start and end-bearing handle; bearing-handle distance does not define a second radius.
 
-`area.gathering-place@1.0.0` stores exactly flank A, front crown and flank B. The flank pair may be canonicalized only by deterministic permutation; the rounded rear closure anchor remains derived.
+Circular v1 is local-metre only and fails closed for invalid WGS84 positions, duplicate/collinear controls, unstable or excessive circles, ambiguous sweeps, invalid parameters and invalid Polygon topology.
 
-## Arrow families
+### Closed action areas
 
-PlotLibre includes exact two-point arrows, curved and attack-path arrows, flat and tailed attack closures, four-control double arrow, five-control pincer, center-path squad combat arrow, route and corridor ribbons, bidirectional exact-two-tip route and a route with a derived secondary emphasis head.
+- `area.closed-curve@1.0.0`: 3–64 ordered boundary waypoints with periodic interpolating closure;
+- `area.gathering-place@1.0.0`: flank A, front crown and flank B with only deterministic flank permutation allowed.
 
-Every Definition preserves authored semantic roles while widths, heads, necks, notches, bridges, mirrored points and samples remain derived.
+### Arrow and path families
 
-## Workspace packages
+PlotLibre includes exact two-point arrows, curved and attack-path arrows, flat and tailed attack closures, four-control double arrow, five-control pincer, center-path squad combat, route/corridor ribbons, bidirectional exact-two-tip route and a route with a derived secondary emphasis head.
 
-| Package | Responsibility |
-|---|---|
-| `@plotlibre/core` | Domain types, Registry, transactional Store, commands, history and PlotJSON |
-| `@plotlibre/geometry` | Pure planar, circular, closed-area and geodesic geometry |
-| `@plotlibre/symbols` | Built-in parametric Definitions |
-| `@plotlibre/interaction` | Draw sessions, selection, batch commands and local translation |
-| `@plotlibre/maplibre` | MapLibre rendering, overlays, semantic handles/guides and gesture adapters |
-| `@plotlibre/playground` | Browser demo, E2E and GitHub Pages site |
+Widths, heads, necks, notches, bridges, mirrored points and samples are derived; authored semantic roles are preserved.
 
-## Development and validation
+## Validation
 
 ```bash
 npm install
@@ -217,4 +268,30 @@ npm run playground:e2e
 npm run handover:check
 ```
 
-Pull requests must remain Draft while implementation is incomplete. Merge only after current-head Node 20.19/22 validation, all Node tests, Playground build, handover contract and Chromium E2E are green, review threads are resolved and the PR is marked Ready. Use Squash and merge; never merge the feature branch locally.
+Final 007B evidence:
+
+```text
+PR #42 runtime foundation
+head: 812183a47413bdac554fbd6ca75e1443026ac474
+CI:   #437 / 30920263173
+Node: 264 passed
+E2E:  30 passed
+merge: e18183df5be4b98c38ba177e8440b28e859c2c90
+
+PR #43 Playground/browser finalization
+head: f7d9e107221d4ee3fc4278f697a7c0ba84d95a59
+CI:   #445 / 30924648279
+Node: 264 passed
+E2E:  32 passed
+merge: f98483d3504ce464c93e5a03a49f7f856d1cc1a0
+```
+
+Pull requests remain Draft while incomplete. Merge only after current-head Node 20.19/22 validation, Node tests, Playground build, handover contract, Chromium E2E and review threads are green. Use Squash and merge with the exact expected head SHA; never merge feature branches locally.
+
+## Current boundaries and next work
+
+- no hard region-selection latency guarantee is published;
+- measure 100 / 1,000 / 10,000 feature fixtures before adding a persistent spatial index;
+- rotation and positive uniform scale belong to Milestone 007C;
+- groups, locks, visibility and z-order require formal PlotJSON schema/migration design first;
+- touch region gestures, snapping, contain-only selection, persistent region tools, coordinated package releases and Playground code splitting remain deferred.
