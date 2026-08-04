@@ -10,7 +10,7 @@ export const playgroundTemplate = `
       </a>
       <div class="header-links">
         <a href="https://github.com/hujinghaoabcd/PlotLibre" target="_blank" rel="noreferrer">GitHub</a>
-        <span class="version-badge">v0.0.21 demo</span>
+        <span class="version-badge">v0.0.22 demo</span>
       </div>
     </header>
 
@@ -97,6 +97,10 @@ export const playgroundTemplate = `
           <h2>交互说明</h2>
           <ol class="instruction-list">
             <li>普通点击替换选择；Shift 点击添加；Ctrl/Cmd 点击切换；Alt 点击移除。</li>
+            <li>“框选”与“套索”启动一次性区域选择，默认替换；开始拖动时按 Shift、Ctrl/Cmd 或 Alt 可覆盖为添加、切换或移除。</li>
+            <li>Shift 从空白处拖动可直接执行一次添加式框选；达到 4 CSS px 阈值后才进入区域手势。</li>
+            <li>套索按 2 CSS px 间距采样，并校验最少三个点、16 CSS px² 面积和简单环拓扑；无效区域保留原选择，可直接重试。</li>
+            <li>区域命中使用派生语义几何的屏幕投影精确判断，不使用 CSS 线宽、点半径、标签、手柄或选择覆盖层。</li>
             <li>多选中的最后一个对象是 Primary，只有 Primary 显示语义控制点并接受样式编辑。</li>
             <li>拖动任一已选对象的主体可整体平移全部选中对象；拖动期间只更新临时预览，释放后一次原子提交。</li>
             <li>Delete/Backspace 或“批量删除选中”会生成一个历史命令；撤销恢复原文档顺序、选择集合和 Primary。</li>
@@ -125,7 +129,7 @@ export const playgroundTemplate = `
 
         <section class="inspector-section technical-card">
           <span class="eyebrow">Architecture</span>
-          <p>PlotLibre 保存 authored controls、参数、样式和元数据。选择轮廓、平移预览、LineString、Polygon 与语义引导线均为派生结果，可随编辑、算法升级或地图样式重载重新生成。</p>
+          <p>PlotLibre 保存 authored controls、参数、样式和元数据。选择轮廓、区域选择路径、平移预览、LineString、Polygon 与语义引导线均为派生结果，可随编辑、算法升级或地图样式重载重新生成。</p>
         </section>
       </aside>
     </main>
