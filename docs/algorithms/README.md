@@ -35,6 +35,7 @@ tests and golden fixtures
 | `arrow-squad-combat.md` | `arrow.squad-combat` |
 | `arrow-route-corridor.md` | `arrow.route`、`arrow.corridor` 与 PathRibbon frame |
 | `arrow-route-multihead.md` | `arrow.route.bidirectional`、`arrow.route.double-head` |
+| `closed-action-area.md` | `area.closed-curve`、`area.gathering-place` 与 cyclic closed interpolation |
 
 基础通用几何另见：
 
@@ -43,20 +44,21 @@ tests and golden fixtures
 ../ALGORITHM_POLICY.md
 ```
 
-## 下一算法记录
+## Milestone 006I 算法边界
 
-Milestone 006I 在实现前应新增闭合行动区域算法记录，覆盖：
+`closed-action-area.md` 已冻结：
 
-- closed interpolation 或 smoothing 的明确数学定义；
-- local-metre projection origin；
+- 周期 Hermite/Catmull-Rom 数学表达；
+- local-metre projection；
+- authored control interpolation；
 - automatic closure；
-- control preservation；
-- ring winding；
-- duplicate、degenerate、self-intersection 和 sharp-return policy；
-- control-order/reversal semantics；
-- parameter isolation；
-- antimeridian/high-latitude policy；
-- clean-room behavior research；
-- golden and property fixtures。
+- gathering-place derived rear anchor；
+- counterclockwise ring normalization；
+- duplicate、degenerate 和 self-intersection fail-closed policy；
+- gathering flank-only canonical permutation；
+- 参数隔离；
+- antimeridian/high-latitude 限制；
+- 两个固定 revision 的 clean-room 行为参考；
+- Node、PlotJSON、interaction 和 browser 测试要求。
 
 不得把最终 Polygon ring 保存为 authored controls，也不得通过静默 ring repair 改变用户控制点语义。
