@@ -272,3 +272,94 @@ test("Definition migration output accessors reject without getter invocation", (
   );
   assert.equal(getterCalls, 0);
 });
+
+test("Definition migration enforces the per-feature authored-control limit", () => {
+  const migrations = new PlotJsonMigrationRegistry().registerDefinition({
+    from: { plotType: "arrow.straight", definitionVersion: "1.0.0" },
+    to: { plotType: "arrow.current", definitionVersion: "2.0.0" },
+    migrate(value) {
+      return {
+        ...value,
+        plotType: "arrow.current",
+        definitionVersion: "2.0.0",
+        controlPoints: [...value.controlPoints, [119.0, 32.3]],
+      };
+    },
+  });
+
+  assert.throws(
+    () =>
+      readPlotDocument(currentDocument(), {
+        ...definitionOptions(migrations),
+        limits: { controlPointsPerFeature: 2 },
+      }),
+    (error) => {
+      assert.equal(error.code, "PLOTJSON_DEFINITION_MIGRATION_OUTPUT_INVALID");
+      assert.equal(error.cause.code, "PLOTJSON_RESOURCE_LIMIT_EXCEEDED");
+      assert.equal(error.cause.limitName, "controlPointsPerFeature");
+      assert.equal(error.cause.limit, 2);
+      assert.equal(error.cause.actual, 3);
+      assert.equal(error.cause.path, "$.features[0].controlPoints");
+      return true;
+    },
+  );
+});
+
+test("the final document scan enforces aggregate authored-control limits", () => {
+  const migrations = new PlotJsonMigrationRegistry().registerDefinition({
+    from: { plotType: "arrow.straight", definitionVersion: "1.0.0" },
+    to: { plotType: "arrow.current", definitionVersion: "2.0.0" },
+    migrate(value) {
+      return {
+        ...value,
+        plotType: "arrow.current",
+        definitionVersion: "2.0.0",
+        controlPoints: [...value.controlPoints, [119.0, 32.3]],
+      };
+    },
+  });
+  const input = currentDocument({
+    features: [feature(), feature({ id: "feature-2" })],
+  });
+
+  assert.throws(
+    () =>
+      readPlotDocument(input, {
+        ...definitionOptions(migrations),
+        limits: { totalControlPoints: 5 },
+      }),
+    (error) => {
+      assert.equal(error.code, "PLOTJSON_RESOURCE_LIMIT_EXCEEDED");
+      assert.equal(error.limitName, "totalControlPoints");
+      assert.equal(error.limit, 5);
+      assert.equal(error.actual, 6);
+      assert.equal(error.path, "$.features[1].controlPoints");
+      return true;
+    },
+  );
+});
+
+test("malformed final Definition output is attributed to the migration", () => {
+  const migrations = new PlotJsonMigrationRegistry().registerDefinition({
+    from: { plotType: "arrow.straight", definitionVersion: "1.0.0" },
+    to: { plotType: "arrow.current", definitionVersion: "2.0.0" },
+    migrate(value) {
+      return {
+        ...value,
+        plotType: "arrow.current",
+        definitionVersion: "2.0.0",
+        controlPoints: "not-an-array",
+      };
+    },
+  });
+
+  assert.throws(
+    () => readPlotDocument(currentDocument(), definitionOptions(migrations)),
+    (error) => {
+      assert.equal(error.code, "PLOTJSON_DEFINITION_MIGRATION_OUTPUT_INVALID");
+      assert.equal(error.cause.code, "PLOTJSON_CURRENT_SCHEMA_INVALID");
+      assert.equal(error.featureId, "feature-1");
+      return true;
+    },
+  );
+});
