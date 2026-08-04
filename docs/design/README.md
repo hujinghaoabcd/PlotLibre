@@ -22,23 +22,27 @@
 | `arrow-pincer-semantic-design.md` | 五控制钳形箭头 | 已实现，`arrow.pincer@1.1.0` |
 | `route-corridor-group.md` | route + flat-cap corridor | 已实现并合并 |
 | `route-multihead-group.md` | bidirectional + derived secondary-head route | 已实现并合并 |
-| `closed-action-area-group.md` | closed curve + gathering place | 已实现并通过 PR #31 合并 |
-| `circular-arc-family.md` | circular arc + sector + circular segment | 设计 PR #33、实现 PR #34 均已合并 |
-| `professional-editing.md` | multi-selection、batch transaction、translation、box/lasso、rotation/scale、groups | Milestone 007 设计冻结候选，尚无 runtime |
+| `closed-action-area-group.md` | closed curve + gathering place | 已实现并合并 |
+| `circular-arc-family.md` | circular arc + sector + circular segment | 已实现并合并 |
+| `professional-editing.md` | multi-selection、batch transaction、translation、box/lasso、rotation/scale、groups | 007 总设计已冻结；007A runtime 已在 PR #38 实现，007B–D 仍仅为设计方向 |
 
-## Milestone 006J 最终状态
+## 当前实现基线
 
 ```text
-workspace:        0.0.20
+workspace:        0.0.21
 symbols:          19 (14 Arrow + 1 Line + 4 Area)
-Node:             184 passed
-Chromium:         28 passed
-implementation:   PR #34
-finalization:     PR #35
-final main SHA:   4ce59d189b65c8257bf49beabc308a4020249cd0
+Node:             219 passed on runtime head
+Chromium:         30 passed on runtime head
+Sources:          4
+Layers:           10
+007A PR:          #38
+runtime head:     07449e7fda66069b148fa08c865b209d7dc365a3
+runtime CI:       #398 / 30904843935
 ```
 
-Circular family public范围：
+最终文档 head 必须重新运行完整 CI 后才能把 PR #38 标记 Ready。
+
+## Circular family
 
 ```text
 line.circular-arc@1.0.0
@@ -48,63 +52,94 @@ area.sector@1.0.0
 
 `area.lune` 继续延期。详细语义见 `circular-arc-family.md`，数学与 provenance 见 `../algorithms/circular-arc-foundation.md`。
 
-## Milestone 007 设计冻结候选
-
-`professional-editing.md` 将专业编辑拆为四个实施切片：
+## Milestone 007 分片
 
 ```text
-007A selection + atomic batch commands + local translation
+007A ordered selection + atomic Store + batch delete + local translation
 007B box/lasso selection
 007C rotation + positive uniform scale
 007D canonical groups/locks/visibility/z-order after PlotJSON migration design
 ```
 
-### Selection
+### 007A 已实现
 
-- transient engine-independent state；
-- ordered `selectedIds` + one `primaryId`；
-- primary 必须是 selection order 的最后一个 id；
-- selection 不进入 PlotJSON；
-- replace/add/subtract/toggle/clear/reconcile 每次最多一个 event；
-- Store remove/clear 自动 reconcile surviving ids；
-- secondary features 显示 lightweight overlay；
-- only primary feature 显示 authored handles 与 Definition guides。
+Selection：
 
-### Atomic transaction
+- transient engine-independent ordered `selectedIds`；
+- final selected id is Primary；
+- replace/add/subtract/toggle/clear/reconcile/restore；
+- one immutable event per effective operation；
+- Store remove/clear reconciliation；
+- secondary lightweight overlay；
+- only Primary authored handles and Definition guides；
+- backward-compatible `selectedId` aliases；
+- excluded from PlotJSON and feature revision。
+
+Atomic transaction：
 
 ```text
-build every candidate
-→ Registry canonicalize/generate all
-→ any invalid: reject entire edit
-→ all valid: one PlotStore transaction
+stage add/replace/remove/order
+→ validate complete staged state
+→ any invalid: no mutation
+→ commit once
 → one batch event
-→ one history entry
+→ listener errors isolated after commit
 ```
 
-Store listeners 在 commit 后出错不能回滚已经被其他 listeners 观察的状态，也不能让 history 漏记 command。错误必须被收集并交给 error handler。
+`BatchEditCommand` stores exact before/after features, order and selection. Execute/undo/redo restore exact revisions and one explicit selection state.
 
-### Translation
+Batch delete：
 
-007A 只支持 local-metre whole-object translation：
+- one command removes all selected ids；
+- after selection empty；
+- undo restores exact feature order、membership and Primary；
+- redo replays exact after-state。
 
-- one shared projection and meter delta；
+Translation：
+
+- one shared local projection and metre delta；
 - transform authored controls only；
 - parameters/style/metadata unchanged；
-- all selected features preview together；
+- Store unchanged during preview；
+- all candidates Registry-preflighted before atomic commit；
 - any invalid member prevents all mutation；
-- one pointer gesture = one `BatchEditCommand`；
-- Escape cancellation and zero-movement no-op。
+- Escape cancellation；
+- one pointer gesture = one history entry。
 
-### Later slices
+MapLibre resources：
 
-- 007B default box/lasso policy is intersection, candidate ids ordered by Store order；
-- 007C uses selection authored-control bounds center as deterministic pivot；
-- scale is positive uniform only；
-- group/lock/z-order cannot be hidden in free-form metadata and requires formal PlotJSON schema/migration。
+```text
+Sources: committed / selection / draft / handles
+Layers: committed fill-line-point, selection line-point,
+        draft fill-line-point, handle guide, handle
+```
 
-### Reference boundary
+Shift additive selection reserves and temporarily disables MapLibre box zoom; destroy restores prior state.
 
-Fixed behavior references：
+## Later slices
+
+007B：
+
+- default screen-space box/lasso intersection policy；
+- candidate ids de-duplicated by `plotId` and ordered deterministically；
+- simple lasso only, self-intersection fail closed；
+- spatial index before scale claims。
+
+007C：
+
+- local-metre only；
+- pivot from selection authored-control bounds；
+- positive clockwise rotation；
+- positive uniform scale `[0.01, 100]`；
+- no reflection/non-uniform scale；
+- atomic all-member preflight。
+
+007D：
+
+- group/lock/visibility/z-order cannot be hidden in free-form metadata；
+- formal PlotJSON schema, migration and command semantics must precede runtime。
+
+## Reference boundary
 
 ```text
 JamesLMilner/terra-draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
@@ -112,19 +147,20 @@ geoman-io/maplibre-geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
 mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
 ```
 
-Code reuse：`none`。只研究 selection lifecycle、direct/whole-feature editing、drag/rotate/scale mode separation、keyboard configuration 和 test organization。
+Code reuse：`none`。只研究 observable selection lifecycle、whole-feature editing、mode separation、keyboard configuration 和 test organization。
 
 详细事务算法见 `../algorithms/batch-edit-transaction.md`。
 
 ## 状态说明
 
-历史设计文档可能保留设计当时的状态，不应被重写以伪造历史。当前事实以以下入口共同确定：
+历史设计文档保留设计当时状态，不应重写以伪造历史。当前事实由以下入口共同确定：
 
 ```text
 main source
 README.md
 AGENTS.md
 docs/DEVELOPMENT_PLAN.md
+docs/INTERACTION_MODEL.md
 docs/handover/LATEST.md
 latest active/merged PR
 ```
