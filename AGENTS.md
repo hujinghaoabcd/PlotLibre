@@ -9,7 +9,7 @@ PlotLibre is a semantic parametric plotting framework, not a generic GeoJSON too
 Canonical state:
 
 ```text
-plot definition + control points + parameters + style + metadata
+plot definition + authored control points + parameters + style + metadata
 ```
 
 Rendered GeoJSON is derived output and must never replace semantic source data.
@@ -43,27 +43,27 @@ Rules:
 - Shared primitives and frames must remain pure and worker-ready.
 - Related symbols must share components, frames or strategies; copying complete generators is prohibited.
 - A public symbol needs a real semantic or structural distinction, not only new defaults.
-- Semantic controls must remain separate from curve samples and polygon vertices.
-- Self-intersection checks must not be removed merely to make a difficult path render.
+- Semantic controls must remain separate from samples and polygon vertices.
+- Self-intersection checks must not be removed merely to make difficult input render.
 - Topology-sensitive Definitions must validate complete renderability before Store mutation.
-- Compound symbols must declare their coupling topology and produce coherent render components under one semantic Definition.
+- Compound symbols must declare coupling topology and emit coherent components under one semantic Definition.
 - Shaft/head joins must not retain offset vertices beyond the head neck plane.
-- Closed-area symbols must explicitly define authored boundary/path roles, automatic closure and Polygon/LineString output.
-- A closed-area symbol must not persist its sampled curve or final ring as a substitute for authored controls.
+- Closed-area symbols must explicitly define authored boundary/path roles, automatic closure and output topology.
+- Closed-area symbols must not persist sampled curves, derived closure anchors or final rings as controls.
 
 ## 4. Related-symbol groups
 
-A development slice may contain two or three related symbols when all of the following are true:
+A development slice may contain two or three related symbols only when:
 
 1. they share a meaningful mathematical foundation;
-2. the shared foundation is extracted as a pure geometry frame or component;
+2. the shared foundation is extracted as pure geometry;
 3. every public identifier has independent semantic controls or closure structure;
-4. each Definition has independent validation and tests;
-5. the group completes Registry, PlotJSON, Playground, browser coverage and handover in one PR.
+4. every Definition has independent validation and tests;
+5. Registry, PlotJSON, Playground, browser coverage and handover complete in one milestone.
 
-Do not group unrelated symbols merely to increase symbol count. Do not create variants by changing only default parameters. A difficult coupled symbol may still be developed alone.
+Do not group unrelated symbols to increase symbol count. Do not create public variants only by changing defaults.
 
-For Milestone 006I, `area.route-loop` is not automatically approved merely because it could reuse a closed-curve frame. It must demonstrate independent direction or route semantics before becoming a public Definition.
+Milestone 006I includes `area.closed-curve` and `area.gathering-place`. `area.route-loop` remains deferred until independent route, direction, entry/exit or operational semantics are documented.
 
 ## 5. Clean-room and licensing
 
@@ -74,9 +74,9 @@ Before code reuse:
 1. identify source and revision;
 2. verify license;
 3. record provenance;
-4. preserve notices;
+4. preserve required notices;
 5. avoid unclear or incompatible code;
-6. prefer independent implementation from mathematical descriptions and behavioral tests.
+6. prefer independent implementation from mathematics and behavioral tests.
 
 Never copy proprietary Mapbox code. Current packages remain `UNLICENSED` until the owner selects a license.
 
@@ -87,18 +87,16 @@ Never copy proprietary Mapbox code. Current packages remain `UNLICENSED` until t
 - Breaking changes require migration notes and a PlotJSON migration plan.
 - Definition defaults are part of the visual/data contract.
 - Every authored semantic control must survive PlotJSON round trip.
-- Derived centerline, sample, offset, width, notch, branch, bridge, shoulder, tail edge, neck, head and polygon vertices must not be serialized as controls.
-- Definition-derived draft controls and semantic guides are transient and never enter Store, History, handles or PlotJSON.
-- A Definition may provide `canonicalizeControlPoints` to reorder authored coordinates into stable positional roles.
-- Canonicalization must be deterministic and may only permute the exact input coordinates.
+- Derived centerlines, samples, offsets, widths, notches, branches, bridges, shoulders, tail edges, necks, heads, closure anchors and polygon vertices must not be serialized as controls.
+- Definition-derived draft controls and semantic guides are transient.
+- `canonicalizeControlPoints` may only deterministically permute exact authored coordinates.
 - Canonicalization must not add, remove, move, mirror, clamp or synthesize a control.
 - Registry validation and generation operate on canonicalized controls.
-- Create, replace and import persist canonicalized controls so Store and PlotJSON expose one stable role order.
+- Create, replace and import persist canonicalized controls.
 - Invalid canonicalization fails closed with `INVALID_CONTROL_POINT_CANONICALIZATION`.
-- Closed-area Definitions must state whether authored controls lie on the boundary, define a center path, or have special semantic roles.
-- Automatic ring closure is derived behavior and must not append a duplicate authored control to PlotJSON.
+- Automatic ring closure must not append a duplicate authored control to PlotJSON.
 
-Current public Arrow identifiers:
+Current public identifiers:
 
 ```text
 arrow.straight
@@ -115,94 +113,58 @@ arrow.route
 arrow.corridor
 arrow.route.bidirectional
 arrow.route.double-head
+area.closed-curve
+area.gathering-place
 ```
 
-### Squad combat
+### Closed curve
 
-`arrow.squad-combat@1.0.0` stores a centre action path:
+`area.closed-curve@1.0.0` stores 3–64 ordered boundary waypoints. Periodic interpolation and ring closure are derived. Reversing controls preserves the footprint contract while canonical authored order remains unchanged.
+
+### Gathering place
+
+`area.gathering-place@1.0.0` stores exactly:
 
 ```text
-0      tail centre
-1..n-2 optional path controls
-n-1    exact objective/tip
+0 flank A
+1 front crown
+2 flank B
 ```
 
-Its two tail edges and tail width are derived in local metres. Derived tails never enter Store, handles, History or PlotJSON. It is distinct from `arrow.attack`, whose two tail edges are authored controls.
+Only the flank pair may be permuted for deterministic canonical orientation. The rear closure anchor is derived and must never enter Store, History, handles or PlotJSON.
 
-### Route
+### Existing path and compound semantics
 
-`arrow.route@1.0.0` stores a directed centre path:
-
-```text
-0      route origin
-1..n-2 optional path controls
-n-1    exact objective/tip
-```
-
-The constant-width shaft, neck plane and arrow head are derived. The final authored coordinate must remain the exact rendered tip.
-
-### Corridor
-
-`arrow.corridor@1.0.0` stores an undirected centre path:
-
-```text
-0      endpoint A
-1..n-2 optional path controls
-n-1    endpoint B
-```
-
-The output is a constant-width ribbon with flat end caps and no arrow head. It must not be implemented as a route arrow with a hidden, zero-width or degenerate head.
-
-### Bidirectional route
-
-`arrow.route.bidirectional@1.0.0` stores a centre path whose two authored endpoints are exact tips:
-
-```text
-0      exact start tip
-1..n-2 optional path controls
-n-1    exact end tip
-```
-
-The two neck planes and the shaft between them are derived. Reversing the authored path preserves two-tip topology. The result is one closed simple Polygon.
-
-### Double-head route
-
-`arrow.route.double-head@1.0.0` stores a directed centre path:
-
-```text
-0      route origin
-1..n-2 optional path controls
-n-1    exact primary objective/tip
-```
-
-The primary route body and exact tip use ordinary route semantics. A second same-direction emphasis head is derived behind the primary neck and rendered as an additional Polygon component. The secondary head must never enter Store, History, handles or PlotJSON.
+- `arrow.squad-combat`: authored centre action path; tail edges derived.
+- `arrow.route`: directed centre path; terminal authored point is exact tip.
+- `arrow.corridor`: undirected centre path; flat-cap ribbon, no head.
+- `arrow.route.bidirectional`: both authored endpoints are exact tips.
+- `arrow.route.double-head`: primary exact tip; secondary emphasis head derived.
+- `arrow.pincer@1.1.0`: two tails, two objectives and one authored inner junction.
 
 ## 7. Interaction and rejection rules
 
 - Exact two-point Definitions use `TwoPointDrawSession`.
-- Fixed or variable schemas that are not exact-two use `MultiPointDrawSession`.
-- A variable schema may use `minPoints = 2` only when `maxPoints > 2` is explicit.
+- Other fixed or variable schemas use `MultiPointDrawSession`.
 - Session choice comes from `controlSchema`, never hard-coded symbol IDs.
 - Fixed-count symbols use maximum-point completion; variable-count symbols use explicit completion.
 - Pointer drafts may use committed controls plus the live pointer candidate.
 - Derived draft controls are rendering-only and cannot complete or persist a plot.
-- A session becomes terminal only after full Registry validation and generation preflight.
-- `validateCompletion` may return legacy `boolean` or a full Core `ValidationResult`.
-- Invalid validation issues must be retained as `DrawSessionSnapshot.rejection`.
-- Rejection is non-terminal and must never enter Store, History or PlotJSON.
-- Rejected completion remains active so the final candidate can be replaced.
-- Rejected fixed-count candidates must not trap the session at maximum points.
-- Pointer movement, Backspace/Delete, cancellation, a new session and successful completion clear stale rejection state.
+- A session becomes terminal only after Registry validation and full generation preflight.
+- `validateCompletion` may return legacy `boolean` or Core `ValidationResult`.
+- Invalid issues remain available as `DrawSessionSnapshot.rejection`.
+- Rejection is non-terminal and never enters Store, History or PlotJSON.
+- Rejected fixed-count candidates must not trap a session at maximum points.
+- Pointer movement, point removal, cancellation, a new session and successful completion clear stale rejection.
 - Registry issues are the source of truth; Playground must not duplicate geometry logic.
 - Backspace/Delete removes one uncommitted multi-point control.
-- Drawing-state point removal is not Store history.
 - Invalid transient pointer geometry preserves the last valid draft or shows a semantic guide.
-- Create, replace and import must complete generation before Store mutation.
+- Create, replace and import complete generation before Store mutation.
 - One completed handle drag produces one `ReplacePlotCommand`.
 - Invalid handle previews never enter Store or History.
-- Variable path symbols show a full draft after one committed start plus the live terminal candidate when their Definition allows a two-control form.
-- Squad combat, route, corridor and route multi-head symbols complete with double-click or Enter and persist only authored centre-path controls.
-- A variable closed-area symbol must define explicit completion behavior; pointer movement alone must never persist automatic closure.
+- Variable closed areas complete only through explicit double-click/Enter; pointer movement alone never persists closure.
+- Fixed-three gathering place completes on the third authored click.
+- Double-click completion must not duplicate the terminal authored point.
 
 ## 8. Testing requirements
 
@@ -222,12 +184,11 @@ Browser-facing changes also require:
 npm run playground:e2e
 ```
 
-For MapLibre symbols, tests must verify committed/draft Source data, correct `plotType`, relevant fill/line Layers and at least one actual `queryRenderedFeatures()` result.
+MapLibre tests verify committed/draft Source data, `plotType`, fill/line Layers and at least one actual `queryRenderedFeatures()` result.
 
-New geometry additionally requires:
+New geometry additionally proves:
 
-- exact semantic controls;
-- minimum and maximum controls where declared;
+- exact semantic controls and declared count limits;
 - interior-control influence where applicable;
 - duplicate-control policy;
 - finite/closed/winding/simple topology;
@@ -238,105 +199,95 @@ New geometry additionally requires:
 
 Closed-area tests additionally prove:
 
-- automatic closure does not create an extra authored control;
-- every authored boundary control remains represented by the semantic contract;
-- normalized ring is finite, closed, counterclockwise and simple;
-- reversing controls either preserves or intentionally changes semantics as documented;
-- no sampled curve or final ring vertex enters PlotJSON;
+- automatic closure creates no extra authored control;
+- authored boundary controls remain represented;
+- ring is finite, closed, counterclockwise and simple;
+- reversal or flank-swap behavior matches the documented contract;
+- sampled curves, derived anchors and ring vertices do not enter PlotJSON;
 - invalid closure and self-intersection remain outside Store and History;
 - actual draft and committed rendering are visible.
 
-Current minimum regression baseline:
+Milestone 006I regression target:
 
 ```text
-154 Node tests
-20 Chromium tests
-14 public Arrow types
+163 Node tests
+23 Chromium tests
+16 public symbols: 14 Arrow + 2 Area
 ```
 
 ## 9. Playground and Pages
 
 - GitHub Pages base is `/PlotLibre/`.
 - Production cannot require private API keys.
-- Basemap failure cannot block plotting.
+- Basemap failure cannot block plotting or change the semantic catalog.
 - E2E cannot depend on remote tiles.
-- MapLibre 6 Worker and Shared modules must remain aligned.
-- Every public symbol gets selector, sample and browser coverage in the same slice.
-- Fixed-count symbols clearly state automatic maximum-point completion.
-- Variable symbols clearly state double-click/Enter completion.
-- Production exposes all fourteen current Arrow types by default.
-- Extended E2E uses `?e2e=1&squad=1&paths=1`; compatibility tests for the original sample baseline must remain intentional rather than accidental.
-- Clicking Load Sample under the full feature flag produces all fourteen current samples.
+- MapLibre 6 Worker and Shared modules remain aligned.
+- Every public symbol receives selector, sample and browser coverage in the same milestone.
+- Fixed-count symbols state automatic completion.
+- Variable symbols state double-click/Enter completion.
+- Production exposes all sixteen current symbols and loads sixteen samples.
+- Base compatibility E2E uses `?e2e=1` and intentionally exposes the original nine-selector surface.
+- Extended E2E uses `?e2e=1&squad=1&paths=1&areas=1`.
+- Symbol-specific status listeners must be installed after generic listeners so actionable guidance is not overwritten.
 - Pages deploys only from `main`.
-- A new area family must receive a clear selector category and completion instructions rather than being mixed into Arrow copy without explanation.
 
 ## 10. Documentation and handover
 
-Every completed task must update `docs/handover/LATEST.md` and add an immutable handover:
+Every completed milestone updates `docs/handover/LATEST.md` and adds an immutable handover:
 
 ```text
-docs/handover/YYYY-MM-DD-milestone-NNN.md
+docs/handover/YYYY-MM-DD-milestone-NNN-description.md
 ```
 
 Each handover records branch/PR/deployment state, files and capabilities, exact validation, architecture decisions, risks and prioritized continuation.
 
-The handover contract requires these exact headings:
+The handover contract requires these exact headings in `LATEST.md`:
 
 ```text
+## Current state
 ## Completed in this milestone
+## Validation
 ## Next tasks
 ## Risks and decisions
 ```
 
-Never rewrite earlier immutable handovers.
-
-`LATEST.md` must describe the actual merged or active state. It must not leave an already merged PR described as pending.
+Never rewrite earlier immutable handovers. `LATEST.md` must describe the actual active or merged state.
 
 ## 11. Scope control
 
-Prefer one complete related-symbol group to many incomplete symbols. Do not develop unrelated complex symbols in parallel. For routine groups, use one implementation PR unless a genuinely unresolved semantic design requires a separate design review.
-
-Documentation-state repair may be isolated from runtime work so that the next implementation branch begins from an accurate baseline.
+Prefer one complete related-symbol group to many incomplete symbols. Do not develop unrelated complex symbols in parallel. Documentation-state repair may be isolated so implementation starts from an accurate baseline.
 
 ## 12. Current priority
 
-Completed baseline:
+Merged baseline before this milestone:
 
 ```text
-main SHA:             e799b3263bc36410c4195225faad5d2fc36f494f
-workspace:            0.0.18
-public Arrow types:   14
-Node baseline:        154
-Chromium baseline:    20
-Milestone 006H:       merged and finalized
+main SHA:           a883cbf382b61309e7d64e788e46d9319b8c0ea1
+workspace:          0.0.18
+public symbols:     14 Arrow
+Node baseline:      154
+Chromium baseline:  20
+Milestone 006H:     finalized
 ```
 
-Active handover synchronization:
+Active milestone:
 
 ```text
-branch: agent/006i-handover-baseline
-scope:  synchronize current documentation and freeze the 006I starting boundary
+Milestone: 006I closed action area group
+branch:    agent/006i-closed-action-area-group
+PR:        #31 Add closed action area symbol group
+workspace: 0.0.19
+symbols:   16 (14 Arrow + 2 Area)
 ```
 
-Next implementation milestone:
+Binding completion order:
 
-```text
-Milestone 006I: closed action area group
-candidate identifiers:
-  area.closed-curve
-  area.gathering-place
-  area.route-loop (conditional on independent semantics)
-```
-
-Binding order:
-
-1. synchronize stale current-state documentation;
-2. freeze public identifiers and canonical control roles;
-3. define automatic closure and direction semantics;
-4. decide which candidates form one legitimate related group;
-5. record clean-room references and license review;
-6. implement a pure closed-area frame;
-7. add independent Definitions and validation;
-8. complete Registry, PlotJSON, Playground and browser coverage;
-9. update immutable handover and current baseline;
-10. do not return to pincer hardening or add more route-head variants.
+1. keep `area.closed-curve@1.0.0` and `area.gathering-place@1.0.0` semantic contracts stable;
+2. keep `area.route-loop` deferred;
+3. preserve pure cyclic closed-area geometry and strict topology rejection;
+4. preserve full Registry/PlotJSON preflight;
+5. verify 163 Node and 23 Chromium tests on the final head;
+6. update current and immutable handover documents;
+7. merge only with a fully green current-head CI and zero unresolved review threads;
+8. after 006I finalization, begin 006J arc/sector/lune semantic design;
+9. do not return to pincer hardening or add route-head variants in this milestone.
