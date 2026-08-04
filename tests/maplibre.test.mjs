@@ -363,7 +363,7 @@ test("clicking a committed layer selects its semantic plot", () => {
   assert.equal(map.getSource("plotlibre-handles").data.features.length, 2);
 });
 
-test("style.load restores sources, layers, committed plots and handles", () => {
+test("style.load restores sources, layers, committed plots, selection and handles", () => {
   const { map, plot } = createPlot();
   plot.create({
     id: "arrow-1",
@@ -379,9 +379,12 @@ test("style.load restores sources, layers, committed plots and handles", () => {
   map.layers.clear();
   map.fire("style.load");
 
-  assert.equal(map.sources.size, 3);
-  assert.equal(map.layers.size, 8);
+  assert.equal(map.sources.size, 4);
+  assert.equal(map.layers.size, 10);
+  assert.equal(map.getLayer("plotlibre-selection-line")?.type, "line");
+  assert.equal(map.getLayer("plotlibre-selection-point")?.type, "circle");
   assert.equal(map.getLayer("plotlibre-handle-guide")?.type, "line");
   assert.equal(map.getSource("plotlibre-committed").data.features.length, 2);
+  assert.ok(map.getSource("plotlibre-selection").data.features.length >= 1);
   assert.equal(map.getSource("plotlibre-handles").data.features.length, 2);
 });
