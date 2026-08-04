@@ -16,6 +16,10 @@ export interface MapLibreMouseEventLike {
   readonly lngLat: MapLibreLngLatLike;
   readonly point?: MapLibrePointLike;
   readonly originalEvent?: {
+    readonly shiftKey?: boolean;
+    readonly ctrlKey?: boolean;
+    readonly metaKey?: boolean;
+    readonly altKey?: boolean;
     preventDefault?(): void;
     stopPropagation?(): void;
   };
