@@ -11,7 +11,6 @@ import {
 import type {
   CompletedSelectionTransform,
   SelectionTransformKind,
-  SelectionTransformRejectionCode,
 } from "./selection-transform-session.js";
 
 export class SelectionTransformCommandError extends Error {
@@ -47,9 +46,9 @@ export interface CreateSelectionTransformCommandOptions {
 /**
  * Builds one stale-safe atomic command from a preflighted transform completion.
  *
- * The returned command revalidates exact expected feature values, document
- * order and semantic selection before execute/redo and before undo. It cannot
- * overwrite a Store state that changed after the interactive preview.
+ * Members whose authored controls remain exactly at the shared pivot are not
+ * replaced and retain their original revision. The command validates the exact
+ * mixed post-state before undo, so it cannot overwrite later Store changes.
  */
 export function createSelectionTransformCommand(
   store: PlotStore,
@@ -63,11 +62,16 @@ export function createSelectionTransformCommand(
 
   const replacements: PlotFeature[] = [];
   const undoReplacements: PlotFeature[] = [];
+  const actualPostState: PlotFeature[] = [];
   for (const [index, original] of originals.entries()) {
     const next = transformed[index]!;
-    if (sameControlPoints(original, next)) continue;
+    if (sameControlPoints(original, next)) {
+      actualPostState.push(original);
+      continue;
+    }
     replacements.push(next);
     undoReplacements.push(original);
+    actualPostState.push(next);
   }
   if (replacements.length === 0) return undefined;
 
@@ -94,7 +98,7 @@ export function createSelectionTransformCommand(
     inner,
     options.completion.kind,
     originals,
-    transformed,
+    actualPostState,
     orderedIds,
     options.selectionSnapshot,
   );
@@ -107,7 +111,7 @@ class ValidatedSelectionTransformCommand implements Command {
   readonly #inner: BatchEditCommand;
   readonly #kind: SelectionTransformKind;
   readonly #originals: readonly PlotFeature[];
-  readonly #transformed: readonly PlotFeature[];
+  readonly #actualPostState: readonly PlotFeature[];
   readonly #orderedIds: readonly string[];
   readonly #selectionSnapshot: SelectionSnapshot;
 
@@ -117,7 +121,7 @@ class ValidatedSelectionTransformCommand implements Command {
     inner: BatchEditCommand,
     kind: SelectionTransformKind,
     originals: readonly PlotFeature[],
-    transformed: readonly PlotFeature[],
+    actualPostState: readonly PlotFeature[],
     orderedIds: readonly string[],
     selectionSnapshot: SelectionSnapshot,
   ) {
@@ -127,7 +131,7 @@ class ValidatedSelectionTransformCommand implements Command {
     this.#inner = inner;
     this.#kind = kind;
     this.#originals = originals;
-    this.#transformed = transformed;
+    this.#actualPostState = actualPostState;
     this.#orderedIds = orderedIds;
     this.#selectionSnapshot = selectionSnapshot;
   }
@@ -138,7 +142,7 @@ class ValidatedSelectionTransformCommand implements Command {
   }
 
   public undo(): void {
-    this.#assertExpectedState(this.#transformed, "undo");
+    this.#assertExpectedState(this.#actualPostState, "undo");
     this.#inner.undo();
   }
 
@@ -146,15 +150,6 @@ class ValidatedSelectionTransformCommand implements Command {
     expectedFeatures: readonly PlotFeature[],
     operation: "execute" | "undo",
   ): void {
-    const currentOrder = this.#store.list().map((feature) => feature.id);
-    if (!sameIds(currentOrder, this.#orderedIds)) {
-      throw new SelectionTransformCommandError(
-        "SELECTION_TRANSFORM_TRANSACTION_INVALID",
-        `Cannot ${operation} ${this.#kind} transform because Store document order changed.`,
-        { featureIds: expectedFeatures.map((feature) => feature.id) },
-      );
-    }
-
     assertSelectionSemantics(
       this.#selection.snapshot(),
       this.#selectionSnapshot,
@@ -178,6 +173,15 @@ class ValidatedSelectionTransformCommand implements Command {
           { featureIds: [expected.id] },
         );
       }
+    }
+
+    const currentOrder = this.#store.list().map((feature) => feature.id);
+    if (!sameIds(currentOrder, this.#orderedIds)) {
+      throw new SelectionTransformCommandError(
+        "SELECTION_TRANSFORM_TRANSACTION_INVALID",
+        `Cannot ${operation} ${this.#kind} transform because Store document order changed.`,
+        { featureIds: expectedFeatures.map((feature) => feature.id) },
+      );
     }
   }
 }
@@ -294,5 +298,3 @@ function sameIds(left: readonly string[], right: readonly string[]): boolean {
     left.every((id, index) => id === right[index])
   );
 }
-
-export type { SelectionTransformRejectionCode };
