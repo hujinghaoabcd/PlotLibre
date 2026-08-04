@@ -11,34 +11,49 @@
 → immutable handover
 → Ready review
 → squash merge
-→ 必要时 documentation-only post-merge finalization
+→ documentation-only post-merge finalization
 ```
 
 禁止：
 
 - 编辑 rendered GeoJSON vertices 代替 authored controls；
 - 允许部分 batch mutation；
-- 为提高成功率关闭 Registry generation preflight；
+- 关闭 Registry generation preflight；
 - 把 canonical editor state 隐藏在任意 metadata 中；
-- 在 documentation-only PR 中提前写 runtime；
+- 在 documentation-only PR 中写 runtime；
 - 一个 PR 并行扩散多个复杂编辑子系统；
-- 使用旧 head 的 CI 结论声明新 head 已通过。
+- 使用旧 head 的 CI 声明新 head 已通过。
 
-## 当前候选基线
+## 当前合并基线
 
 ```text
+main SHA:          04dca0b120b1440afb49a300eeee92faf6644a7d
 workspace:         0.0.21
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
 Node tests:        219
 Chromium tests:    30
 MapLibre Sources:  4
 MapLibre Layers:   10
-current PR:        #38
-current branch:    agent/007a-selection-batch-translation
-current milestone: 007A implementation and documentation finalization
+completed:         Milestone 007A through PR #38
+current slice:     007A post-merge documentation finalization
+current branch:    agent/007a-post-merge-finalization
+next milestone:    007B box/lasso selection design
 ```
 
-007A runtime head `07449e7fda66069b148fa08c865b209d7dc365a3` 已由 CI #398 完整验证。版本与文档同步后的最终 head 必须重新运行完整 CI，不能复用该结论作为最终合并证据。
+PR #38 final evidence：
+
+```text
+validated head:   2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
+CI:               #409 / 30906467230
+Node 20.19:       success
+Node 22:          success
+Node tests:       219 passed
+Chromium tests:   30 passed
+Playground build: success
+handover check:  success
+threads:          0 unresolved
+squash SHA:       04dca0b120b1440afb49a300eeee92faf6644a7d
+```
 
 ## 已完成里程碑
 
@@ -53,112 +68,60 @@ current milestone: 007A implementation and documentation finalization
 | 006I | closed curve + gathering place | 已合并 |
 | 006J | circular design、implementation、semantic guides | 已合并 |
 | 007 Design | professional editing semantics and transaction algorithms | 已合并 |
-| 007A Runtime | multi-selection、atomic Store、batch delete、local translation | PR #38 runtime 已实现，待最终文档 CI 与合并 |
+| 007A | ordered selection、atomic Store、batch delete、local translation | PR #38 已合并 |
 
 ## Milestone 007 总体拆分
 
 ```text
-007A — ordered multi-selection + atomic Store + batch delete + local translation
-007B — box/lasso selection
-007C — rotation + positive uniform scale
-007D — groups/locks/visibility/z-order after PlotJSON migration design
+007A — ordered multi-selection + atomic Store + batch delete + local translation — merged
+007B — box/lasso selection — next
+007C — rotation + positive uniform scale — deferred
+007D — groups/locks/visibility/z-order after PlotJSON migration design — deferred
 ```
 
-007A 必须独立完成并合并后才能进入 007B。007B–D 不得混入 PR #38。
+## 007A 已合并能力
 
-## Milestone 007A 已实现能力
+### SelectionController
 
-### 7A.1 SelectionController
+- ordered unique `selectedIds`；
+- final id Primary；
+- replace/add/subtract/toggle/clear/makePrimary/restore/reconcile；
+- immutable monotonic snapshots；
+- one effective operation = one event；
+- no-op = no event；
+- Store remove/clear reconciliation；
+- selection excluded from PlotJSON and feature revision；
+- backward-compatible `select()` / `selectedId` aliases。
 
-已完成 engine-independent：
-
-```text
-replace
-add
-subtract
-toggle
-clear
-makePrimary
-restore
-snapshot
-subscribe
-destroy
-store reconciliation
-modifier intent application
-```
-
-语义：
-
-- `selectedIds` 唯一并按 acquisition order 排列；
-- 最后一个 id 是 Primary；
-- restore 保留 membership/Primary，但 interaction revision 单调递增；
-- no-op 不发 event；
-- 每个有效操作只发一个 immutable event；
-- Store remove/clear 自动 reconcile；
-- selection 不进入 PlotJSON，不增加 feature revision。
-
-### 7A.2 PlotStore atomic transaction
-
-已完成：
+### Atomic PlotStore transaction
 
 ```text
-validate transaction
+validate operation id sets
 → clone ordered Store state
 → stage add/replace/remove
-→ validate optional exact orderedIds
-→ any error: no mutation and no event
+→ validate exact orderedIds
+→ any error: no mutation
 → commit once
 → one batch event
 ```
 
-现有单操作 API 保持兼容。Undo 可恢复 exact document/render order，禁止 append-on-undo。
+Post-commit listener errors are collected and reported through `onListenerError`; they do not prevent History from recording an already committed command。
 
-### 7A.3 Listener failure isolation
+### BatchEditCommand
 
-已完成冻结策略：
+Stores exact before/after features, document order and selection snapshots。Execute/undo/redo replay exact revisions。Automatic reconciliation is suspended during Store mutation and followed by one explicit selection restoration。
 
-- semantic/precondition error 在 commit 前抛出；
-- commit 后所有 listeners 均执行；
-- listener exceptions 收集并交给 `onListenerError`；
-- 不同步逃逸破坏 History；
-- 已提交 Store 状态始终可由对应 command undo。
-
-### 7A.4 BatchEditCommand
-
-已完成 exact：
+### MapLibre selection
 
 ```text
-before/after features
-before/after document order
-before/after selection
-label
+plain click       replace / make-primary
+Shift             add
+Ctrl/Cmd          toggle
+Alt               subtract
+empty plain click clear
 ```
 
-Execute/redo 回放 exact after-state，undo 回放 exact before-state。Redo 不再次增加 revisions。事务期间暂停自动 selection reconciliation，最终只发布一个明确 selection restoration event。
-
-### 7A.5 Public selection API
-
-保持兼容：
-
-```text
-plot.select(id | undefined)
-plot.selectedId
-interaction.select(id | undefined)
-interaction.selectedId
-```
-
-新增：
-
-```text
-plot.selectedIds
-plot.selection
-plot.removeSelected()
-plot.translation
-```
-
-Only Primary exposes authored handles and Definition guides；secondary selections 只显示轻量 overlay。
-
-### 7A.6 MapLibre selection resources
+MapLibre box zoom is preserved、disabled during PlotLibre lifecycle and restored on destroy。
 
 Sources：
 
@@ -184,132 +147,88 @@ plotlibre-handle-guide
 plotlibre-handle
 ```
 
-Selection source 与 handles source 独立。Polygon 转 boundary、LineString 保持 line、Point 保持 point；Primary 通过 derived property 表达。Style reload 恢复 committed、selection、draft、handles 和 guides。
+Only Primary exposes authored handles and Definition guides。
 
-### 7A.7 Modifier input
+### Batch delete
 
-```text
-plain click       replace / make-primary
-Shift             add
-Ctrl/Cmd          toggle
-Alt               subtract
-empty plain click clear
-```
+- `plot.removeSelected()`；
+- Delete/Backspace and Playground action share one command path；
+- one atomic remove transaction；
+- undo restores exact values、document order、selection and Primary；
+- redo restores exact after-state。
 
-MapLibre box zoom 会在 PlotLibre 生命周期内被保留并关闭，使 Shift 专用于 additive selection；`destroy()` 恢复原 box-zoom 状态。Shift 在 MapLibre `mousedown` 层处理，后续 click 以幂等 add 避免重复改变。
-
-### 7A.8 Batch delete
-
-```text
-selected ids
-→ one BatchEditCommand
-→ one atomic remove transaction
-→ afterSelection empty
-→ one History entry
-```
-
-Undo 恢复 exact features、order、selection 和 Primary；redo 恢复 exact after-state。Delete/Backspace 与 Playground 按钮共用该语义。
-
-### 7A.9 Local whole-selection translation
+### Local whole-selection translation
 
 ```text
 selected authored controls
-→ one shared coordinate analysis
-→ one order-independent local projection origin
-→ pointer start/end meter delta
-→ same delta for every authored control
-→ revision = original + 1
-→ canonicalize/generate all candidates
-→ all valid: transient preview then one batch command
+→ one shared local coordinate frame
+→ one order-independent projection origin
+→ one common metre delta
+→ transform every authored control
+→ candidate revision = original + 1
+→ Registry preflight all candidates
+→ all valid: transient preview and one command
 → any invalid: no Store or History mutation
 ```
 
-规则：
+Parameters/style/metadata remain unchanged。Escape cancels。Handle drag has priority。dragPan is restored after the gesture。
 
-- parameters/style/metadata unchanged；
-- Store 在 preview 期间保持原值；
-- Escape 全量取消；
-- zero/sub-threshold movement no-op；
-- one gesture = one History entry；
-- handle drag priority > translation > selection click > camera drag；
-- dragPan 只在 active translation 时关闭并恢复；
-- antimeridian、高纬、large extent、non-finite 或任一 generation failure 均整批拒绝。
+## 当前 documentation-only finalization
 
-### 7A.10 Playground
+`agent/007a-post-merge-finalization` 只能：
 
-Playground 已显示：
+- record actual squash SHA；
+- replace pre-merge candidate wording；
+- update latest handover and continuation order；
+- add immutable post-merge handover；
+- pass unchanged 219 Node / 30 Chromium baseline。
 
-- selection count；
-- Primary id；
-- multi-selection instructions；
-- atomic batch delete；
-- body-drag translation state；
-- rejection/cancel feedback；
-- Primary-only style editing。
+禁止 runtime、API、geometry、interaction or test behavior changes。
 
-## 007A 验证证据
+## Milestone 007B：Box and lasso design
 
-Runtime head：
+Only after finalization merges：
 
-```text
-head:              07449e7fda66069b148fa08c865b209d7dc365a3
-CI run:            #398 / 30904843935
-Node 20.19:        success
-Node 22:           success
-Node tests:        219 passed
-Chromium tests:    30 passed
-Playground build:  success
-handover check:    success
-```
+### Box selection decisions to freeze
 
-真实 Chromium 纵向测试覆盖：
+- gesture and modifier ownership；
+- screen-space rectangle representation；
+- default intersection policy；
+- candidate layer set；
+- compound feature de-duplication by `plotId`；
+- deterministic result ordering by Store/document order；
+- relationship with Shift click and MapLibre camera gestures；
+- behavior for active draw、handle drag and translation；
+- empty result and Primary selection policy。
 
-- rendered-feature hit detection；
-- plain + Shift selection；
-- common-delta body translation；
-- transient preview with unchanged Store；
-- one-command commit；
-- undo/redo exact values；
-- Escape rollback；
-- Delete all selected；
-- undo document order and Primary restoration。
+### Lasso decisions to freeze
 
-最终文档 head 仍需重新执行同样门槛。
-
-## PR #38 合并前剩余任务
-
-1. 同步所有权威文档与 `0.0.21` baseline；
-2. 创建 immutable 007A implementation handover；
-3. 更新 `docs/handover/LATEST.md`；
-4. 更新 PR body 为完整实现事实；
-5. 对最终 head 运行 Node 20.19/22、219 Node、Playground build、handover check、30 Chromium；
-6. 检查 unresolved review threads = 0；
-7. Mark Ready；
-8. 使用 expected head SHA Squash and merge；
-9. 工具允许时删除 feature branch；
-10. 必要时从新 main 创建 documentation-only finalization PR，记录实际 squash SHA。
-
-## Milestone 007B：Box and lasso
-
-仅在 007A 合并后开始设计：
-
-- screen-space box intersection selection；
-- lasso simple-ring validation；
-- candidate ids by `plotId` de-duplication；
-- deterministic Store/document order；
-- exact contain policy deferred；
+- screen-space authored lasso path；
+- closure threshold and completion gesture；
+- simple-ring requirement；
 - self-intersection fail closed；
-- spatial index before large-document claims；
-- 不复用 rendered vertices 作为 authored state。
+- intersection policy；
+- simplification tolerance boundary；
+- transient overlay source/layer ownership；
+- cancellation and keyboard behavior。
+
+### Performance boundary
+
+- no large-document claim without measured fixtures；
+- candidate feature de-duplication before expensive geometry tests；
+- define spatial-index ownership and invalidation；
+- record hardware、browser、feature mix and viewport for benchmarks。
+
+007B must not include rotation/scale、groups/locks、snapping or new symbols。
 
 ## Milestone 007C：Rotation and scale
 
 - local-metre only initially；
 - pivot = selection authored-control bounds center；
-- positive clockwise UI angle with documented Cartesian conversion；
+- positive clockwise user angle with documented Cartesian conversion；
 - positive uniform scale `[0.01, 100]`；
 - no reflection/non-uniform scale；
-- all-feature atomic preflight；
+- atomic all-member Registry preflight；
 - parameters unchanged unless a future pure/versioned Definition transform hook opts in。
 
 ## Milestone 007D：Canonical editor object state
