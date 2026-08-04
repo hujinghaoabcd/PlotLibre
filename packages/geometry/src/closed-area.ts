@@ -15,6 +15,9 @@ import {
   type Vec2,
 } from "./vector.js";
 
+const DEGREES_TO_RADIANS = Math.PI / 180;
+const RADIANS_TO_DEGREES = 180 / Math.PI;
+
 export interface ClosedAreaParameters {
   readonly tension?: number;
   readonly segmentsPerSpan?: number;
@@ -118,8 +121,7 @@ export function buildClosedCurveRing(
     throw new RangeError("Closed curve requires at least three control points.");
   }
 
-  const origin = controlPoints[0]!;
-  const projection = createLocalProjection(origin);
+  const projection = createLocalProjection(closedAreaProjectionOrigin(controlPoints));
   const projectedControls = controlPoints.map((point) => projection.project(point));
   assertDistinctCyclicControls(projectedControls);
 
@@ -204,6 +206,42 @@ function finalizeAreaRing(
 
   const oriented = ensureRingWinding(closed, "counterclockwise");
   return oriented.map((point) => unproject(point));
+}
+
+function closedAreaProjectionOrigin(
+  controlPoints: readonly Position[],
+): Position {
+  let longitudeSine = 0;
+  let longitudeCosine = 0;
+  let latitudeSum = 0;
+
+  for (const [index, [longitude, latitude]] of controlPoints.entries()) {
+    if (
+      !Number.isFinite(longitude) ||
+      !Number.isFinite(latitude) ||
+      latitude < -90 ||
+      latitude > 90
+    ) {
+      throw new RangeError(
+        `Closed-area control ${index} must be a finite WGS84 position.`,
+      );
+    }
+    const radians = longitude * DEGREES_TO_RADIANS;
+    longitudeSine += Math.sin(radians);
+    longitudeCosine += Math.cos(radians);
+    latitudeSum += latitude;
+  }
+
+  if (Math.hypot(longitudeSine, longitudeCosine) <= 1e-12) {
+    throw new RangeError(
+      "Closed-area longitude center is ambiguous for this global extent.",
+    );
+  }
+
+  return [
+    Math.atan2(longitudeSine, longitudeCosine) * RADIANS_TO_DEGREES,
+    latitudeSum / controlPoints.length,
+  ];
 }
 
 function assertDistinctCyclicControls(controls: readonly Vec2[]): void {
