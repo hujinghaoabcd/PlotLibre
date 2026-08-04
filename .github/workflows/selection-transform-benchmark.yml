@@ -1,0 +1,49 @@
+name: Selection Transform Benchmark
+
+on:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Source branch head represented by this benchmark run
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Optional source SHA label for a manual run
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run selection transform benchmark
+        env:
+          PLOTLIBRE_BENCHMARK_SHA: ${{ inputs.source_sha || github.sha }}
+        run: npm run benchmark:selection-transform
+
+      - name: Publish benchmark summary
+        run: cat artifacts/selection-transform-benchmark/results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: selection-transform-benchmark-${{ github.run_id }}
+          path: artifacts/selection-transform-benchmark
+          if-no-files-found: error
+          retention-days: 14
