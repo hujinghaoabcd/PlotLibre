@@ -312,9 +312,9 @@ test("invalid lasso preserves selection and remains armed for retry", () => {
   harness.selection.replace(["c"]);
   harness.interaction.start("lasso");
   harness.map.canvas.emit("pointerdown", pointer({ offsetX: 0, offsetY: 0 }));
-  harness.map.canvas.emit("pointermove", pointer({ offsetX: 10, offsetY: 10 }));
-  harness.map.canvas.emit("pointermove", pointer({ offsetX: 0, offsetY: 10 }));
-  harness.map.canvas.emit("pointerup", pointer({ offsetX: 10, offsetY: 0 }));
+  harness.map.canvas.emit("pointermove", pointer({ offsetX: 20, offsetY: 20 }));
+  harness.map.canvas.emit("pointermove", pointer({ offsetX: 0, offsetY: 12 }));
+  harness.map.canvas.emit("pointerup", pointer({ offsetX: 12, offsetY: 0 }));
 
   assert.deepEqual(harness.selection.selectedIds, ["c"]);
   assert.equal(harness.interaction.snapshot.status, "rejected");
@@ -387,7 +387,11 @@ test("resolver failure rejects without partial selection", () => {
   harness.map.canvas.emit("pointermove", pointer({ offsetX: 10, offsetY: 10 }));
   harness.map.canvas.emit("pointerup", pointer({ offsetX: 10, offsetY: 10 }));
   assert.deepEqual(harness.selection.selectedIds, ["c"]);
-  assert.equal(harness.interaction.snapshot.status, "rejected");
+  assert.equal(harness.interaction.snapshot.status, "armed");
+  assert.equal(
+    harness.interaction.snapshot.rejection.code,
+    "SELECTION_REGION_QUERY_FAILED",
+  );
   assert.equal(harness.interaction.rejection.code, "SELECTION_REGION_QUERY_FAILED");
   harness.interaction.destroy();
 });
