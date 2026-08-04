@@ -17,7 +17,7 @@
 ## 当前基线
 
 ```text
-main SHA:          9a1c761b3e9d1f94c944485137fb21a92bdcc786
+main SHA:          2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0
 workspace:         0.0.22
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
 Node tests:        299
@@ -25,26 +25,30 @@ Chromium tests:    34
 MapLibre Sources:  4
 MapLibre Layers:   10
 benchmark jobs:    region selection + selection transform
-completed:         007A + 007B + 007B-P + 007C design
-current slice:     007C runtime validation and documentation
-current branch:    agent/007c-rotation-scale-runtime
-current PR:        #49 (Draft until exact-head gate)
+completed:         007A + 007B + 007B-P + 007C design/runtime
+current slice:     007C post-merge authority synchronization
+current branch:    agent/007c-runtime-post-merge-finalization
+next branch:       agent/008-plotjson-migrations-design
 ```
+
+PR #49 exact head `c9c8cadf678a0758075af76d078b2e5a5bfbd379` passed CI `30943895213` / `#505` and was squash-merged as `2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0`.
 
 ## Milestones
 
 | 里程碑 | 成果 | 状态 |
 |---|---|---|
 | 001–006J | Core、History、PlotJSON、MapLibre、geometry、19 symbols | 已完成 |
-| 007A | selection、atomic Store、delete、translation | PR #38/#39 |
-| 007B | box/lasso design/runtime/Playground/docs | PR #40–#44 |
-| 007B-P | resolver benchmark 与索引决策 | PR #45/#46 |
-| 007C Design | shared-pivot rotation + positive uniform scale | PR #47/#48 |
-| 007C Runtime | pure math、session、atomic command、MapLibre handles、Playground、Chromium、benchmark | PR #49，收尾中 |
-| 007C Finalization | merge-state authority synchronization | PR #49 合并后独立分支 |
-| 007D | groups/locks/visibility/z-order after PlotJSON migration | deferred |
+| 007A | selection、atomic Store、delete、translation | PR #38/#39，已完成 |
+| 007B | box/lasso design/runtime/Playground/docs | PR #40–#44，已完成 |
+| 007B-P | resolver benchmark 与索引决策 | PR #45/#46，已完成 |
+| 007C Design | shared-pivot rotation + positive uniform scale | PR #47/#48，已完成 |
+| 007C Runtime | pure math、session、atomic command、MapLibre handles、Playground、Chromium、benchmark | PR #49，已合并 |
+| 007C Finalization | merge-state authority synchronization | 当前纯文档分支 |
+| 008 Design | PlotJSON schema、兼容性与迁移语义 | 下一阶段 |
+| 008 Runtime | migration registry、fixtures、兼容解析 | 设计冻结后 |
+| 007D | groups/locks/visibility/z-order | 008 runtime 完成后解除阻塞 |
 
-## 007C runtime implementation
+## 007C merged runtime
 
 Authority:
 
@@ -53,9 +57,11 @@ docs/design/rotation-uniform-scale.md
 docs/design/rotation-uniform-scale-runtime.md
 docs/algorithms/selection-local-transform.md
 docs/performance/selection-transform-benchmark.md
+docs/handover/2026-08-05-milestone-007c-rotation-scale-runtime.md
+docs/handover/2026-08-05-milestone-007c-runtime-post-merge-finalization.md
 ```
 
-Implemented pipeline:
+Merged pipeline:
 
 ```text
 all selected authored controls
@@ -65,9 +71,10 @@ all selected authored controls
 → canonicalize + Registry.generate every member
 → complete transient preview or complete rejection
 → one stale-safe BatchEditCommand
+→ exact captured undo/redo
 ```
 
-Completed runtime slices:
+Delivered slices:
 
 1. shared local frame and pure rotation/scale functions;
 2. engine-independent transform session, angle unwrap and structured rejections;
@@ -79,7 +86,7 @@ Completed runtime slices:
 8. public APIs and Playground controls/status;
 9. real Chromium multi-selection rotation and rejected-scale retry flows;
 10. reproducible `1/100/1,000` transform benchmark and independent Actions workflow;
-11. runtime architecture, performance and handover documentation.
+11. runtime architecture, performance and immutable handover documentation.
 
 ## Binding 007C decisions
 
@@ -100,73 +107,91 @@ Completed runtime slices:
 - exact captured undo/redo;
 - unsupported local coordinate frames reject.
 
-## Runtime acceptance
-
-Pure:
-
-- frame order invariance;
-- clockwise cardinal fixtures;
-- angle unwrap;
-- scale boundaries and no reflection;
-- local-frame failures;
-- no-op behavior.
-
-Registry/command:
-
-- all 19 Definitions rotate through full preflight;
-- all 19 Definitions pass modest positive scale smoke;
-- parameters/style/metadata unchanged;
-- one invalid member rejects all;
-- exact revision/order/selection/Primary/undo/redo.
-
-MapLibre/Chromium:
-
-- explicit and mutually exclusive modes;
-- DOM handles and lifecycle;
-- pointer capture and dragPan restoration;
-- rejection retry;
-- multi-selection rotate/scale;
-- all historical browser regressions.
-
-Performance:
-
-- required `1/100/1,000` measurements;
-- JSON/Markdown artifact;
-- no hard latency SLA;
-- no persistent transform cache or index without new evidence.
-
-## Exact-head gate for PR #49
+## 007C merge evidence
 
 ```text
-Node 20.19 success
-Node 22 success
-299 Node tests
-Playground typecheck/build
-handover check
-region benchmark artifact
-selection-transform benchmark artifact
-34 Chromium tests
-zero unresolved review threads
-immutable runtime handover
+validated head:        c9c8cadf678a0758075af76d078b2e5a5bfbd379
+CI:                    30943895213 / #505
+Node 20.19:            success
+Node 22:               success
+Node tests:            299 passed
+Playground typecheck:  success
+Playground build:      success
+handover check:        success
+Chromium tests:        34 passed
+review threads:        0
+merge method:          squash
+squash SHA:            2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0
 ```
 
-After all items pass on one exact head, update PR #49 evidence, mark Ready and preserve that exact head for squash merge.
+Exact-head artifacts:
 
-## Post-merge finalization
+```text
+region benchmark:     8906262138
+transform benchmark:  8906253893
+```
 
-After PR #49 is squash-merged:
+The transform benchmark remains observational. No persistent transform cache or spatial index is justified by the measured profile.
 
-1. verify `main` equals the returned squash SHA;
-2. create a new post-merge finalization branch from that `main`;
-3. synchronize `README.md`, `AGENTS.md`, `docs/DEVELOPMENT_PLAN.md` and `docs/handover/LATEST.md` to merged authority;
-4. record final CI, artifact ids, test counts, review-thread count and squash SHA;
-5. make no runtime changes in the finalization PR;
-6. merge finalization, then start the next design slice only from synchronized `main`.
+## 008 PlotJSON migration design
 
-## Non-goals
+Groups, locks, visibility and z-order require stable persistence and migration semantics. They must not be added as ad-hoc fields before PlotJSON compatibility is frozen.
 
-Reflection、negative or non-uniform scale、skew、snapping、pivot dragging、touch transforms、groups/locks/visibility/z-order、new symbols、PlotJSON shortcuts、parameter-name heuristics。
+Create the next branch from synchronized `main`:
+
+```text
+agent/008-plotjson-migrations-design
+```
+
+The design PR must inventory and freeze:
+
+1. the current document and feature schema;
+2. document `schemaVersion` ownership and Definition `version` ownership;
+3. parse → structural validation → migration → semantic validation ordering;
+4. migration registry keys, chaining and deterministic output;
+5. unknown schema versions, unknown Definitions and unknown fields;
+6. document order, future group ids and reference integrity;
+7. persistence boundaries for lock, visibility and z-order;
+8. stable migration/rejection error codes;
+9. golden fixtures for every supported historical version;
+10. backward/forward compatibility matrix;
+11. idempotence, determinism and no-partial-migration rules;
+12. implementation milestones before 007D runtime.
+
+The design PR is Markdown and fixture-planning only. It must not mutate PlotJSON runtime behavior.
+
+## 008 runtime acceptance direction
+
+The later implementation must prove:
+
+- deterministic chained migration;
+- exact current-version round trip;
+- historical fixtures migrate to one canonical current document;
+- unsupported future versions fail closed;
+- unknown Definitions remain explicit and never silently relabel;
+- no partial document import or Store mutation;
+- ordering and references remain stable;
+- migration is independent from MapLibre and Playground;
+- current 299 Node and 34 Chromium regressions remain green;
+- new compatibility fixtures and handover are immutable.
+
+## 007D unblock condition
+
+Groups/locks/visibility/z-order can enter design only after 008 defines and implements:
+
+```text
+stable document versioning
+migration registry
+reference integrity
+ordering semantics
+unknown-version behavior
+backward compatibility fixtures
+```
+
+## Non-goals for the next design PR
+
+Runtime migration code、groups/locks UI、visibility rendering、z-order commands、new symbols、reflection、non-uniform scale、snapping、touch transforms、coordinated npm release。
 
 ## Cross-stage tasks
 
-Open-source license、coordinated release、PlotJSON schema/migrations、docs/test consistency automation、real-browser performance、Playground code splitting、npm boundaries、source/build/deploy/live verification、branch cleanup documentation。
+Open-source license、coordinated release、docs/test consistency automation、real-browser performance、Playground code splitting、npm boundaries、source/build/deploy/live verification、branch cleanup documentation。
