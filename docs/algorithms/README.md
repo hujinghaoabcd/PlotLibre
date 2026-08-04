@@ -36,7 +36,7 @@ tests and deterministic fixtures
 | `arrow-route-corridor.md` | route/corridor PathRibbon | 已实现 |
 | `arrow-route-multihead.md` | bidirectional/double-head route | 已实现 |
 | `closed-action-area.md` | closed curve/gathering place | 已实现 |
-| `circular-arc-foundation.md` | circular arc/segment/sector shared frame | 已实现于 PR #34，最终验证阶段 |
+| `circular-arc-foundation.md` | circular arc/segment/sector shared frame | 已通过 PR #34 实现并合并 |
 
 基础通用几何另见：
 
@@ -45,13 +45,13 @@ tests and deterministic fixtures
 ../ALGORITHM_POLICY.md
 ```
 
-## Milestone 006J 实现状态
+## Milestone 006J 最终算法状态
 
 `packages/geometry/src/circular-arc.ts` 已按照 `circular-arc-foundation.md` 独立实现：
 
 - order-independent local projection origin；
-- scale-aware three-point circumcentre；
-- finite radius policy；
+- scale-aware three-point circumcenter；
+- finite minimum/maximum radius policy；
 - exact start/through/end directed sweep；
 - minor/major 和 clockwise/counterclockwise selection；
 - crossing-0° normalization；
@@ -100,7 +100,7 @@ PlotLibre 不采用参考实现的：
 
 ## Semantic guide extension
 
-Sector 的 end-bearing handle 通常不在 rendered endpoint 上。006J 因此增加通用 Core hook：
+Sector 的 end-bearing handle 通常不在 rendered endpoint 上。006J 增加通用 Core hook：
 
 ```text
 deriveSemanticGuidePaths(feature)
@@ -108,32 +108,35 @@ deriveSemanticGuidePaths(feature)
 
 MapLibre 将该纯 WGS84 path 作为 transient dashed guide 渲染。该机制不属于 circular geometry 本身，不进入 Store、History、PlotJSON 或 committed RenderBundle。
 
-## 006J fixture coverage
+## Validation and merge evidence
 
-Node target 184：
+```text
+workspace:          0.0.20
+public symbols:     19
+Node tests:         184 passed
+Chromium tests:     28 passed
+final CI:           #337 / 30893450723
+validated head:     608567d4f8f662242b0356c54742a2ffcb087c66
+implementation PR: #34
+squash merge SHA:  297d0a644eaa3427f8fd59b82b7bc3582221d49e
+```
 
-- minor/major arcs；
-- clockwise/counterclockwise；
-- crossing 0°；
-- exact through-point；
-- reversed traversal；
-- density isolation；
-- minor/major circular-segment area；
-- sector derived endpoint；
-- end-bearing distance isolation；
-- duplicate/collinear/excessive-radius rejection；
-- antimeridian/high-latitude/large-extent rejection；
-- Registry/PlotJSON；
-- semantic guide and style reload；
-- historical regressions。
+Node coverage includes minor/major arcs、clockwise/counterclockwise、crossing 0°、exact through-point、reversal、density isolation、circular-segment areas、sector endpoint/bearing isolation、failure policy、Registry、PlotJSON、semantic guide 和 style reload。
 
-Chromium target 28：
+Chromium coverage includes actual circular arc line、circular-segment and sector Polygon、fixed-three draft/completion、actual radial guide、guide exclusion from committed source、19-symbol production samples and all historical regressions。
 
-- actual circular arc line；
-- actual circular-segment fill/outline；
-- actual sector fill/outline；
-- fixed-three draft/completion；
-- actual radial guide；
-- guide excluded from committed source；
-- 19-symbol production sample matrix；
-- historical interaction and rendering regressions。
+## Next algorithmic work
+
+Milestone 007 is not a geometry-family expansion. Its design must freeze professional editing state and transaction algorithms before runtime：
+
+- ordered multi-selection and primary selection；
+- box/lasso hit testing；
+- authored-control translation；
+- deterministic transform pivots；
+- local/geodesic rotation and scale policy；
+- group/lock/z-order canonical model；
+- batch command preflight；
+- all-or-nothing mutation and rollback；
+- undo/redo memory and performance fixtures。
+
+No Milestone 007 runtime should be added before a documentation-only design PR is merged。
