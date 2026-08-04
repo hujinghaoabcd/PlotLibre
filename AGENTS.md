@@ -30,7 +30,7 @@ PlotJSON parsing, migration, validation and import preparation belong in `@plotl
 ## 3. Current authority
 
 ```text
-main SHA:           fa1648fcd7b263244dabdba31bcdb5b69f74f9a2
+main SHA:           6012868d4c74e64374bfbeb3c032ee47a4a9fb2c
 workspace:          0.0.22
 current schema:     PlotJSON 1.0.0
 production migrations: none
@@ -44,12 +44,12 @@ benchmark jobs:     region selection + selection transform
 007B:               merged PR #40–#44
 007B-P:             merged PR #45/#46
 007C design/runtime: merged PR #47–#50
-current branch:     agent/008-plotjson-migrations-design
+008 design:         merged PR #51
+current branch:     agent/008-plotjson-design-post-merge-finalization
 next runtime branch: agent/008a-plotjson-version-json-safety-runtime
 ```
 
-PR #49 runtime squash: `2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0`.  
-PR #50 post-merge synchronization squash/main: `fa1648fcd7b263244dabdba31bcdb5b69f74f9a2`.
+PR #51 validated head `908ab22401d71dfefe0a9d28add67e28723c13c0` in CI `30947578825` / `#510`, with 299 Node tests, 34 Chromium tests, both benchmark jobs and zero review threads. It squash-merged as `6012868d4c74e64374bfbeb3c032ee47a4a9fb2c`.
 
 Never use old-head evidence for a newer head. Design, runtime and post-merge finalization remain separate scopes.
 
@@ -108,7 +108,7 @@ y' = py + k(y-py)
 
 Reflection, negative/non-uniform scale, skew and snapping remain excluded. Registry generation remains authoritative when absolute parameter caps prevent strict rendered similarity.
 
-## 6. 008 design authority
+## 6. Merged 008 design authority
 
 Binding documents:
 
@@ -118,9 +118,10 @@ docs/design/plotjson-migrations.md
 docs/design/plotjson-compatibility-matrix.md
 docs/algorithms/plotjson-migration-pipeline.md
 docs/handover/2026-08-05-milestone-008-plotjson-migrations-design.md
+docs/handover/2026-08-05-milestone-008-design-post-merge-finalization.md
 ```
 
-This branch is Markdown-only. No parser, type, error, Store, Registry, MapLibre, test, workflow, package or fixture changes belong in the design PR.
+The next branch is strictly 008A runtime. It may add version, JSON-safety, limits and error primitives plus tests/exports, but must not replace the parser, register migrations, change Store/Registry/MapLibre behavior or bump the schema.
 
 ## 7. Version domains
 
@@ -274,7 +275,7 @@ Date / Map / Set / typed array / class instance
 accessor / symbol key / cycle
 ```
 
-Reader limits must cover:
+Reader limits cover:
 
 ```text
 inputBytes
@@ -287,7 +288,7 @@ controlPointsPerFeature
 totalControlPoints
 ```
 
-Concrete finite defaults are measured and published in runtime, not invented in design.
+Concrete finite defaults require explicit rationale and boundary tests. They cannot be disabled with invalid or infinite configuration.
 
 ## 15. Error surface
 
@@ -378,7 +379,16 @@ Every migrator proves deterministic output, input immutability, target-version c
 008E docs, CI, immutable handover and post-merge sync
 ```
 
-The next branch is strictly 008A. It must not implement migration graph execution, parser replacement or MapLibre import changes.
+008A is next. Excluded from 008A:
+
+```text
+migration graph registration/execution
+migration report implementation
+parsePlotDocument replacement
+Definition migration
+Registry/Store/MapLibre behavior changes
+schema bump
+```
 
 ## 20. 007D unblock condition
 
@@ -398,7 +408,7 @@ The exact future schema shape belongs to 007D design, not 008 runtime foundation
 
 ## 21. Validation gate
 
-Every exact head:
+Every exact runtime head:
 
 ```text
 Node 20.19
@@ -412,7 +422,7 @@ selection-transform benchmark
 zero unresolved review threads
 ```
 
-Design PR must additionally prove Markdown-only scope.
+Post-merge finalization additionally proves Markdown-only scope.
 
 ## 22. Clean-room references
 
