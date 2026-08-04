@@ -32,18 +32,38 @@ export interface MapLibreRenderedFeatureLike {
 
 export type MapLibreEventListener = (event: unknown) => void;
 
-export interface MapCanvasLike {
-  tabIndex: number;
-  readonly style: { cursor: string };
-  addEventListener(type: string, listener: (event: KeyboardEventLike) => void): void;
-  removeEventListener(type: string, listener: (event: KeyboardEventLike) => void): void;
-  focus?(): void;
+export interface MapCanvasMouseEventLike {
+  readonly offsetX: number;
+  readonly offsetY: number;
+  readonly shiftKey?: boolean;
+  readonly ctrlKey?: boolean;
+  readonly metaKey?: boolean;
+  readonly altKey?: boolean;
+  preventDefault?(): void;
+  stopPropagation?(): void;
+  stopImmediatePropagation?(): void;
 }
 
 export interface KeyboardEventLike {
   readonly key: string;
   preventDefault?(): void;
   stopImmediatePropagation?(): void;
+}
+
+export interface MapCanvasLike {
+  tabIndex: number;
+  readonly style: { cursor: string };
+  addEventListener(
+    type: string,
+    listener: (event: any) => void,
+    options?: boolean | { readonly capture?: boolean },
+  ): void;
+  removeEventListener(
+    type: string,
+    listener: (event: any) => void,
+    options?: boolean | { readonly capture?: boolean },
+  ): void;
+  focus?(): void;
 }
 
 export interface MapInteractionHandlerLike {
