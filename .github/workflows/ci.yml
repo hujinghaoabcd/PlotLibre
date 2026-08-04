@@ -51,9 +51,14 @@ jobs:
     with:
       source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
+  transform-benchmark:
+    uses: ./.github/workflows/selection-transform-benchmark.yml
+    with:
+      source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+
   browser:
     runs-on: ubuntu-latest
-    needs: [validate, benchmark]
+    needs: [validate, benchmark, transform-benchmark]
     steps:
       - name: Checkout
         uses: actions/checkout@v6

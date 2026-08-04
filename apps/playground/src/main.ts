@@ -14,6 +14,7 @@ import { installPathSymbolsPlayground } from "./path-symbols-playground.js";
 import { installPincerArrowPlayground } from "./pincer-arrow-playground.js";
 import { PlaygroundApp } from "./playground-app.js";
 import { installRegionSelectionPlayground } from "./region-selection-controls.js";
+import { installSelectionTransformPlayground } from "./selection-transform-controls.js";
 import { installSquadCombatPlayground } from "./squad-combat-playground.js";
 import "./styles.css";
 import "./symbol-controls.css";
@@ -86,6 +87,7 @@ map.once("load", () => {
 
   app.start();
   installRegionSelectionPlayground(plot);
+  installSelectionTransformPlayground(plot);
   installDoubleArrowPlayground(app, plot, map, { e2e });
   installPincerArrowPlayground(app, plot, map, { e2e });
   installSquadCombatPlayground(app, plot, map, {

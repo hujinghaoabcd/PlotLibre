@@ -21,58 +21,54 @@ core + interaction <- maplibre
 public packages <- playground / wrappers
 ```
 
-Core/geometry cannot depend on MapLibre or DOM. Interaction math and commands remain engine-independent. MapLibre owns browser normalization, map projection and derived UI.
+Core and geometry cannot depend on MapLibre or DOM. Interaction math and commands remain engine-independent. MapLibre owns browser normalization, map projection and derived UI.
 
-## 3. Current baseline
+## 3. Current authority
 
 ```text
-main SHA:           ace18bcd58466d2eadd2b647cb0e2b67a7b546b2
+main SHA:           9a1c761b3e9d1f94c944485137fb21a92bdcc786
 workspace:          0.0.22
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
-Node baseline:      264
-Chromium baseline:  32
+Node baseline:      299
+Chromium baseline:  34
 MapLibre Sources:   4
 MapLibre Layers:    10
-benchmark job:      required
+benchmark jobs:     region selection + selection transform
 007A:               merged PR #38/#39
 007B:               merged PR #40–#44
 007B-P:             merged PR #45/#46
-007C design:        merged PR #47
+007C design:        merged PR #47/#48
+007C runtime:       Draft PR #49
+current branch:     agent/007c-rotation-scale-runtime
 ```
 
-Current branch:
-
-```text
-agent/007c-design-post-merge-finalization
-scope: actual PR #47 merge-state synchronization only
-runtime: prohibited
-```
-
-PR #47 evidence:
-
-```text
-validated head:     a19444d1c76cad266fe84e3e454afa6d146c7e4d
-CI:                 #468 / 30936185645
-Node tests:         264 passed on 20.19 and 22
-benchmark artifact: 8903197454
-Chromium:           32 passed
-threads:            0
-squash SHA:         ace18bcd58466d2eadd2b647cb0e2b67a7b546b2
-```
-
-Never use old-head evidence for a newer head.
+Never use old-head evidence for a newer head. Runtime completion requires exact-head CI, immutable handover, zero review threads and Ready-for-review state before merge.
 
 ## 4. Selection and atomic editing
 
 Selection is transient, ordered and Primary-last. It is excluded from PlotJSON and feature revision.
 
-`PlotStore.applyTransaction()` commits one staged batch. `BatchEditCommand` owns exact before/after features, document order and selection. Batch delete and local translation remain unchanged.
+`PlotStore.applyTransaction()` commits one staged batch. `BatchEditCommand` owns exact before/after features, document order and selection. Batch delete, local translation and completed whole-selection rotation/scale each use one atomic command.
 
-Every completed whole-selection transform must be one `BatchEditCommand`; preview, rejection and cancel must not enter Store or History.
+Preview, rejection, cancel and no-op must not enter Store or History.
 
 ## 5. 007C canonical boundary
 
-Transform authored controls only. Preserve id, plotType, parameters, style, metadata, Store order, selection order and Primary. Each effectively changed feature gets exact `revision + 1`.
+Transform authored controls only. Preserve:
+
+```text
+id
+plotType
+definitionVersion
+parameters
+style
+metadata
+Store order
+selection order
+Primary
+```
+
+Each effectively changed feature receives exact `revision + 1`.
 
 Frame, pivot, angle, factor, handles and preview are transient.
 
@@ -115,30 +111,31 @@ Parameters, style and metadata remain unchanged. Existing absolute ground caps s
 
 Parameter-transform hooks and parameter-name heuristics are deferred.
 
-## 10. Pure runtime order
+## 10. Runtime ownership
 
-Required runtime APIs:
+Engine-independent runtime in `@plotlibre/interaction`:
 
 ```ts
 deriveSelectionTransformFrame(features, policy)
 rotatePlotFeaturesLocal(features, frame, clockwiseRadians)
 scalePlotFeaturesLocal(features, frame, scaleFactor)
+SelectionTransformSession
+createSelectionTransformCommand(...)
 ```
 
-Implement in this order after post-merge synchronization:
+MapLibre runtime:
 
-1. shared frame and pure math;
-2. transform session and rejections;
-3. all-Definition Registry fixtures;
-4. BatchEditCommand preview/commit integration;
-5. MapLibre explicit controller;
-6. DOM/SVG frame and handles;
-7. public API and Playground;
-8. Chromium flows and transform benchmark.
+```text
+MapLibreSelectionTransformInteraction
+MapLibreSelectionTransformOverlay
+PlotLibre public facade
+```
+
+Playground may call only the public facade. It must not duplicate transform math or commit directly to Store.
 
 ## 11. Explicit one-shot modes
 
-Candidate API:
+Public API:
 
 ```text
 plot.selectionTransform
@@ -153,7 +150,7 @@ Transform and region modes are mutually exclusive. Primary handles/guides hide w
 
 ## 12. Overlay and gesture priority
 
-Use one DOM/SVG overlay with projected local-frame quadrilateral, pivot, scale handle, 28 CSS-pixel rotation handle and value label. A 24-pixel minimum visual frame cannot change canonical math. Add no Source/Layer.
+Use one DOM/SVG overlay with projected local-frame quadrilateral, pivot, scale handle, 28 CSS-pixel rotation handle and value label. A 24-pixel minimum visual frame cannot change canonical math. A transform gesture must start at least four CSS pixels from the projected pivot. Add no Source or Layer.
 
 ```text
 active drawing
@@ -204,21 +201,21 @@ SELECTION_TRANSFORM_TRANSACTION_INVALID
 
 Cancel without mutation on Escape, pointercancel, unexpected lost capture, style load, resize, active-drag camera movement, Store change, external selection revision, document lifecycle operation or destroy.
 
-## 15. Required runtime validation
+## 15. Required validation
 
 - order-independent frame and pivot;
 - clockwise cardinal fixtures and angle unwrap;
 - scale `0.01/1/100`, range rejection and no reflection;
 - local-frame failure policies;
-- all 19 Definitions Registry smoke;
+- all 19 Definitions rotation preflight and positive-scale smoke;
 - unchanged parameters/style/metadata;
 - all-member failure atomicity;
-- exact revision/order/selection/undo/redo;
+- exact revision/order/selection/Primary/undo/redo;
 - explicit DOM handles and lifecycle;
-- multi-selection rotate/scale Chromium flows;
-- region-select → transform → delete → undo;
+- four-pixel start-radius and 24-pixel visual-frame contracts;
+- multi-selection rotate and scale Chromium flows;
 - transform benchmark for `1/100/1,000` selected features;
-- all historical 264 Node / 32 Chromium regressions.
+- all historical regressions.
 
 ## 16. Validation gate
 
@@ -227,12 +224,19 @@ Every exact head:
 ```text
 Node 20.19
 Node 22
-264 Node tests
-Playground build
+299 Node tests
+Playground typecheck/build
 handover contract
 region benchmark job/artifact
-32 Chromium E2E
+selection-transform benchmark job/artifact
+34 Chromium E2E
 zero unresolved review threads
+```
+
+Measured transform performance is observational only. Do not publish a latency SLA or add a persistent cache/index without a reproducible need. Authority:
+
+```text
+docs/performance/selection-transform-benchmark.md
 ```
 
 ## 17. Clean-room references
@@ -247,6 +251,6 @@ code reuse: none
 
 ## 18. Merge discipline
 
-Design, runtime and finalization use separate branches. Keep Draft until exact-head green; resolve threads; Ready; squash with expected SHA; verify main; start new work only from latest synchronized main; never merge locally.
+Design, runtime and finalization use separate branches. Keep Draft until exact-head green; resolve threads; write immutable handover; mark Ready; squash with expected SHA; verify main; start post-merge synchronization only from latest main; never merge locally.
 
 Runtime still excludes reflection, non-uniform scale, groups/locks/visibility/z-order, snapping, touch transforms, new symbols and PlotJSON shortcuts.
