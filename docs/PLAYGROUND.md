@@ -6,13 +6,7 @@
 https://hujinghaoabcd.github.io/PlotLibre/
 ```
 
-`apps/playground` 同时承担：
-
-- 真实 MapLibre 浏览器应用；
-- 人工验收入口；
-- Playwright 测试目标；
-- GitHub Pages 站点；
-- 公共 API 使用示例。
+`apps/playground` 同时承担真实 MapLibre 浏览器应用、人工验收入口、Playwright 测试目标、GitHub Pages 站点和公共 API 使用示例。
 
 Playground 只能通过公开 PlotLibre packages 工作，不得直接调用内部 geometry 或修改 MapLibre Source 绕过 Store、Registry 和 CommandHistory。
 
@@ -30,7 +24,7 @@ Chromium tests:       23
 public symbols:       16 (14 Arrow + 2 Area)
 ```
 
-公共 packages 仍为开发期独立版本，Playground package 仍为 `0.0.3`。根 workspace `0.0.19` 是里程碑基线，不代表已完成统一 npm release。
+公共 packages 仍为开发期独立版本，Playground package 仍为 `0.0.3`。根 workspace `0.0.19` 是里程碑基线，不代表统一 npm release。
 
 ## 3. 当前公共符号
 
@@ -84,13 +78,11 @@ arrow.route.double-head
 ### 4.3 固定复合箭头
 
 ```text
-arrow.double   4 controls
-a rrow.pincer  5 controls
+arrow.double  4 controls
+arrow.pincer  5 controls
 ```
 
 达到最大 authored control 数量后自动尝试完成。无效候选保留 active session，并通过 `drawRejection` 暴露稳定 issue codes。派生的镜像目标、branch、bridge 或 curve samples 不持久化。
-
-> 上述代码块中的 `arrow.pincer` 为五控制点符号；实现标识符不含空格。
 
 ### 4.4 闭合曲线区域
 
@@ -177,7 +169,7 @@ Playground 的通用事件监听器必须先注册，symbol-specific 监听器�
 2 × Area Definitions
 ```
 
-示例只通过公开 `create()`/Registry preflight 进入 Store。首次启动流程为：
+示例只通过公开 `create()` 和 Registry preflight 进入 Store。首次启动流程为：
 
 ```text
 PlaygroundApp.start()
