@@ -24,23 +24,22 @@
 | `route-multihead-group.md` | bidirectional + derived secondary-head route | 已实现并合并 |
 | `closed-action-area-group.md` | closed curve + gathering place | 已实现并合并 |
 | `circular-arc-family.md` | circular arc + sector + circular segment | 已实现并合并 |
-| `professional-editing.md` | multi-selection、batch transaction、translation、box/lasso、rotation/scale、groups | 007 总设计已冻结；007A runtime 已在 PR #38 实现，007B–D 仍仅为设计方向 |
+| `professional-editing.md` | multi-selection、batch transaction、translation、box/lasso、rotation/scale、groups | 007A 已实现并通过 PR #38 合并；007B–D 仍为设计阶段 |
 
-## 当前实现基线
+## 当前合并基线
 
 ```text
 workspace:        0.0.21
 symbols:          19 (14 Arrow + 1 Line + 4 Area)
-Node:             219 passed on runtime head
-Chromium:         30 passed on runtime head
+Node:             219 passed
+Chromium:         30 passed
 Sources:          4
 Layers:           10
-007A PR:          #38
-runtime head:     07449e7fda66069b148fa08c865b209d7dc365a3
-runtime CI:       #398 / 30904843935
+merged PR:        #38
+validated head:   2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
+validated CI:     #409 / 30906467230
+squash SHA:       04dca0b120b1440afb49a300eeee92faf6644a7d
 ```
-
-最终文档 head 必须重新运行完整 CI 后才能把 PR #38 标记 Ready。
 
 ## Circular family
 
@@ -55,13 +54,13 @@ area.sector@1.0.0
 ## Milestone 007 分片
 
 ```text
-007A ordered selection + atomic Store + batch delete + local translation
-007B box/lasso selection
-007C rotation + positive uniform scale
-007D canonical groups/locks/visibility/z-order after PlotJSON migration design
+007A ordered selection + atomic Store + batch delete + local translation — merged
+007B box/lasso selection — next design slice
+007C rotation + positive uniform scale — deferred
+007D groups/locks/visibility/z-order after PlotJSON migration design — deferred
 ```
 
-### 007A 已实现
+### 007A merged behavior
 
 Selection：
 
@@ -83,28 +82,23 @@ stage add/replace/remove/order
 → any invalid: no mutation
 → commit once
 → one batch event
-→ listener errors isolated after commit
+→ isolate listener errors after commit
 ```
 
-`BatchEditCommand` stores exact before/after features, order and selection. Execute/undo/redo restore exact revisions and one explicit selection state.
+`BatchEditCommand` stores exact before/after features, order and selection. Execute/undo/redo restore exact revisions and one explicit final selection state.
 
-Batch delete：
+Batch delete and translation：
 
-- one command removes all selected ids；
-- after selection empty；
+- one command removes the complete selection；
 - undo restores exact feature order、membership and Primary；
-- redo replays exact after-state。
-
-Translation：
-
 - one shared local projection and metre delta；
 - transform authored controls only；
 - parameters/style/metadata unchanged；
 - Store unchanged during preview；
-- all candidates Registry-preflighted before atomic commit；
+- all candidates Registry-preflighted before commit；
 - any invalid member prevents all mutation；
 - Escape cancellation；
-- one pointer gesture = one history entry。
+- one completed pointer gesture = one history entry。
 
 MapLibre resources：
 
@@ -114,30 +108,25 @@ Layers: committed fill-line-point, selection line-point,
         draft fill-line-point, handle guide, handle
 ```
 
-Shift additive selection reserves and temporarily disables MapLibre box zoom; destroy restores prior state.
+Shift additive selection temporarily disables MapLibre box zoom; destroy restores its prior state.
+
+## 007B design requirements
+
+- define box gesture ownership and screen-space rectangle；
+- freeze default intersection policy；
+- de-duplicate compound output by `plotId`；
+- order results by deterministic Store/document order；
+- freeze empty-result and Primary policy；
+- define simple lasso closure and self-intersection rejection；
+- define candidate layer set and spatial-index boundary；
+- preserve authored-control canonical state；
+- keep rotation/scale、groups/locks、snapping and new symbols outside 007B。
 
 ## Later slices
 
-007B：
+007C：local-metre rotation and positive uniform scale, deterministic pivot, no reflection/non-uniform scale, atomic preflight。
 
-- default screen-space box/lasso intersection policy；
-- candidate ids de-duplicated by `plotId` and ordered deterministically；
-- simple lasso only, self-intersection fail closed；
-- spatial index before scale claims。
-
-007C：
-
-- local-metre only；
-- pivot from selection authored-control bounds；
-- positive clockwise rotation；
-- positive uniform scale `[0.01, 100]`；
-- no reflection/non-uniform scale；
-- atomic all-member preflight。
-
-007D：
-
-- group/lock/visibility/z-order cannot be hidden in free-form metadata；
-- formal PlotJSON schema, migration and command semantics must precede runtime。
+007D：group/lock/visibility/z-order only after formal PlotJSON schema、migration and command semantics。Free-form metadata shortcuts are prohibited。
 
 ## Reference boundary
 
@@ -153,7 +142,7 @@ Code reuse：`none`。只研究 observable selection lifecycle、whole-feature e
 
 ## 状态说明
 
-历史设计文档保留设计当时状态，不应重写以伪造历史。当前事实由以下入口共同确定：
+历史设计文档保留设计时状态，不应重写以伪造历史。当前事实由以下入口共同确定：
 
 ```text
 main source
