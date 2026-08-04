@@ -45,6 +45,7 @@ export class PlaygroundApp {
   readonly #elements: PlaygroundElements;
   readonly #e2e: boolean;
   readonly #unsubscribeStore: () => void;
+  readonly #unsubscribeSelection: () => void;
 
   public constructor(map: Map, plot: PlotLibre, options: PlaygroundAppOptions) {
     this.#map = map;
@@ -52,6 +53,7 @@ export class PlaygroundApp {
     this.#e2e = options.e2e;
     this.#elements = collectElements();
     this.#unsubscribeStore = this.#plot.store.subscribe(() => this.refresh());
+    this.#unsubscribeSelection = this.#plot.selection.subscribe(() => this.refresh());
   }
 
   public start(): void {
@@ -62,31 +64,43 @@ export class PlaygroundApp {
     if (!this.#e2e && this.#plot.store.size === 0) {
       this.loadSample();
     } else {
-      this.setStatus("准备就绪。选择符号后点击“开始绘制”。", "ready");
+      this.setStatus(
+        "准备就绪。点击选择；Shift 添加，Ctrl/Cmd 切换，Alt 移除。",
+        "ready",
+      );
       this.refresh();
     }
   }
 
   public destroy(): void {
+    this.#unsubscribeSelection();
     this.#unsubscribeStore();
   }
 
   public refresh(): void {
     const selected = this.#selectedFeature();
+    const selectedCount = this.#plot.selectedIds.length;
     const isDrawing = this.#plot.interaction.isDrawing;
     const plotCount = this.#plot.store.size;
 
     this.#elements.plotCount.textContent = `${plotCount} 个标绘`;
-    this.#elements.selectedId.textContent = selected?.id ?? "未选择";
-    this.#elements.selectionState.textContent = selected ? "已选择" : "未选择";
-    this.#elements.selectionState.dataset.state = selected ? "active" : "idle";
+    this.#elements.selectedId.textContent =
+      selectedCount === 0
+        ? "未选择"
+        : selectedCount === 1
+          ? selected?.id ?? "未选择"
+          : `${selected?.id ?? "未知"}（主对象）`;
+    this.#elements.selectionState.textContent =
+      selectedCount === 0 ? "未选择" : `已选择 ${selectedCount} 个`;
+    this.#elements.selectionState.dataset.state =
+      selectedCount > 0 ? "active" : "idle";
 
     this.#elements.symbolSelect.disabled = isDrawing;
     this.#elements.drawButton.disabled = isDrawing;
     this.#elements.cancelButton.disabled = !isDrawing;
     this.#elements.undoButton.disabled = !this.#plot.history.canUndo;
     this.#elements.redoButton.disabled = !this.#plot.history.canRedo;
-    this.#elements.deleteButton.disabled = selected === undefined;
+    this.#elements.deleteButton.disabled = selectedCount === 0;
     this.#elements.clearButton.disabled = plotCount === 0;
     this.#elements.exportButton.disabled = plotCount === 0;
 
@@ -236,7 +250,7 @@ export class PlaygroundApp {
       { padding: 72, duration: 500 },
     );
     this.setStatus(
-      "已加载南京七类箭头示例。平尾与燕尾攻击箭头共享语义尾缘和进攻骨架。",
+      "已加载南京七类箭头示例。可按 Shift 多选并拖动任一选中对象整体移动。",
       "ready",
     );
     this.refresh();
@@ -280,11 +294,15 @@ export class PlaygroundApp {
     });
 
     this.#elements.deleteButton.addEventListener("click", () => {
-      const selectedId = this.#plot.interaction.selectedId;
-      if (!selectedId) return;
-      this.#plot.remove(selectedId);
-      this.#plot.select(undefined);
-      this.setStatus(`已删除 ${selectedId}。`, "ready");
+      const selectedCount = this.#plot.selectedIds.length;
+      if (selectedCount === 0) return;
+      const changed = this.#plot.removeSelected();
+      this.setStatus(
+        changed
+          ? `已原子删除 ${selectedCount} 个选中对象。`
+          : "当前没有可删除的选中对象。",
+        "ready",
+      );
       this.refresh();
     });
 
@@ -333,8 +351,26 @@ export class PlaygroundApp {
       queueMicrotask(() => {
         if (this.#plot.interaction.isDrawing) {
           this.setStatus(this.#drawingProgressInstruction(), "drawing");
-        } else if (this.#plot.interaction.selectedId) {
-          this.setStatus("对象已选择。拖动圆形控制点可重新编辑。", "selected");
+        } else if (this.#plot.translation.isTranslating) {
+          this.setStatus(
+            `正在整体移动 ${this.#plot.selectedIds.length} 个对象；Escape 取消。`,
+            "selected",
+          );
+        } else if (this.#plot.transformRejection) {
+          this.setStatus(
+            `整体移动被拒绝：${this.#plot.transformRejection.message}`,
+            "error",
+          );
+        } else if (this.#plot.selectedIds.length > 1) {
+          this.setStatus(
+            `已选择 ${this.#plot.selectedIds.length} 个对象。拖动对象整体移动；Delete 批量删除。`,
+            "selected",
+          );
+        } else if (this.#plot.selectedId) {
+          this.setStatus(
+            "对象已选择。拖动对象整体移动；拖动圆形控制点编辑 primary。",
+            "selected",
+          );
         }
         this.refresh();
       });
@@ -342,6 +378,7 @@ export class PlaygroundApp {
 
     this.#map.on("click", deferredRefresh);
     this.#map.on("dblclick", deferredRefresh);
+    this.#map.on("mousemove", deferredRefresh);
     this.#map.on("mouseup", deferredRefresh);
     this.#map.on("style.load", deferredRefresh);
     this.#map.getCanvas().addEventListener("keydown", deferredRefresh);
@@ -358,12 +395,12 @@ export class PlaygroundApp {
         ...patch,
       },
     });
-    this.setStatus("已更新选中对象样式。", "selected");
+    this.setStatus("已更新 primary 对象样式。", "selected");
     this.refresh();
   }
 
   #selectedFeature(): PlotFeature | undefined {
-    const selectedId = this.#plot.interaction.selectedId;
+    const selectedId = this.#plot.selectedId;
     return selectedId ? this.#plot.store.find(selectedId) : undefined;
   }
 
