@@ -74,6 +74,7 @@ export interface MapInteractionHandlerLike {
 
 export type MapDragPanLike = MapInteractionHandlerLike;
 export type MapDoubleClickZoomLike = MapInteractionHandlerLike;
+export type MapBoxZoomLike = MapInteractionHandlerLike;
 
 export interface MapLibreMapLike {
   getSource(id: string): unknown;
@@ -96,6 +97,7 @@ export interface MapLibreMapLike {
   ): readonly MapLibreRenderedFeatureLike[];
   readonly dragPan?: MapDragPanLike;
   readonly doubleClickZoom?: MapDoubleClickZoomLike;
+  readonly boxZoom?: MapBoxZoomLike;
 }
 
 export interface PlotLibreSourceIds {
