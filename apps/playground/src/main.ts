@@ -89,6 +89,11 @@ map.once("load", () => {
     historySize: 300,
   });
   const app = new PlaygroundApp(map, plot, { e2e });
+
+  // Bind the generic application lifecycle first. Symbol-group listeners are
+  // installed afterwards so their semantic guidance can refine generic status
+  // messages, including fixed-count completion rejection details.
+  app.start();
   installDoubleArrowPlayground(app, plot, map, { e2e });
   installPincerArrowPlayground(app, plot, map, { e2e });
   installSquadCombatPlayground(app, plot, map, {
@@ -103,9 +108,13 @@ map.once("load", () => {
     e2e,
     enableInE2e: closedActionAreaE2e,
   });
-  // Install all symbol groups before start so the non-E2E automatic sample
-  // uses the complete current catalog rather than only the original base set.
-  app.start();
+
+  // `start()` loads the original base sample before the installers wrap
+  // `loadSample`. Reload once in production so the first visible document uses
+  // the complete current sixteen-symbol catalog. E2E starts empty by design.
+  if (!e2e) {
+    app.loadSample();
+  }
 
   window.__plotlibrePlayground = { map, plot, app };
 });
