@@ -1,7 +1,4 @@
-import {
-  SelectionController,
-  type SelectionIntent,
-} from "@plotlibre/interaction";
+import { SelectionController } from "@plotlibre/interaction";
 import { MapLibrePlotRenderer } from "./renderer.js";
 import type {
   MapLibreMapLike,
@@ -9,12 +6,13 @@ import type {
 } from "./types.js";
 
 /**
- * Reserves MapLibre modifier-mousedown gestures for PlotLibre selection.
+ * Reserves Shift + MapLibre mousedown for additive PlotLibre selection.
  *
- * Box zoom is disabled while installed so MapLibre emits the regular mousedown
- * event for Shift gestures. The adapter is registered before body translation
- * and handle editing, and later modifier-click events are ignored by the general
- * interaction controller to avoid applying toggle/subtract twice.
+ * MapLibre normally owns Shift for box zoom and may never emit the later click.
+ * PlotLibre therefore disables box zoom while installed and performs the add on
+ * mousedown. The eventual Shift click, when emitted, is harmless because add is
+ * idempotent. Ctrl/Cmd toggle and Alt subtract remain click-driven so they are
+ * never applied twice.
  */
 export class MapLibreSelectionModifierCapture {
   readonly #map: MapLibreMapLike;
@@ -24,14 +22,17 @@ export class MapLibreSelectionModifierCapture {
 
   readonly #onMouseDown = (event: unknown): void => {
     const mouseEvent = asMouseEvent(event);
-    if (!mouseEvent?.point) return;
-    const intent = readModifierIntent(mouseEvent);
-    if (!intent) return;
+    if (
+      !mouseEvent?.point ||
+      mouseEvent.originalEvent?.shiftKey !== true
+    ) {
+      return;
+    }
 
     const plotId = this.#queryPlotId(mouseEvent.point.x, mouseEvent.point.y);
-    this.#selection.applyIntent(plotId, intent);
-    mouseEvent.originalEvent?.preventDefault?.();
-    mouseEvent.originalEvent?.stopPropagation?.();
+    this.#selection.applyIntent(plotId, "add");
+    mouseEvent.originalEvent.preventDefault?.();
+    mouseEvent.originalEvent.stopPropagation?.();
     this.#map.getCanvas().focus?.();
   };
 
@@ -83,14 +84,4 @@ function asMouseEvent(event: unknown): MapLibreMouseEventLike | undefined {
   const y = (point as { y?: unknown }).y;
   if (typeof x !== "number" || typeof y !== "number") return undefined;
   return event as MapLibreMouseEventLike;
-}
-
-function readModifierIntent(
-  event: MapLibreMouseEventLike,
-): SelectionIntent | undefined {
-  const original = event.originalEvent;
-  if (original?.altKey === true) return "subtract";
-  if (original?.ctrlKey === true || original?.metaKey === true) return "toggle";
-  if (original?.shiftKey === true) return "add";
-  return undefined;
 }
