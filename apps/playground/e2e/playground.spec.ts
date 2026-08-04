@@ -216,16 +216,16 @@ async function dragControl(
   await page.mouse.up();
 }
 
-test("loads nine symbols from the GitHub Pages project path", async ({ page }) => {
+test("loads nine base symbols from the GitHub Pages project path", async ({ page }) => {
   await openPlayground(page);
   await expect(page).toHaveTitle("PlotLibre Playground");
   await expect(page.getByTestId("plot-count")).toHaveText("0 个标绘");
   await expect(page.getByTestId("symbol-select").locator("option")).toHaveCount(9);
 });
 
-test("loads all nine Nanjing samples without the optional basemap", async ({ page }) => {
+test("loads all sixteen Nanjing samples without the optional basemap", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
-  await expect(page.getByTestId("plot-count")).toHaveText("9 个标绘");
+  await expect(page.getByTestId("plot-count")).toHaveText("16 个标绘");
   const types = await page.evaluate(() => {
     const playground = window.__plotlibrePlayground;
     if (!playground) throw new Error("Playground API is unavailable.");
@@ -241,14 +241,21 @@ test("loads all nine Nanjing samples without the optional basemap", async ({ pag
     "arrow.attack.tailed",
     "arrow.double",
     "arrow.pincer",
+    "arrow.squad-combat",
+    "arrow.route",
+    "arrow.corridor",
+    "arrow.route.bidirectional",
+    "arrow.route.double-head",
+    "area.closed-curve",
+    "area.gathering-place",
   ]) {
     expect(types).toContain(expected);
   }
 });
 
-test("renders all nine sample types through committed layers", async ({ page }) => {
+test("renders all sixteen sample types through committed layers", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
-  await expect(page.getByTestId("plot-count")).toHaveText("9 个标绘");
+  await expect(page.getByTestId("plot-count")).toHaveText("16 个标绘");
   await expect
     .poll(async () =>
       page.evaluate(() => {
@@ -270,6 +277,13 @@ test("renders all nine sample types through committed layers", async ({ page }) 
           tailedAttack: types.has("arrow.attack.tailed"),
           double: types.has("arrow.double"),
           pincer: types.has("arrow.pincer"),
+          squad: types.has("arrow.squad-combat"),
+          route: types.has("arrow.route"),
+          corridor: types.has("arrow.corridor"),
+          bidirectional: types.has("arrow.route.bidirectional"),
+          doubleHead: types.has("arrow.route.double-head"),
+          closedCurve: types.has("area.closed-curve"),
+          gatheringPlace: types.has("area.gathering-place"),
           rendered: rendered.length > 0,
         };
       }),
@@ -285,6 +299,13 @@ test("renders all nine sample types through committed layers", async ({ page }) 
       tailedAttack: true,
       double: true,
       pincer: true,
+      squad: true,
+      route: true,
+      corridor: true,
+      bidirectional: true,
+      doubleHead: true,
+      closedCurve: true,
+      gatheringPlace: true,
       rendered: true,
     });
 });
