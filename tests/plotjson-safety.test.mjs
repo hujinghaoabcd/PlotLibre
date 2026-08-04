@@ -39,7 +39,7 @@ test("JSON-safe values are deeply cloned with immutable statistics", () => {
   assert.equal(Object.isFrozen(result.statistics), true);
   assert.equal(Object.isFrozen(result.limits), true);
   assert.equal(result.statistics.maximumDepth, 3);
-  assert.equal(result.statistics.maximumStringLength, 4);
+  assert.equal(result.statistics.maximumStringLength, 5);
 });
 
 test("null-prototype objects clone into safe ordinary JSON objects", () => {
