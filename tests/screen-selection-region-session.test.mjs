@@ -64,9 +64,9 @@ test("lasso session samples movement and returns a simplified valid region", () 
 test("invalid lasso keeps rejection state for retry", () => {
   const session = new ScreenSelectionRegionSession("lasso", "replace");
   session.pointerDown({ x: 0, y: 0 });
-  session.pointerMove({ x: 10, y: 10 });
-  session.pointerMove({ x: 0, y: 10 });
-  const completion = session.pointerUp({ x: 10, y: 0 });
+  session.pointerMove({ x: 20, y: 20 });
+  session.pointerMove({ x: 0, y: 12 });
+  const completion = session.pointerUp({ x: 12, y: 0 });
 
   assert.equal(completion.completed, false);
   if (completion.completed || completion.noop) return;
