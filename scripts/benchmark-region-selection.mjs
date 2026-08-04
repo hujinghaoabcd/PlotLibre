@@ -19,14 +19,16 @@ const RENDERED_DUPLICATES_PER_FEATURE = 2;
 const PROFILE = "arrow.straight / all-candidates / deterministic-linear-projector";
 
 const CASES = [
-  { size: 100, warmups: 3, repetitions: 12 },
-  { size: 1_000, warmups: 2, repetitions: 8 },
-  { size: 10_000, warmups: 1, repetitions: 5 },
+  { size: 100, warmups: 5, repetitions: 30, profileRepetitions: 7 },
+  { size: 1_000, warmups: 3, repetitions: 24, profileRepetitions: 7 },
+  { size: 10_000, warmups: 2, repetitions: 20, profileRepetitions: 7 },
 ];
 
 const environment = Object.freeze({
   timestamp: new Date().toISOString(),
-  gitSha: process.env.GITHUB_SHA ?? process.env.PLOTLIBRE_BENCHMARK_SHA ?? "local",
+  sourceGitSha:
+    process.env.PLOTLIBRE_BENCHMARK_SHA ?? process.env.GITHUB_SHA ?? "local",
+  workflowGitSha: process.env.GITHUB_SHA ?? "local",
   runnerName: process.env.RUNNER_NAME ?? "local",
   runnerOs: process.env.RUNNER_OS ?? os.platform(),
   node: process.version,
@@ -41,6 +43,7 @@ const environment = Object.freeze({
     "x=(lng-118.7)*100000; y=(32.2-lat)*100000; CSS-pixel-like deterministic adapter",
   regionPolicy: "one rectangle containing every generated candidate",
   renderedDuplicatesPerFeature: RENDERED_DUPLICATES_PER_FEATURE,
+  garbageCollectionAvailable: typeof global.gc === "function",
 });
 
 const results = [];
@@ -49,14 +52,15 @@ for (const benchmarkCase of CASES) {
 }
 
 const report = Object.freeze({
-  schemaVersion: 1,
+  schemaVersion: 2,
   environment,
   cases: results,
   limitations: [
     "This is a Node/CI resolver microbenchmark, not a browser frame-time or GPU benchmark.",
+    "The headline total timings use an uninstrumented resolver path. Diagnostic phase timings are collected in separate instrumented runs and must not be added to or subtracted from the headline totals.",
     "queryRenderedFeatures is a deterministic adapter returning a prebuilt rendered-feature array; real MapLibre tile-index query latency is not measured.",
-    "The measured total includes rendered-id deduplication, PlotStore-order filtering, Registry generation, projection and exact screen intersection.",
     "The fixture is 100% arrow.straight and every feature is a broad-phase candidate and an exact hit; it represents a deliberate worst-candidate-count profile, not a mixed production document.",
+    "RSS observations include Node.js allocator and garbage-collector behavior and are not a retained-heap measurement.",
     "Timing is observational and no pass/fail latency threshold is enforced.",
   ],
 });
@@ -77,46 +81,42 @@ console.log(renderConsoleTable(report));
 console.log(`\nWrote ${OUTPUT_DIRECTORY}/results.json`);
 console.log(`Wrote ${OUTPUT_DIRECTORY}/results.md`);
 
-function runCase({ size, warmups, repetitions }) {
+function runCase({ size, warmups, repetitions, profileRepetitions }) {
+  collectGarbage();
+  const rssBeforeFixture = process.memoryUsage().rss;
   const fixture = createFixture(size);
 
   for (let index = 0; index < warmups; index += 1) {
-    executeResolution(fixture);
+    executeUninstrumentedResolution(fixture);
   }
 
-  const samples = [];
-  const rssBefore = process.memoryUsage().rss;
-  let peakRss = rssBefore;
+  collectGarbage();
+  const rssAfterWarmup = process.memoryUsage().rss;
+  const totalSamples = [];
+  let peakRss = rssAfterWarmup;
 
   for (let index = 0; index < repetitions; index += 1) {
-    const sample = executeResolution(fixture);
-    samples.push(sample);
+    const sample = executeUninstrumentedResolution(fixture);
+    assertResolutionSample(sample, size);
+    totalSamples.push(sample);
     peakRss = Math.max(peakRss, process.memoryUsage().rss);
   }
 
-  const first = samples[0];
-  if (!first) throw new Error(`Benchmark case ${size} produced no samples.`);
-  for (const sample of samples) {
-    if (sample.selectedCount !== size) {
-      throw new Error(
-        `Benchmark case ${size} selected ${sample.selectedCount}; expected ${size}.`,
-      );
-    }
-    if (
-      sample.metrics.candidateCount !== size ||
-      sample.metrics.generatedCandidateCount !== size ||
-      sample.metrics.uniqueRenderedPlotIdCount !== size
-    ) {
-      throw new Error(
-        `Benchmark case ${size} returned inconsistent resolver metrics: ${JSON.stringify(sample.metrics)}.`,
-      );
-    }
+  const profileSamples = [];
+  for (let index = 0; index < profileRepetitions; index += 1) {
+    const sample = executeProfiledResolution(fixture);
+    assertResolutionSample(sample, size);
+    profileSamples.push(sample);
   }
+
+  const first = totalSamples[0];
+  if (!first) throw new Error(`Benchmark case ${size} produced no samples.`);
 
   return Object.freeze({
     size,
     warmups,
     repetitions,
+    profileRepetitions,
     featureType: STRAIGHT_ARROW_TYPE,
     authoredControlPointsPerFeature: 2,
     queriedFeatureCount: first.metrics.queriedFeatureCount,
@@ -126,23 +126,47 @@ function runCase({ size, warmups, repetitions }) {
     projectedGeometryCount: first.metrics.projectedGeometryCount,
     selectedCount: first.selectedCount,
     timingsMs: Object.freeze({
-      total: summarize(samples.map((sample) => sample.totalMs)),
-      queryAdapter: summarize(samples.map((sample) => sample.queryMs)),
-      registryGenerate: summarize(samples.map((sample) => sample.generateMs)),
-      projectCalls: summarize(samples.map((sample) => sample.projectMs)),
-      orderingDedupAndIntersection: summarize(
-        samples.map((sample) => sample.residualMs),
-      ),
+      total: summarize(totalSamples.map((sample) => sample.totalMs)),
     }),
     throughputCandidatesPerSecond: summarize(
-      samples.map((sample) => size / (sample.totalMs / 1_000)),
+      totalSamples.map((sample) => size / (sample.totalMs / 1_000)),
     ),
+    diagnosticProfileMs: Object.freeze({
+      profiledTotal: summarize(profileSamples.map((sample) => sample.totalMs)),
+      queryAdapter: summarize(profileSamples.map((sample) => sample.queryMs)),
+      registryGenerate: summarize(
+        profileSamples.map((sample) => sample.generateMs),
+      ),
+      projectCalls: summarize(profileSamples.map((sample) => sample.projectMs)),
+      nonIsolatedRemainder: summarize(
+        profileSamples.map((sample) => sample.remainderMs),
+      ),
+    }),
     memory: Object.freeze({
-      rssBeforeBytes: rssBefore,
+      rssBeforeFixtureBytes: rssBeforeFixture,
+      rssAfterWarmupBytes: rssAfterWarmup,
       peakRssBytes: peakRss,
-      peakDeltaBytes: Math.max(0, peakRss - rssBefore),
+      fixtureAndWarmupDeltaBytes: Math.max(0, rssAfterWarmup - rssBeforeFixture),
+      peakAdditionalDuringSamplesBytes: Math.max(0, peakRss - rssAfterWarmup),
     }),
   });
+}
+
+function assertResolutionSample(sample, size) {
+  if (sample.selectedCount !== size) {
+    throw new Error(
+      `Benchmark case ${size} selected ${sample.selectedCount}; expected ${size}.`,
+    );
+  }
+  if (
+    sample.metrics.candidateCount !== size ||
+    sample.metrics.generatedCandidateCount !== size ||
+    sample.metrics.uniqueRenderedPlotIdCount !== size
+  ) {
+    throw new Error(
+      `Benchmark case ${size} returned inconsistent resolver metrics: ${JSON.stringify(sample.metrics)}.`,
+    );
+  }
 }
 
 function createFixture(size) {
@@ -166,7 +190,11 @@ function createFixture(size) {
       ],
     });
 
-    for (let duplicate = 0; duplicate < RENDERED_DUPLICATES_PER_FEATURE; duplicate += 1) {
+    for (
+      let duplicate = 0;
+      duplicate < RENDERED_DUPLICATES_PER_FEATURE;
+      duplicate += 1
+    ) {
       rendered.push({ properties: { plotId: id } });
     }
   }
@@ -174,13 +202,11 @@ function createFixture(size) {
   const maximumRow = Math.ceil(size / GRID_COLUMNS);
   const maximumX =
     (GRID_COLUMNS * GRID_SPACING_DEGREES + 0.002) * PROJECTION_SCALE;
-  const maximumY =
-    (0.2 - maximumRow * GRID_SPACING_DEGREES + 0.002) * PROJECTION_SCALE;
   const minimumY =
     (0.2 - maximumRow * GRID_SPACING_DEGREES - 0.002) * PROJECTION_SCALE;
   const regionBounds = Object.freeze({
     minX: -200,
-    minY: Math.min(minimumY, maximumY) - 200,
+    minY: minimumY - 200,
     maxX: maximumX + 200,
     maxY: 20_200,
   });
@@ -195,14 +221,69 @@ function createFixture(size) {
   return Object.freeze({ store, registry, rendered, regionBounds, regionRing });
 }
 
-function executeResolution(fixture) {
-  const phase = {
-    queryMs: 0,
-    generateMs: 0,
-    projectMs: 0,
-  };
+function executeUninstrumentedResolution(fixture) {
+  const resolver = new MapLibreSelectionRegionResolver(
+    createMapAdapter(fixture),
+    fixture.store,
+    fixture.registry,
+  );
+  const started = performance.now();
+  const resolution = resolver.resolve(fixture.regionRing, fixture.regionBounds);
+  return Object.freeze({
+    totalMs: performance.now() - started,
+    selectedCount: resolution.ids.length,
+    metrics: resolution.metrics,
+  });
+}
 
-  const map = {
+function executeProfiledResolution(fixture) {
+  const phase = { queryMs: 0, generateMs: 0, projectMs: 0 };
+  const map = createMapAdapter(fixture, phase);
+  const registry = {
+    generate(feature) {
+      const started = performance.now();
+      try {
+        return fixture.registry.generate(feature);
+      } finally {
+        phase.generateMs += performance.now() - started;
+      }
+    },
+  };
+  const resolver = new MapLibreSelectionRegionResolver(
+    map,
+    fixture.store,
+    registry,
+  );
+  const started = performance.now();
+  const resolution = resolver.resolve(fixture.regionRing, fixture.regionBounds);
+  const totalMs = performance.now() - started;
+  return Object.freeze({
+    totalMs,
+    queryMs: phase.queryMs,
+    generateMs: phase.generateMs,
+    projectMs: phase.projectMs,
+    remainderMs: Math.max(
+      0,
+      totalMs - phase.queryMs - phase.generateMs - phase.projectMs,
+    ),
+    selectedCount: resolution.ids.length,
+    metrics: resolution.metrics,
+  });
+}
+
+function createMapAdapter(fixture, phase) {
+  if (phase === undefined) {
+    return {
+      queryRenderedFeatures() {
+        return fixture.rendered;
+      },
+      project(position) {
+        return projectPosition(position);
+      },
+    };
+  }
+
+  return {
     queryRenderedFeatures() {
       const started = performance.now();
       try {
@@ -214,50 +295,23 @@ function executeResolution(fixture) {
     project(position) {
       const started = performance.now();
       try {
-        return {
-          x: (position[0] - BASE_LONGITUDE) * PROJECTION_SCALE,
-          y: (BASE_LATITUDE + 0.2 - position[1]) * PROJECTION_SCALE,
-        };
+        return projectPosition(position);
       } finally {
         phase.projectMs += performance.now() - started;
       }
     },
   };
+}
 
-  const registry = {
-    generate(feature) {
-      const started = performance.now();
-      try {
-        return fixture.registry.generate(feature);
-      } finally {
-        phase.generateMs += performance.now() - started;
-      }
-    },
+function projectPosition(position) {
+  return {
+    x: (position[0] - BASE_LONGITUDE) * PROJECTION_SCALE,
+    y: (BASE_LATITUDE + 0.2 - position[1]) * PROJECTION_SCALE,
   };
+}
 
-  const resolver = new MapLibreSelectionRegionResolver(
-    map,
-    fixture.store,
-    registry,
-  );
-
-  const started = performance.now();
-  const resolution = resolver.resolve(fixture.regionRing, fixture.regionBounds);
-  const totalMs = performance.now() - started;
-  const residualMs = Math.max(
-    0,
-    totalMs - phase.queryMs - phase.generateMs - phase.projectMs,
-  );
-
-  return Object.freeze({
-    totalMs,
-    queryMs: phase.queryMs,
-    generateMs: phase.generateMs,
-    projectMs: phase.projectMs,
-    residualMs,
-    selectedCount: resolution.ids.length,
-    metrics: resolution.metrics,
-  });
+function collectGarbage() {
+  if (typeof global.gc === "function") global.gc();
 }
 
 function summarize(values) {
@@ -283,6 +337,7 @@ function percentile(sorted, probability) {
 function renderConsoleTable(report) {
   const lines = [
     "PlotLibre region-selection resolver benchmark",
+    `Source ${report.environment.sourceGitSha}`,
     `Node ${report.environment.node}; ${report.environment.platform} ${report.environment.release}; ${report.environment.cpuModel}`,
     "",
     [
@@ -290,10 +345,11 @@ function renderConsoleTable(report) {
       "candidates".padStart(10),
       "total med".padStart(12),
       "total p95".padStart(12),
-      "generate med".padStart(14),
-      "project med".padStart(12),
-      "residual med".padStart(13),
       "cand/s med".padStart(12),
+      "profile gen".padStart(12),
+      "profile proj".padStart(12),
+      "profile rest".padStart(12),
+      "peak +MiB".padStart(10),
     ].join(" | "),
   ];
 
@@ -304,14 +360,21 @@ function renderConsoleTable(report) {
         String(benchmarkCase.candidateCount).padStart(10),
         formatMs(benchmarkCase.timingsMs.total.median).padStart(12),
         formatMs(benchmarkCase.timingsMs.total.p95).padStart(12),
-        formatMs(benchmarkCase.timingsMs.registryGenerate.median).padStart(14),
-        formatMs(benchmarkCase.timingsMs.projectCalls.median).padStart(12),
-        formatMs(
-          benchmarkCase.timingsMs.orderingDedupAndIntersection.median,
-        ).padStart(13),
         Math.round(
           benchmarkCase.throughputCandidatesPerSecond.median,
         ).toLocaleString("en-US").padStart(12),
+        formatMs(
+          benchmarkCase.diagnosticProfileMs.registryGenerate.median,
+        ).padStart(12),
+        formatMs(
+          benchmarkCase.diagnosticProfileMs.projectCalls.median,
+        ).padStart(12),
+        formatMs(
+          benchmarkCase.diagnosticProfileMs.nonIsolatedRemainder.median,
+        ).padStart(12),
+        formatMiB(
+          benchmarkCase.memory.peakAdditionalDuringSamplesBytes,
+        ).padStart(10),
       ].join(" | "),
     );
   }
@@ -322,15 +385,19 @@ function renderMarkdown(report) {
   const rows = report.cases
     .map(
       (benchmarkCase) =>
-        `| ${benchmarkCase.size.toLocaleString("en-US")} | ${benchmarkCase.repetitions} | ${benchmarkCase.queriedFeatureCount.toLocaleString("en-US")} | ${benchmarkCase.candidateCount.toLocaleString("en-US")} | ${formatNumber(benchmarkCase.timingsMs.total.median)} | ${formatNumber(benchmarkCase.timingsMs.total.p95)} | ${formatNumber(benchmarkCase.timingsMs.registryGenerate.median)} | ${formatNumber(benchmarkCase.timingsMs.projectCalls.median)} | ${formatNumber(benchmarkCase.timingsMs.orderingDedupAndIntersection.median)} | ${Math.round(benchmarkCase.throughputCandidatesPerSecond.median).toLocaleString("en-US")} |`,
+        `| ${benchmarkCase.size.toLocaleString("en-US")} | ${benchmarkCase.repetitions} | ${benchmarkCase.queriedFeatureCount.toLocaleString("en-US")} | ${benchmarkCase.candidateCount.toLocaleString("en-US")} | ${formatNumber(benchmarkCase.timingsMs.total.median)} | ${formatNumber(benchmarkCase.timingsMs.total.p95)} | ${Math.round(benchmarkCase.throughputCandidatesPerSecond.median).toLocaleString("en-US")} | ${formatNumber(benchmarkCase.diagnosticProfileMs.registryGenerate.median)} | ${formatNumber(benchmarkCase.diagnosticProfileMs.projectCalls.median)} | ${formatNumber(benchmarkCase.diagnosticProfileMs.nonIsolatedRemainder.median)} | ${formatNumber(benchmarkCase.memory.peakAdditionalDuringSamplesBytes / 1024 ** 2)} |`,
     )
     .join("\n");
 
-  return `# PlotLibre Region-Selection Resolver Benchmark\n\nGenerated: ${report.environment.timestamp}  \nGit SHA: \`${report.environment.gitSha}\`  \nNode: \`${report.environment.node}\`  \nPlatform: \`${report.environment.platform} ${report.environment.release} ${report.environment.arch}\`  \nCPU: \`${report.environment.cpuModel}\` (${report.environment.logicalCpuCount} logical CPUs)  \nTotal memory: ${(report.environment.totalMemoryBytes / 1024 ** 3).toFixed(2)} GiB  \nProfile: \`${report.environment.profile}\`\n\n## Results\n\n| Features | Repetitions | Rendered rows | Unique candidates | Total median ms | Total p95 ms | Generate median ms | Project median ms | Residual median ms | Median candidates/s |\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n${rows}\n\nResidual time is total resolver time minus the measured query-adapter, Registry.generate and map.project wrapper durations. It includes rendered-id collection, deduplication, PlotStore-order filtering, projected-geometry allocation and exact screen intersection.\n\n## Fixture\n\n- 100% \`${STRAIGHT_ARROW_TYPE}\`; two authored controls per feature.\n- ${RENDERED_DUPLICATES_PER_FEATURE} rendered rows per PlotFeature to exercise layer/tile deduplication.\n- Every PlotFeature is a broad-phase candidate and an exact region hit.\n- Deterministic linear CSS-pixel-like projector; no browser, GPU, tile worker or style evaluation.\n- Warmups and repetitions are recorded per row.\n\n## Limitations\n\n${report.limitations.map((item) => `- ${item}`).join("\n")}\n`;
+  return `# PlotLibre Region-Selection Resolver Benchmark\n\nGenerated: ${report.environment.timestamp}  \nSource head SHA: \`${report.environment.sourceGitSha}\`  \nWorkflow checkout SHA: \`${report.environment.workflowGitSha}\`  \nNode: \`${report.environment.node}\`  \nPlatform: \`${report.environment.platform} ${report.environment.release} ${report.environment.arch}\`  \nCPU: \`${report.environment.cpuModel}\` (${report.environment.logicalCpuCount} logical CPUs)  \nTotal memory: ${(report.environment.totalMemoryBytes / 1024 ** 3).toFixed(2)} GiB  \nProfile: \`${report.environment.profile}\`\n\n## Headline results\n\n| Features | Total repetitions | Rendered rows | Unique candidates | Total median ms | Total p95 ms | Median candidates/s | Profile generate median ms | Profile project median ms | Profile non-isolated remainder median ms | Peak additional RSS MiB |\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n${rows}\n\nThe headline total and throughput columns come from uninstrumented resolver runs. The three profile columns come from separate instrumented runs and are diagnostic only; they are not an additive decomposition of the headline total.\n\n## Fixture\n\n- 100% \`${STRAIGHT_ARROW_TYPE}\`; two authored controls per feature.\n- ${RENDERED_DUPLICATES_PER_FEATURE} rendered rows per PlotFeature to exercise layer/tile deduplication.\n- Every PlotFeature is a broad-phase candidate and an exact region hit.\n- Deterministic linear CSS-pixel-like projector; no browser, GPU, tile worker or style evaluation.\n- Warmups, total repetitions and profile repetitions are recorded in JSON for every case.\n\n## Limitations\n\n${report.limitations.map((item) => `- ${item}`).join("\n")}\n`;
 }
 
 function formatMs(value) {
   return `${formatNumber(value)} ms`;
+}
+
+function formatMiB(bytes) {
+  return `${formatNumber(bytes / 1024 ** 2)} MiB`;
 }
 
 function formatNumber(value) {
