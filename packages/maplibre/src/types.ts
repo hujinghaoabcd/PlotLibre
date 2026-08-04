@@ -43,6 +43,7 @@ export interface MapCanvasLike {
 export interface KeyboardEventLike {
   readonly key: string;
   preventDefault?(): void;
+  stopImmediatePropagation?(): void;
 }
 
 export interface MapInteractionHandlerLike {
