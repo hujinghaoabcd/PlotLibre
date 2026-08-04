@@ -1,4 +1,4 @@
-# PlotLibre Development Handover — Milestone 006I Active
+# PlotLibre Development Handover — Milestone 006I Ready Candidate
 
 日期：2026-08-04  
 仓库：`hujinghaoabcd/PlotLibre`  
@@ -6,7 +6,7 @@
 活跃分支：`agent/006i-closed-action-area-group`  
 活跃 PR：`#31 Add closed action area symbol group`  
 Workspace：`0.0.19`  
-状态：006I 实现、Playground 与文档已完成；正在进行最终 current-head CI 和交接冻结
+状态：006I 实现、Playground、文档和 immutable handover 已完成；run #292 全绿，等待包含最终交接文档的新 head CI
 
 ## Current state
 
@@ -69,38 +69,42 @@ plot definition + authored control points + parameters + style + metadata
 - 增加 3 个 Area Chromium tests，suite 从 20 增至 23；
 - 修复 installer/start 顺序，保证 symbol-specific rejection guidance 不被 generic status 覆盖；
 - 根 workspace 提升到 `0.0.19`；
-- README、AGENTS、DEVELOPMENT_PLAN、PLAYGROUND、INTERACTION_MODEL、设计与算法索引已同步。
+- README、AGENTS、DEVELOPMENT_PLAN、PLAYGROUND、INTERACTION_MODEL、设计与算法索引已同步；
+- 新增 immutable handover：`docs/handover/2026-08-04-milestone-006i-closed-action-area.md`；
+- PR #31 当前无未解决评审线程，与 `main` 无分叉。
 
 ## Validation
 
-已取得的阶段性证据：
+权威实现候选 run：
 
 ```text
-Core validation run #275:
-  Node 20.19:        success
-  Node 22:           success
-  Node tests:        163 passed / 0 failed
-  TypeScript:        success
-  Playground build: success
-  handover contract: success
-
-Browser run #279 before compatibility fixes:
-  Area tests:        3 passed
-  total passed:      20
-  failures:          3 compatibility/listener-order regressions
+GitHub Actions run: 30883349847 (#292)
+validated head SHA: 145e6fe007353c39c5f71a13f0e54cbfe509b949
+Node 20.19:         success
+Node 22:            success
+TypeScript:         success
+Node tests:         163 passed / 0 failed
+Playground typecheck: success
+Playground build:   success
+handover contract:  success
+Chromium tests:     23 passed / 0 failed
+unresolved threads: 0
 ```
 
-三个浏览器失败的根因与处理：
-
-1. 两项旧测试仍断言生产样例为 9，现已更新为 16 类完整目录；
-2. installer 提前绑定导致 generic status 覆盖 pincer rejection，现已恢复 generic-first、specialized-after 顺序；
-3. 未降低任何 geometry、rejection 或 rendered-feature 断言。
-
-最终 merge gate：
+Chromium 日志明确记录：
 
 ```text
-Node 20.19:        success on final head
-Node 22:           success on final head
+Running 23 tests using 1 worker
+23 passed (1.3m)
+```
+
+run #292 验证了最终实现、16 类样例、兼容 E2E、钳形 rejection 恢复和全部新 Area tests。随后只新增 immutable handover 并更新本 current-state 文件，没有修改运行时代码、Definition、geometry、interaction、Playground 或 tests。
+
+最终 merge gate 仍要求对包含这两份交接文档的 current head 再执行：
+
+```text
+Node 20.19:        success
+Node 22:           success
 Node tests:        163 passed
 Chromium tests:    23 passed
 Playground build: success
@@ -108,18 +112,18 @@ handover contract: success
 unresolved review threads: 0
 ```
 
-PR #31 在上述 final current-head gate 全绿前保持 Draft。
+PR #31 在最终文档 head 全绿前保持 Draft。
 
 ## Next tasks
 
-1. 触发 PR #31 最新 head 的完整 GitHub Actions；
-2. 处理任何真实类型、geometry、interaction 或 browser regression；
-3. 全绿后新增 immutable 006I final handover；
+1. 触发包含 immutable handover 与本 `LATEST.md` 的最终 current-head CI；
+2. 确认 163 Node、23 Chromium、build 和 handover contract 全绿；
+3. 再确认 unresolved review threads = 0；
 4. 将 PR #31 标记 Ready；
-5. 确认 unresolved review threads = 0；
-6. 使用 expected head SHA squash merge；
-7. 通过独立 finalization PR 把 `LATEST.md` 更新为真实 merged SHA；
-8. 从最终 `main` 创建 006J arc/sector/lune 语义设计分支；
+5. 使用 expected final head SHA squash merge；
+6. 记录真实 squash merge SHA；
+7. 通过独立 post-merge finalization PR 把 `LATEST.md` 更新为 merged state；
+8. 从最终 `main` 创建 `agent/006j-arc-sector-lune-design`；
 9. 先研究控制点、方位角、弧方向、输出类型与 geodesic 边界，再实现 geometry；
 10. 不返回 pincer hardening，不扩展 route-head variants。
 
@@ -135,7 +139,8 @@ PR #31 在上述 final current-head gate 全绿前保持 Draft。
 - sampled ring、closing duplicate 和 rear anchor 绝不能进入 canonical controls；
 - production sample catalog 为 16，基础 E2E 的 9-selector surface 是明确 compatibility mode，不是生产目录；
 - generic 与 specialized Playground listener 顺序是可见行为契约；
-- Vite 生产 bundle 已超过 1 MB，后续需评估 code splitting，但不阻塞 006I；
+- Vite 生产 bundle 为约 `1,067.41 kB`，后续需评估 code splitting，但不阻塞 006I；
+- connector 工作流无法删除已合并分支；
 - Pages 是否真实线上更新必须以 main deploy workflow 和 live verification 分别确认。
 
-Continuation：继续在 `agent/006i-closed-action-area-group` / PR #31 完成最终 CI、immutable handover、Ready 与 squash merge。不要在该 PR 中加入 006J geometry。
+Continuation：继续在 `agent/006i-closed-action-area-group` / PR #31 完成最终文档 head CI、Ready 与 squash merge。不要在该 PR 中加入 006J geometry。
