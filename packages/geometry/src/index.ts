@@ -1,6 +1,7 @@
 export * from "./arrow-components.js";
 export * from "./assault-direction.js";
 export * from "./attack-arrow.js";
+export * from "./circular-arc.js";
 export * from "./closed-area.js";
 export * from "./corridor.js";
 export * from "./curved-arrow.js";
