@@ -1,110 +1,71 @@
 # PlotLibre Design Notes
 
-本目录保存公共符号或专业编辑能力在 runtime 实现前冻结的语义设计，以及多个相关功能共享状态或数学基础时的组设计。
+本目录保存公共符号或专业编辑能力在 runtime 前冻结的语义设计。设计文档必须说明 authored state、derived boundary、数学、交互所有权、失败原子性、测试、性能边界和非目标。
 
-设计文档应回答 public identifiers/modes、authored state、ordering/canonicalization、derived boundary、validation/rollback、PlotJSON migration、clean-room provenance、tests and non-goals。
+## Current records
 
-## 当前设计文档
-
-| 文档 | 范围 | 当前状态 |
+| 文档 | 范围 | 状态 |
 |---|---|---|
-| `arrow-double-semantic-design.md` | 四控制双箭头 | 已实现，`arrow.double@1.0.0` |
-| `arrow-pincer-semantic-design.md` | 五控制钳形箭头 | 已实现，`arrow.pincer@1.1.0` |
-| `route-corridor-group.md` | route + flat-cap corridor | 已实现并合并 |
-| `route-multihead-group.md` | bidirectional + derived secondary-head route | 已实现并合并 |
-| `closed-action-area-group.md` | closed curve + gathering place | 已实现并合并 |
-| `circular-arc-family.md` | circular arc + sector + circular segment | 已实现并合并 |
-| `professional-editing.md` | 007 总体 selection/transaction/transform 分片 | 007A 已实现；007B–D 分片推进 |
-| `box-lasso-selection.md` | 007B screen-space box/lasso selection | 设计已通过 PR #40 合并；runtime 下一步 |
+| `arrow-double-semantic-design.md` | 四控制双箭头 | 已实现 |
+| `arrow-pincer-semantic-design.md` | 五控制钳形箭头 | 已实现 |
+| `route-corridor-group.md` | route + corridor | 已实现 |
+| `route-multihead-group.md` | bidirectional + double-head route | 已实现 |
+| `closed-action-area-group.md` | closed curve + gathering place | 已实现 |
+| `circular-arc-family.md` | circular arc + segment + sector | 已实现 |
+| `professional-editing.md` | 007 总体分片 | 007A/B 已实现；历史总体设计 |
+| `box-lasso-selection.md` | 007B screen-region selection | 已实现并合并 |
+| `rotation-uniform-scale.md` | 007C shared-pivot rotation + positive uniform scale | 当前 design freeze candidate |
 
-## 当前基线
-
-```text
-main:             a9b9efc090c01f45133f3f136a0049a97ee52b90
-workspace:        0.0.21
-symbols:          19 (14 Arrow + 1 Line + 4 Area)
-Node:             219 passed
-Chromium:         30 passed
-Sources/Layers:   4 / 10
-007A PRs:         #38 / #39
-007B design PR:   #40
-007B design head: 4a8ee1102bb923801ada95c648a258225ccb9ec4
-007B design CI:   #413 / 30912109618
-```
-
-## Milestone 007 status
+## Current baseline
 
 ```text
-007A ordered selection + atomic Store + batch delete + local translation — merged
-007B box/lasso design — merged; runtime next
-007C rotation + positive uniform scale — deferred
-007D groups/locks/visibility/z-order after PlotJSON migration design — deferred
+main:               349a09160ac2e17883e2270123d371c164ef28c2
+workspace:          0.0.22
+public symbols:     19
+Node tests:         264
+Chromium tests:     32
+Sources/Layers:     4 / 10
+benchmark job:      required in CI
+007B-P:             merged through PR #45/#46
+current branch:     agent/007c-rotation-scale-design
+runtime on branch:  prohibited
 ```
 
-## 007B merged design summary
+## 007C summary
 
-Authoritative design：`box-lasso-selection.md`.
+Authoritative design：`rotation-uniform-scale.md`.
 
 ```text
-screen region
-→ MapLibre committed-layer broad query
-→ plotId dedup
-→ Store-order normalization
-→ Registry-generated screen geometry
-→ exact intersection
-→ one SelectionController.applyMany event
+selected authored controls
+→ one order-independent local-metre frame
+→ AABB-center fixed pivot
+→ clockwise rotation or positive uniform scale
+→ canonicalize + Registry.generate every member
+→ one transient complete preview
+→ one BatchEditCommand
 ```
 
-Frozen input：
+Frozen boundaries：
 
-- current immediate Shift-mousedown add must be replaced；
-- neutral `Shift + empty drag` = additive box；
-- explicit one-shot box/lasso modes = default replace；
-- explicit modes support add/toggle/subtract overrides；
-- box threshold `4 CSS px`；
-- lasso spacing `2 px`、minimum `3` points/`16 px²`、RDP `1.5 px`；
-- raw and simplified self-intersection both reject；
-- touch deferred。
+- rotation and positive uniform scale only；
+- local-metre only；
+- scale `[0.01,100]`；
+- no reflection/non-uniform scale/skew/snapping；
+- parameters/style/metadata unchanged；
+- absolute ground parameter caps may prevent strict derived similarity；
+- explicit one-shot modes and DOM/SVG handles；
+- no new MapLibre Source/Layer；
+- selection/order/Primary preserved；
+- all-member fail-closed preflight and exact undo/redo；
+- runtime deferred to a separate branch after design merge/finalization。
 
-Frozen hit semantics：
-
-- MapLibre query is broad phase only；
-- committed fill/line/point layers only；
-- Store order determines result order；
-- exact Point/Line/Polygon/Multi/compound intersection；
-- Polygon holes respected；
-- CSS stroke/radius、selection、draft、guide and label geometry ignored；
-- query/generation/projection failure rejects whole completion；
-- partial selection prohibited。
-
-Frozen presentation/lifecycle：
-
-- DOM/SVG screen overlay；
-- no new Source/Layer；
-- 4/10 baseline retained；
-- cancel on pointer/camera/style/resize/Store/selection/programmatic lifecycle changes；
-- restore dragPan、boxZoom and pointer capture exactly once；
-- region selection remains outside Store、History and PlotJSON。
-
-## Runtime implementation order
-
-After post-merge finalization, create：
+Algorithms：
 
 ```text
-agent/007b-box-lasso-selection
+../algorithms/batch-edit-transaction.md
+../algorithms/screen-region-selection.md
+../algorithms/selection-local-transform.md
 ```
-
-Then：
-
-1. pure screen/RDP/topology utilities；
-2. `SelectionController.applyMany()`；
-3. exact projected predicates；
-4. MapLibre candidate resolver；
-5. unified region adapter；
-6. DOM/SVG overlay；
-7. public one-shot API；
-8. Playground、Chromium and benchmark report；
-9. immutable handover and merge。
 
 ## Reference boundary
 
@@ -116,11 +77,4 @@ MapLibre GL JS@v6.0.0 — BSD-3-Clause
 code reuse: none
 ```
 
-Algorithms：
-
-```text
-../algorithms/batch-edit-transaction.md
-../algorithms/screen-region-selection.md
-```
-
-Historical design documents preserve their original state. Current truth is determined by source, README, AGENTS, development/interaction docs, `handover/LATEST.md` and the latest PRs.
+Historical records preserve their original state. Current truth is determined by source, AGENTS, development/interaction docs, `handover/LATEST.md` and current PR evidence.
