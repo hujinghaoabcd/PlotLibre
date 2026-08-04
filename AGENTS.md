@@ -48,6 +48,8 @@ Rules:
 - Topology-sensitive Definitions must validate complete renderability before Store mutation.
 - Compound symbols must declare their coupling topology and produce coherent render components under one semantic Definition.
 - Shaft/head joins must not retain offset vertices beyond the head neck plane.
+- Closed-area symbols must explicitly define authored boundary/path roles, automatic closure and Polygon/LineString output.
+- A closed-area symbol must not persist its sampled curve or final ring as a substitute for authored controls.
 
 ## 4. Related-symbol groups
 
@@ -60,6 +62,8 @@ A development slice may contain two or three related symbols when all of the fol
 5. the group completes Registry, PlotJSON, Playground, browser coverage and handover in one PR.
 
 Do not group unrelated symbols merely to increase symbol count. Do not create variants by changing only default parameters. A difficult coupled symbol may still be developed alone.
+
+For Milestone 006I, `area.route-loop` is not automatically approved merely because it could reuse a closed-curve frame. It must demonstrate independent direction or route semantics before becoming a public Definition.
 
 ## 5. Clean-room and licensing
 
@@ -91,6 +95,8 @@ Never copy proprietary Mapbox code. Current packages remain `UNLICENSED` until t
 - Registry validation and generation operate on canonicalized controls.
 - Create, replace and import persist canonicalized controls so Store and PlotJSON expose one stable role order.
 - Invalid canonicalization fails closed with `INVALID_CONTROL_POINT_CANONICALIZATION`.
+- Closed-area Definitions must state whether authored controls lie on the boundary, define a center path, or have special semantic roles.
+- Automatic ring closure is derived behavior and must not append a duplicate authored control to PlotJSON.
 
 Current public Arrow identifiers:
 
@@ -194,8 +200,9 @@ The primary route body and exact tip use ordinary route semantics. A second same
 - Create, replace and import must complete generation before Store mutation.
 - One completed handle drag produces one `ReplacePlotCommand`.
 - Invalid handle previews never enter Store or History.
-- Variable path symbols show a full draft after one committed start plus the live terminal candidate.
+- Variable path symbols show a full draft after one committed start plus the live terminal candidate when their Definition allows a two-control form.
 - Squad combat, route, corridor and route multi-head symbols complete with double-click or Enter and persist only authored centre-path controls.
+- A variable closed-area symbol must define explicit completion behavior; pointer movement alone must never persist automatic closure.
 
 ## 8. Testing requirements
 
@@ -220,7 +227,7 @@ For MapLibre symbols, tests must verify committed/draft Source data, correct `pl
 New geometry additionally requires:
 
 - exact semantic controls;
-- two-control minimum where declared;
+- minimum and maximum controls where declared;
 - interior-control influence where applicable;
 - duplicate-control policy;
 - finite/closed/winding/simple topology;
@@ -229,17 +236,15 @@ New geometry additionally requires:
 - completion mode;
 - invalid geometry rejection before Store mutation.
 
-Route multi-head tests additionally prove:
+Closed-area tests additionally prove:
 
-- bidirectional route preserves both exact authored endpoint tips;
-- bidirectional route remains one closed counterclockwise simple Polygon;
-- path reversal preserves two-tip topology;
-- double-head route preserves the exact primary terminal tip;
-- the secondary head is derived and structurally separate;
-- secondary-head parameters do not change the primary route body;
-- both Definitions are independently registered and validated;
-- PlotJSON contains only authored center-path controls;
-- actual draft and committed rendering is visible for both.
+- automatic closure does not create an extra authored control;
+- every authored boundary control remains represented by the semantic contract;
+- normalized ring is finite, closed, counterclockwise and simple;
+- reversing controls either preserves or intentionally changes semantics as documented;
+- no sampled curve or final ring vertex enters PlotJSON;
+- invalid closure and self-intersection remain outside Store and History;
+- actual draft and committed rendering are visible.
 
 Current minimum regression baseline:
 
@@ -259,10 +264,11 @@ Current minimum regression baseline:
 - Every public symbol gets selector, sample and browser coverage in the same slice.
 - Fixed-count symbols clearly state automatic maximum-point completion.
 - Variable symbols clearly state double-click/Enter completion.
-- Production exposes squad combat and all path symbols by default.
-- Extended E2E uses `?e2e=1&squad=1&paths=1`; legacy initial nine-symbol/sample tests remain stable.
-- Clicking Load Sample under the extended flag produces all fourteen samples.
+- Production exposes all fourteen current Arrow types by default.
+- Extended E2E uses `?e2e=1&squad=1&paths=1`; compatibility tests for the original sample baseline must remain intentional rather than accidental.
+- Clicking Load Sample under the full feature flag produces all fourteen current samples.
 - Pages deploys only from `main`.
+- A new area family must receive a clear selector category and completion instructions rather than being mixed into Arrow copy without explanation.
 
 ## 10. Documentation and handover
 
@@ -284,34 +290,53 @@ The handover contract requires these exact headings:
 
 Never rewrite earlier immutable handovers.
 
+`LATEST.md` must describe the actual merged or active state. It must not leave an already merged PR described as pending.
+
 ## 11. Scope control
 
 Prefer one complete related-symbol group to many incomplete symbols. Do not develop unrelated complex symbols in parallel. For routine groups, use one implementation PR unless a genuinely unresolved semantic design requires a separate design review.
 
+Documentation-state repair may be isolated from runtime work so that the next implementation branch begins from an accurate baseline.
+
 ## 12. Current priority
 
-Active related-symbol group:
+Completed baseline:
 
 ```text
-branch: agent/route-multihead-group
-PR: #29 Add route multi-head symbol group
-workspace: 0.0.18
-Definitions: arrow.route.bidirectional@1.0.0, arrow.route.double-head@1.0.0
-expected Node baseline: 154
-expected Chromium baseline: 20
+main SHA:             e799b3263bc36410c4195225faad5d2fc36f494f
+workspace:            0.0.18
+public Arrow types:   14
+Node baseline:        154
+Chromium baseline:    20
+Milestone 006H:       merged and finalized
 ```
 
-Approved behavior:
+Active handover synchronization:
 
-1. both Definitions persist authored centre paths;
-2. both allow a two-control straight form and optional intermediate controls;
-3. both share pure route/head geometry rather than copied generators;
-4. bidirectional route gives equal directional emphasis to exact authored endpoints;
-5. double-head route preserves one exact objective and one derived secondary emphasis head;
-6. strict simple-ring validation remains for every Polygon component;
-7. Store and PlotJSON contain only authored controls;
-8. no symbol-ID branch is added to interaction;
-9. Playground exposes fourteen public symbols and a full fourteen-sample action;
-10. this group stays in one implementation PR.
+```text
+branch: agent/006i-handover-baseline
+scope:  synchronize current documentation and freeze the 006I starting boundary
+```
 
-After PR #29 merges, continue to the next related symbol group rather than returning to pincer hardening. The next planned group should move beyond route-head variants and add a new area/curve family.
+Next implementation milestone:
+
+```text
+Milestone 006I: closed action area group
+candidate identifiers:
+  area.closed-curve
+  area.gathering-place
+  area.route-loop (conditional on independent semantics)
+```
+
+Binding order:
+
+1. synchronize stale current-state documentation;
+2. freeze public identifiers and canonical control roles;
+3. define automatic closure and direction semantics;
+4. decide which candidates form one legitimate related group;
+5. record clean-room references and license review;
+6. implement a pure closed-area frame;
+7. add independent Definitions and validation;
+8. complete Registry, PlotJSON, Playground and browser coverage;
+9. update immutable handover and current baseline;
+10. do not return to pincer hardening or add more route-head variants.
