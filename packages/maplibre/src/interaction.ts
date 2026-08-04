@@ -11,10 +11,12 @@ import {
 } from "@plotlibre/core";
 import {
   MultiPointDrawSession,
+  SelectionController,
   TwoPointDrawSession,
   type DrawSession,
   type DrawSessionRejection,
   type DrawSessionSnapshot,
+  type SelectionIntent,
 } from "@plotlibre/interaction";
 import { MapLibrePlotRenderer } from "./renderer.js";
 import type {
@@ -59,11 +61,13 @@ export class MapLibrePlotInteraction {
   readonly #renderer: MapLibrePlotRenderer;
   readonly #callbacks: MapLibrePlotInteractionCallbacks;
   readonly #idFactory: () => string;
+  readonly #selection: SelectionController;
+  readonly #ownsSelection: boolean;
   readonly #unsubscribeStore: () => void;
+  readonly #unsubscribeSelection: () => void;
   #session: DrawSession | undefined;
   #draftFeature: PlotFeature | undefined;
   #drawRejection: DrawSessionRejection | undefined;
-  #selectedId: string | undefined;
   #drag: ControlPointDrag | undefined;
   #doubleClickZoomWasEnabled: boolean | undefined;
   #doubleClickZoomRestoreTimer: ReturnType<typeof setTimeout> | undefined;
@@ -87,7 +91,8 @@ export class MapLibrePlotInteraction {
     }
 
     const plotId = this.#queryPlotId(mouseEvent);
-    this.select(plotId);
+    this.#selection.applyIntent(plotId, readSelectionIntent(mouseEvent));
+    this.#syncSelection();
   };
 
   readonly #onDoubleClick = (event: unknown): void => {
@@ -119,7 +124,7 @@ export class MapLibrePlotInteraction {
       return;
     }
 
-    if (this.#selectedId && this.#queryHandle(mouseEvent)) {
+    if (this.#selection.primaryId && this.#queryHandle(mouseEvent)) {
       this.#setCursor("grab");
     } else {
       this.#setCursor("");
@@ -138,6 +143,7 @@ export class MapLibrePlotInteraction {
     const plotId = readString(properties?.plotId);
     const handleIndex = readInteger(properties?.handleIndex);
     if (plotId === undefined || handleIndex === undefined) return;
+    if (plotId !== this.#selection.primaryId) return;
 
     const original = this.#store.get(plotId);
     if (!original.controlPoints[handleIndex]) return;
@@ -174,7 +180,7 @@ export class MapLibrePlotInteraction {
       this.#restoreDragPan(drag);
       this.#syncSelection();
       this.#armClickSuppression();
-      this.#setCursor(this.#selectedId ? "grab" : "");
+      this.#setCursor(this.#selection.primaryId ? "grab" : "");
     }
   };
 
@@ -207,7 +213,7 @@ export class MapLibrePlotInteraction {
       return;
     }
 
-    if (event.key === "Escape" && this.#selectedId) {
+    if (event.key === "Escape" && this.#selection.size > 0) {
       event.preventDefault?.();
       this.select(undefined);
     }
@@ -220,6 +226,7 @@ export class MapLibrePlotInteraction {
     renderer: MapLibrePlotRenderer,
     callbacks: MapLibrePlotInteractionCallbacks,
     options: MapLibrePlotInteractionOptions = {},
+    selection?: SelectionController,
   ) {
     this.#map = map;
     this.#registry = registry;
@@ -227,6 +234,8 @@ export class MapLibrePlotInteraction {
     this.#renderer = renderer;
     this.#callbacks = callbacks;
     this.#idFactory = options.idFactory ?? createDefaultIdFactory();
+    this.#ownsSelection = selection === undefined;
+    this.#selection = selection ?? new SelectionController(store);
 
     this.#map.on("click", this.#onClick);
     this.#map.on("dblclick", this.#onDoubleClick);
@@ -240,6 +249,9 @@ export class MapLibrePlotInteraction {
     canvas.addEventListener("keydown", this.#onKeyDown);
 
     this.#unsubscribeStore = this.#store.subscribe(() => {
+      if (!this.#drag) this.#syncSelection();
+    });
+    this.#unsubscribeSelection = this.#selection.subscribe(() => {
       if (!this.#drag) this.#syncSelection();
     });
   }
@@ -311,18 +323,23 @@ export class MapLibrePlotInteraction {
 
   public select(id: string | undefined): void {
     if (id === undefined) {
-      this.#selectedId = undefined;
-      this.#renderer.clearHandles();
-      return;
+      this.#selection.clear();
+    } else {
+      this.#selection.replace([id]);
     }
-
-    const feature = this.#store.get(id);
-    this.#selectedId = feature.id;
-    this.#renderer.renderHandles(feature);
+    this.#syncSelection();
   }
 
   public get selectedId(): string | undefined {
-    return this.#selectedId;
+    return this.#selection.primaryId;
+  }
+
+  public get selectedIds(): readonly string[] {
+    return this.#selection.selectedIds;
+  }
+
+  public get selection(): SelectionController {
+    return this.#selection;
   }
 
   public get isDrawing(): boolean {
@@ -337,7 +354,9 @@ export class MapLibrePlotInteraction {
     this.cancelDraw();
     this.#cancelDrag();
     this.#restoreDoubleClickZoom();
+    this.#unsubscribeSelection();
     this.#unsubscribeStore();
+    if (this.#ownsSelection) this.#selection.destroy();
     this.#map.off("click", this.#onClick);
     this.#map.off("dblclick", this.#onDoubleClick);
     this.#map.off("mousemove", this.#onMouseMove);
@@ -490,8 +509,8 @@ export class MapLibrePlotInteraction {
     this.#draftFeature = undefined;
     this.#renderer.clearDraft();
     this.#restoreDragPan(drag);
-    this.#renderer.renderHandles(drag.original);
-    this.#setCursor("grab");
+    this.#syncSelection();
+    this.#setCursor(this.#selection.primaryId ? "grab" : "");
     return true;
   }
 
@@ -535,14 +554,14 @@ export class MapLibrePlotInteraction {
   }
 
   #syncSelection(): void {
-    if (!this.#selectedId) {
+    const selectedId = this.#selection.primaryId;
+    if (!selectedId) {
       this.#renderer.clearHandles();
       return;
     }
 
-    const selected = this.#store.find(this.#selectedId);
+    const selected = this.#store.find(selectedId);
     if (!selected) {
-      this.#selectedId = undefined;
       this.#renderer.clearHandles();
       return;
     }
@@ -609,6 +628,14 @@ function asMouseEvent(event: unknown): MapLibreMouseEventLike | undefined {
 
 function toPosition(event: MapLibreMouseEventLike): Position {
   return [event.lngLat.lng, event.lngLat.lat];
+}
+
+function readSelectionIntent(event: MapLibreMouseEventLike): SelectionIntent {
+  const original = event.originalEvent;
+  if (original?.altKey === true) return "subtract";
+  if (original?.ctrlKey === true || original?.metaKey === true) return "toggle";
+  if (original?.shiftKey === true) return "add";
+  return "replace";
 }
 
 function readString(value: unknown): string | undefined {
