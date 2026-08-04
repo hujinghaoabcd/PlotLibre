@@ -1,5 +1,3 @@
-import type { Position } from "@plotlibre/core";
-
 export interface GeoJsonSourceLike {
   setData(data: unknown): void;
 }
@@ -110,7 +108,12 @@ export interface MapLibreMapLike {
   off(type: string, listener: MapLibreEventListener): unknown;
   getCanvas(): MapCanvasLike;
   getContainer?(): MapContainerLike;
-  project?(position: Position): MapLibrePointLike;
+  /**
+   * MapLibre accepts its own LngLatLike union while lightweight adapters may
+   * accept plain coordinate tuples. Keep the input opaque at this boundary;
+   * callers must pass a fresh mutable tuple rather than a readonly Position.
+   */
+  project?(position: any): MapLibrePointLike;
   /**
    * The concrete MapLibre engine uses its own Point class while tests may use a
    * lightweight point object. Keep these arguments opaque at the adapter boundary
