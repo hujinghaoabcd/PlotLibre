@@ -116,7 +116,12 @@ export class MapLibreSelectionRegionInteraction {
   #destroyed = false;
 
   readonly #onPointerDown = (event: MapCanvasPointerEventLike): void => {
-    if (this.#destroyed || this.#session || !isPrimaryRegionPointer(event)) {
+    const existingSessionStatus = this.#session?.snapshot().status;
+    if (
+      this.#destroyed ||
+      (this.#session !== undefined && existingSessionStatus !== "rejected") ||
+      !isPrimaryRegionPointer(event)
+    ) {
       return;
     }
     if (this.#callbacks.isDrawing?.() || this.#callbacks.isTranslating?.()) {
@@ -125,6 +130,10 @@ export class MapLibreSelectionRegionInteraction {
 
     const point = this.#readScreenPoint(event);
     if (!point) return;
+
+    if (existingSessionStatus === "rejected") {
+      this.#session = undefined;
+    }
 
     let mode = this.#mode?.explicit === true ? this.#mode : undefined;
     if (!mode) {
