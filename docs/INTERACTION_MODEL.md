@@ -2,355 +2,236 @@
 
 ## 1. Boundary
 
-PlotLibre separates semantic interaction from MapLibre:
-
 ```text
-@plotlibre/core
-       ↑
-@plotlibre/interaction
-       ↑
-@plotlibre/maplibre
-       ↑
-MapLibre GL JS
+core
+  ↑
+interaction
+  ↑
+maplibre
+  ↑
+MapLibre GL JS / DOM
 ```
 
-Interaction owns engine-independent drawing sessions, ordered selection, batch commands, local translation and screen-region algorithms. MapLibre owns browser-event normalization, screen projection, rendered-index queries, pointer/camera lifecycle and derived presentation. Core never depends on DOM, MapLibre or CSS-pixel types.
+Interaction owns drawing sessions, ordered selection, atomic batch commands, local transforms and screen-region algorithms. MapLibre owns browser events, map projection/unprojection, rendered queries, pointer/camera lifecycle and derived overlays. Core never depends on DOM or MapLibre.
 
-## 2. Drawing
-
-Drawing sessions return authored controls only. Samples, rings, mirrored points, closures and guides remain derived.
+## 2. Canonical state
 
 ```text
-candidate
-→ canonicalize authored controls
-→ Registry validation
-→ full Registry generation
-→ invalid: active session + rejection, no mutation
-→ valid: one command and Store commit
+PlotDefinition + authored controls + parameters + style + metadata
 ```
 
-Session choice remains schema-driven, never `plotType`-driven.
+Generated geometry, local frames, pivots, selection/region/transform overlays, previews and guides are derived. One successful document gesture creates one command over canonical state.
 
-## 3. Ordered selection
+## 3. Existing editing
+
+- ordered selection with Primary-last semantics;
+- click replace/add/toggle/subtract;
+- atomic `PlotStore.applyTransaction()`;
+- exact `BatchEditCommand` execute/undo/redo;
+- batch delete;
+- whole-selection local-metre translation;
+- screen-space box/lasso selection;
+- DOM/SVG region overlay;
+- 4 MapLibre Sources / 10 Layers.
+
+Selection and region gestures remain outside PlotJSON and History.
+
+## 4. 007C transform state
+
+Candidate engine-independent state:
 
 ```ts
-interface SelectionSnapshot {
+type SelectionTransformKind = "rotate" | "scale";
+type SelectionTransformStatus = "idle" | "armed" | "active" | "rejected";
+
+interface SelectionTransformSnapshot {
+  readonly status: SelectionTransformStatus;
+  readonly kind?: SelectionTransformKind;
   readonly selectedIds: readonly string[];
-  readonly primaryId?: string;
+  readonly pivot?: Position;
+  readonly clockwiseDegrees?: number;
+  readonly scaleFactor?: number;
+  readonly rejection?: SelectionTransformRejection;
   readonly revision: number;
 }
 ```
 
-- ids are unique existing Store ids;
-- order is acquisition order;
-- Primary is the final selected id;
-- one effective operation emits one immutable snapshot;
-- no-op emits nothing;
-- Store removal reconciles once;
-- selection is excluded from PlotJSON and feature revision.
+Transform state is transient and excluded from PlotJSON, Store and History.
 
-Click intents:
+## 5. Shared local frame
+
+At explicit-mode start:
 
 ```text
-plain       replace / make Primary
-Shift       add
-Ctrl/Cmd    toggle
-Alt         subtract
-empty plain clear
+selected authored controls
+→ validate one supported local domain
+→ order-independent geographic seed
+→ one local projection
+→ local authored-control AABB
+→ fixed AABB-center pivot
 ```
 
-Modifier priority: `Alt > Ctrl/Cmd > Shift > default`.
+The pivot is shared by all selected features and fixed for the gesture. It is not a screen bounds center or rendered centroid.
 
-## 4. Selection rendering
+## 6. Rotation
 
-Derived MapLibre resources:
+User-positive rotation is clockwise in local east/north axes:
 
 ```text
-Sources:
-  plotlibre-committed
-  plotlibre-selection
-  plotlibre-draft
-  plotlibre-handles
-
-Layers:
-  plotlibre-fill
-  plotlibre-line
-  plotlibre-point
-  plotlibre-selection-line
-  plotlibre-selection-point
-  plotlibre-draft-fill
-  plotlibre-draft-line
-  plotlibre-draft-point
-  plotlibre-handle-guide
-  plotlibre-handle
+x' = px + cosθ(x-px) + sinθ(y-py)
+y' = py - sinθ(x-px) + cosθ(y-py)
 ```
 
-Polygon selections render as boundaries, LineStrings as lines and Points as points. Only Primary exposes authored handles and Definition guides.
+The adapter uses `map.unproject()` to convert pointer positions into the fixed local frame. Successive signed vector deltas are accumulated so crossing ±180° does not jump. Display angle normalizes to `(-180°,180°]`.
 
-Box/lasso guides are a separate DOM/SVG overlay and add no geographic Source or Layer.
-
-## 5. Direct handle editing
+## 7. Positive uniform scale
 
 ```text
-pointerdown on authored handle
-→ capture original feature
-→ generated preview
-→ Registry preflight
-→ pointerup: one ReplacePlotCommand
+k = current local radius / start local radius
+x' = px + k(x-px)
+y' = py + k(y-py)
+0.01 <= k <= 100
 ```
 
-Invalid preview does not mutate Store. Escape cancels. Handle drag has priority over body translation and region selection.
+Out-of-range factors reject instead of clamping. Pointer crossing pivot cannot reflect because `k` is positive radial distance.
 
-## 6. Atomic document editing
+## 8. Parameter boundary
 
-`PlotStore.applyTransaction()` stages add/replace/remove/exact order and commits once. Listener errors after commit are isolated through `onListenerError`.
+007C v1 transforms authored controls only. Parameters, style and metadata remain unchanged.
 
-`BatchEditCommand` stores exact before/after features, document order and selection. Execute/undo/redo replay exact revisions. One document-mutation gesture creates one History entry.
+Absolute ground caps such as `minimumWidthMeters` and `maximumWidthMeters` can prevent strict rendered similarity after scale. Registry generation remains authoritative. Parameter-transform hooks and heuristics are deferred.
 
-Delete/Backspace and `removeSelected()` remove all selected features through one command. Undo restores exact values, order, selected ids and Primary.
+## 9. Explicit modes
 
-## 7. Whole-selection translation
+Candidate API:
 
 ```text
-selected body pointerdown
-→ one shared local frame
-→ one common metre delta
-→ transient generated preview
-→ all candidates preflight
-→ pointerup: one BatchEditCommand
+plot.selectionTransform
+plot.selectionTransformSnapshot
+plot.selectionTransformRejection
+plot.startSelectionRotation()
+plot.startSelectionScale()
+plot.cancelSelectionTransform()
 ```
 
-Store remains unchanged during preview. Escape cancels. Any invalid member rejects the full batch. Parameters, style and metadata remain unchanged.
+- transform modes are explicit one-shot modes;
+- starting transform cancels region mode without selection mutation;
+- starting region mode cancels transform mode;
+- Primary handles/guides hide while transform is armed/active;
+- selection overlays remain;
+- success exits;
+- invalid completion remains armed for retry;
+- cancel restores ordinary selection presentation.
 
-## 8. Region-selection state
+## 10. Transform overlay
 
-Pure engine-independent session types:
+Use an absolutely positioned DOM/SVG overlay; add no Source or Layer.
 
-```ts
-interface ScreenPoint {
-  readonly x: number;
-  readonly y: number;
-}
-
-interface ScreenBounds {
-  readonly minX: number;
-  readonly minY: number;
-  readonly maxX: number;
-  readonly maxY: number;
-}
-
-type SelectionRegionStatus = "idle" | "armed" | "active" | "rejected";
-```
-
-`ScreenSelectionRegionSession` captures box/lasso screen geometry and rejection state. It never queries MapLibre or mutates SelectionController.
-
-## 9. Region entry
-
-Neutral convenience:
+Contents:
 
 ```text
-Shift + primary drag from empty selectable space
-→ one-shot additive box
+projected local-frame quadrilateral
+pivot marker
+scale handle at projected maxX/maxY corner
+rotation handle 28 CSS px outside visual top edge
+angle or factor label
 ```
 
-Explicit one-shot modes:
+A 24 CSS-pixel minimum visual frame is allowed for usability but cannot alter canonical pivot or transform math.
 
-```text
-plot.startBoxSelection()   default replace
-plot.startLassoSelection() default replace
-```
-
-Public state:
-
-```text
-plot.regionSelection
-plot.regionSelectionSnapshot
-plot.regionSelectionRejection
-plot.cancelRegionSelection()
-```
-
-Explicit modes support configured replace/add/toggle/subtract plus modifier override at pointerdown. Lasso is explicit only. Touch is deferred.
-
-Feature Shift-click remains click-add; no selection mutation occurs on the region controller's pointerdown.
-
-## 10. Gesture priority
+## 11. Gesture priority
 
 ```text
 active drawing
-> authored handle drag
-> active selection translation
+> authored-handle drag
+> active selection transform
 > active region gesture
-> explicit region mode
-> neutral Shift-empty box arm
+> armed transform handle
+> armed region mode
+> neutral Shift-empty box
 > selected-body translation
 > click selection
 > camera gesture
 ```
 
-Convenience box never starts from a handle or selectable body.
+Transform begins only from the active explicit-mode handle. Body translation is disabled while transform mode is armed. Region and transform cannot be active together. Modifiers have no 007C transform meaning.
 
-## 11. Box state machine
-
-```text
-pointerdown: armed
-movement <4 CSS px: remain armed
-movement >=4 CSS px: active rectangle
-pointerup: resolve and apply once
-cancel/degenerate: no mutation
-```
-
-Positive width and height are required. Selection changes only on pointerup.
-
-Empty result:
+## 12. Preview and atomic commit
 
 ```text
-replace clears
-add/subtract/toggle no-op
+original selected features
+→ pure authored-control transform
+→ revision +1 candidates
+→ canonicalize every candidate
+→ Registry.generate every candidate
+→ complete success: render complete preview
+→ any failure: preserve last-valid complete preview + rejection
 ```
 
-## 12. Lasso state machine
+Partial preview/commit is prohibited.
+
+Valid effective pointerup:
 
 ```text
-sample spacing:       2 CSS px
-minimum distinct pts: 3
-minimum area:         16 CSS px²
-RDP tolerance:        1.5 CSS px
+one BatchEditCommand
+execute.replace = changed transformed features
+undo.replace = exact originals
+document order unchanged
+selection snapshot unchanged
 ```
+
+Undo/redo replay exact captured revisions and controls. No command for no-op, rejection or cancel.
+
+## 13. Rejections
 
 ```text
-raw sample path
-→ consecutive-duplicate cleanup
-→ raw point/topology/area validation
-→ RDP simplify
-→ simplified point/topology/area validation
-→ implicit closure
-→ resolve/apply
+SELECTION_TRANSFORM_SELECTION_EMPTY
+SELECTION_TRANSFORM_FEATURE_MISSING
+SELECTION_TRANSFORM_COORDINATE_FRAME_UNSUPPORTED
+SELECTION_TRANSFORM_FRAME_DEGENERATE
+SELECTION_TRANSFORM_POINTER_INVALID
+SELECTION_TRANSFORM_POINTER_RADIUS_TOO_SMALL
+SELECTION_TRANSFORM_SCALE_OUT_OF_RANGE
+SELECTION_TRANSFORM_CANDIDATE_GENERATION_FAILED
+SELECTION_TRANSFORM_TRANSACTION_INVALID
 ```
 
-Repeated non-consecutive vertices and non-adjacent crossing, touch or overlap reject. Invalid lasso preserves selection, displays transient rejection and remains available for direct retry.
+## 14. Lifecycle
 
-## 13. One-event multi-id intent
+Cancel without mutation on Escape, pointercancel, unexpected lost capture, style load, resize, camera movement during active drag, Store change, external selection revision, document lifecycle operation or destroy.
 
-```ts
-selection.applyMany(ids, intent, "box" | "lasso")
-```
+While armed but not dragging, camera render may reproject the overlay. DragPan is disabled only during active transform and restored once. Intentional pointer release cannot let `lostpointercapture` erase a newly created rejected state.
 
-Candidate ids arrive in Store/document order.
+## 15. Current evidence
 
 ```text
-replace  candidates
-add      current + new candidates
-subtract current survivors
-toggle   current survivors + newly selected candidates
-```
-
-One effective completion emits one selection event. No-op emits nothing. Region selection never enters History.
-
-## 14. Broad phase
-
-```text
-region bounds
-→ queryRenderedFeatures(committed fill/line/point layers)
-→ plotId dedup
-→ Store existence filter
-→ Store-order normalization
-```
-
-Selection, draft, handles, guides, labels and hit-area layers are excluded. MapLibre return order and tile duplicates are non-semantic.
-
-The rendered index is the initial broad phase. Persistent custom indexing is deferred pending measured scale evidence.
-
-## 15. Exact projected narrow phase
-
-```text
-Store feature
-→ Registry.generate
-→ semantic fills + lines + points
-→ map.project coordinates
-→ exact region intersection
-```
-
-- Point center;
-- LineString/MultiLineString segments;
-- Polygon/MultiPolygon crossing and containment with holes;
-- compound any-component semantics;
-- boundary inclusive;
-- CSS stroke/radius ignored;
-- labels, hit areas, guides, drafts, handles and selection overlays ignored;
-- generated samples authoritative for curved paths;
-- query/generation/projection failure rejects the whole completion;
-- partial selection prohibited.
-
-## 16. Region overlay
-
-```text
-absolutely positioned DOM/SVG
-CSS-pixel coordinates
-pointer-events:none
-aria-hidden:true
-clipped to map container
-removed on complete/cancel/destroy
-independent from style.load
-```
-
-## 17. Pointer and lifecycle
-
-The unified adapter owns pointer capture, dragPan and MapLibre boxZoom lifecycle.
-
-Cancel without selection mutation on:
-
-```text
-Escape
-pointercancel
-unexpected lost pointer capture
-style.load
-resize
-camera movement
-Store change
-external selection change
-draw/import/clear/undo/redo
-destroy
-```
-
-Synthetic post-drag click is suppressed. Explicit mode hides Primary handles/guides while preserving selection overlays and restores them on exit.
-
-Intentional `releasePointerCapture()` emits `lostpointercapture` in Chromium. The controller clears its owned pointer id before release and ignores the resulting event; unexpected loss while ownership remains active still cancels. This preserves a newly created rejected lasso state.
-
-## 18. Stable rejections
-
-```text
-SELECTION_REGION_TOO_SMALL
-SELECTION_REGION_LASSO_TOO_FEW_POINTS
-SELECTION_REGION_LASSO_SELF_INTERSECTS
-SELECTION_REGION_QUERY_FAILED
-SELECTION_REGION_CANDIDATE_GENERATION_FAILED
-SELECTION_REGION_PROJECTION_FAILED
-```
-
-Empty candidates are valid outcomes.
-
-## 19. Canonical-state rule
-
-Generated geometry may be projected for exact hit testing but never becomes authored state. Screen regions, overlays and rejections remain transient. Whole-object transforms modify authored controls only.
-
-## 20. Merged evidence
-
-```text
+main:              349a09160ac2e17883e2270123d371c164ef28c2
 workspace:         0.0.22
-main:              f98483d3504ce464c93e5a03a49f7f856d1cc1a0
 Node tests:        264
 Chromium tests:    32
 Sources/Layers:    4 / 10
-007A PRs:          #38 / #39
-007B design PRs:   #40 / #41
-007B runtime PRs:  #42 / #43
+007B-P:            PR #45/#46 merged
+current branch:    agent/007c-rotation-scale-design
+runtime:           prohibited
 ```
 
-PR #43 exact head `f7d9e107...` passed CI #445 / `30924648279` with Node 20.19/22, 264 Node tests, build, handover and 32 Chromium tests before squash merge.
+Authoritative 007C records:
 
-## 21. Next work
+```text
+docs/design/rotation-uniform-scale.md
+docs/algorithms/selection-local-transform.md
+```
 
-- produce measured 100 / 1,000 / 10,000 feature evidence before deciding on a persistent index;
-- design 007C local rotation and positive uniform scale in a separate PR;
-- defer groups/locks/visibility/z-order until formal PlotJSON migration design;
-- keep snapping, touch region gestures, contain-only policy, persistent region tools and new symbols outside these slices.
+## 16. Runtime acceptance direction
+
+- pure frame/rotation/scale math and angle unwrap;
+- WGS84/local-frame rejection;
+- all 19 Definitions Registry smoke;
+- parameter/property preservation;
+- all-member failure atomicity;
+- exact BatchEditCommand undo/redo;
+- explicit DOM/SVG handles and mode exclusion;
+- multi-selection rotate and scale Chromium flows;
+- region-select → transform → delete → undo;
+- measured `1/100/1,000` selected-feature transform fixtures;
+- all historical 264 Node / 32 Chromium regressions.
