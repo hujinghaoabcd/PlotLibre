@@ -2,7 +2,7 @@
 
 ## 总体策略
 
-符号族与专业编辑统一采用：
+所有复杂符号族与专业编辑功能统一采用：
 
 ```text
 设计冻结
@@ -17,46 +17,59 @@
 禁止：
 
 - 编辑 rendered GeoJSON vertices 代替 authored controls；
-- 允许部分 batch mutation；
-- 关闭 Registry generation preflight；
-- 把 canonical editor state 隐藏在任意 metadata 中；
-- 在 design/finalization PR 中写 runtime；
-- 一个 PR 并行扩散多个复杂编辑子系统；
-- 使用旧 head 的 CI 声明新 head 已通过。
+- 部分 batch mutation；
+- 绕过 Registry generation preflight；
+- 把 canonical editor state 隐藏在任意 metadata；
+- 在 design/finalization PR 中混入 runtime；
+- 一个 PR 并行扩散多个复杂子系统；
+- 使用旧 head CI 声明新 head 已通过；
+- 未测量就发布性能保证或引入持久空间索引。
 
 ## 当前合并基线
 
 ```text
-main SHA:          a9b9efc090c01f45133f3f136a0049a97ee52b90
-workspace:         0.0.21
+main SHA:          f98483d3504ce464c93e5a03a49f7f856d1cc1a0
+workspace:         0.0.22
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
-Node tests:        219
-Chromium tests:    30
+Node tests:        264
+Chromium tests:    32
 MapLibre Sources:  4
 MapLibre Layers:   10
-completed:         007A runtime/finalization + 007B design PR #40
-current slice:     007B design post-merge finalization
-current branch:    agent/007b-design-post-merge-finalization
+completed:         007A + 007B design/runtime/Playground validation
+current slice:     007B documentation-only finalization
+current branch:    agent/007b-docs-benchmark-finalization
 runtime on branch: prohibited
-next runtime:      agent/007b-box-lasso-selection
 ```
 
-007B design evidence：
+## 007B merge evidence
+
+### Runtime foundation
 
 ```text
-PR:               #40
-validated head:   4a8ee1102bb923801ada95c648a258225ccb9ec4
-CI:               #413 / 30912109618
-Node 20.19:       success
-Node 22:          success
-Node tests:       219 passed
+PR:               #42
+validated head:   812183a47413bdac554fbd6ca75e1443026ac474
+CI:               #437 / 30920263173
+Node 20.19/22:    success
+Node tests:       264 passed
 Chromium tests:   30 passed
-Playground build: success
-handover check:  success
 threads:          0 unresolved
-changed files:    10 Markdown / 0 runtime
-squash SHA:       a9b9efc090c01f45133f3f136a0049a97ee52b90
+squash SHA:       e18183df5be4b98c38ba177e8440b28e859c2c90
 ```
+
+### Playground/browser finalization
+
+```text
+PR:               #43
+validated head:   f7d9e107221d4ee3fc4278f697a7c0ba84d95a59
+CI:               #445 / 30924648279
+Node 20.19/22:    success
+Node tests:       264 passed
+Chromium tests:   32 passed
+threads:          0 unresolved
+squash SHA:       f98483d3504ce464c93e5a03a49f7f856d1cc1a0
+```
+
+After PR #43, `main` was explicitly compared with `f98483d...` and was identical.
 
 ## 已完成里程碑
 
@@ -72,34 +85,36 @@ squash SHA:       a9b9efc090c01f45133f3f136a0049a97ee52b90
 | 006J | circular design、implementation、semantic guides | 已合并 |
 | 007 Design | professional editing overall semantics | 已合并 |
 | 007A | ordered selection、atomic Store、batch delete、local translation | PR #38/#39 已合并 |
-| 007B Design | screen-space box/lasso semantics and algorithms | PR #40 已合并 |
+| 007B Design | screen-space box/lasso semantics and algorithms | PR #40/#41 已合并 |
+| 007B Runtime | screen algorithms、MapLibre resolver、DOM overlay、Playground、Chromium | PR #42/#43 已合并 |
 
 ## Milestone 007 总体拆分
 
 ```text
 007A — ordered multi-selection + atomic Store + batch delete + local translation — merged
-007B — box/lasso selection design — merged; runtime next
-007C — rotation + positive uniform scale — deferred
+007B — exact screen-space box/lasso selection — merged
+007B-P — measured 100/1,000/10,000 scale benchmark and indexing decision — next
+007C — local rotation + positive uniform scale — design after benchmark slice
 007D — groups/locks/visibility/z-order after PlotJSON migration design — deferred
 ```
 
-## 007B 已冻结设计
+## 007B 已实现契约
 
 Authoritative documents：
 
 ```text
 docs/design/box-lasso-selection.md
 docs/algorithms/screen-region-selection.md
-docs/handover/2026-08-04-milestone-007b-box-lasso-design.md
+docs/handover/2026-08-04-milestone-007b-box-lasso-runtime.md
 ```
 
 ### Input ownership
 
-- replace immediate Shift-add-on-mousedown with one unified thresholded region adapter；
-- neutral `Shift + empty drag` = additive box；
+- unified controller replaces immediate Shift-add-on-mousedown；
+- `Shift + empty drag` = additive box；
 - explicit one-shot box/lasso = default replace；
-- explicit modes support modifier override add/toggle/subtract；
-- intent captured on pointer down；
+- configured intent plus modifier override supports add/toggle/subtract；
+- intent captured on pointerdown；
 - drawing、handle drag and translation retain priority；
 - touch deferred。
 
@@ -113,7 +128,7 @@ minimum area:        16 CSS px²
 RDP tolerance:       1.5 CSS px
 ```
 
-Raw and simplified lasso rings both reject repeated non-consecutive vertices and non-adjacent crossing、touch or overlap。
+Raw and simplified lasso paths both reject repeated non-consecutive vertices and non-adjacent crossing、touch or overlap. Invalid explicit lasso preserves selection and supports direct retry.
 
 ### One-event selection
 
@@ -121,14 +136,14 @@ Raw and simplified lasso rings both reject repeated non-consecutive vertices and
 SelectionController.applyMany(ids, intent, "box" | "lasso")
 ```
 
-- candidate ids deduplicated before mutation；
-- order supplied by Store/document order；
-- replace/add/subtract/toggle frozen deterministically；
+- ids validated and deduplicated before mutation；
+- results ordered by Store/document order；
+- replace/add/subtract/toggle deterministic；
 - one effective completion = one SelectionChange；
 - no-op = no event；
-- region selection does not enter History or PlotJSON。
+- region selection remains outside History and PlotJSON。
 
-### Broad/narrow hit pipeline
+### Broad/narrow pipeline
 
 ```text
 region bbox
@@ -136,15 +151,13 @@ region bbox
 → plotId dedup
 → Store-order normalization
 → Registry.generate once per candidate
-→ map.project fills/lines/points
+→ map.project semantic fills/lines/points
 → exact screen intersection
 ```
 
 - MapLibre query is broad phase only；
-- query order and tile duplicates are ignored；
-- selection、draft、handle、guide and label layers excluded；
-- Point、Line、Polygon、Multi and compound predicates frozen；
-- Polygon holes respected；
+- selection、draft、handle、guide、label and hit-area geometry excluded；
+- Point、Line、Polygon、Multi and Polygon holes supported；
 - CSS stroke/radius ignored；
 - query/generation/projection failure rejects whole completion；
 - partial selection prohibited。
@@ -153,132 +166,121 @@ region bbox
 
 - DOM/SVG screen overlay；
 - no new Source/Layer；
-- 4/10 baseline retained；
-- pointer capture and dragPan/boxZoom restored exactly once；
-- synthetic click suppressed；
-- active region cancels on Escape、pointer loss、style、resize、camera、Store、external selection and programmatic document lifecycle changes。
+- 4/10 renderer baseline retained；
+- synthetic post-drag click suppressed；
+- boxZoom、dragPan and pointer capture restored exactly once；
+- Escape、pointer、camera、style、resize、Store、external selection and document lifecycle cancellation implemented；
+- intentional pointer release cannot let `lostpointercapture` erase a rejected state；
+- unexpected pointer loss while owned still cancels。
 
-### Performance boundary
+### Playground and browser validation
 
-- MapLibre rendered index is initial broad phase；
-- no custom persistent index before measured evidence；
-- benchmark 100/1,000/10,000 features；
-- record candidate count、query、exact-test、total、median、p95 and environment；
-- no hard public latency guarantee before measurement。
-
-## 当前 post-merge finalization
-
-`agent/007b-design-post-merge-finalization` 只能：
-
-- record actual PR #40 squash SHA；
-- update current-state authority docs；
-- add immutable post-merge handover；
-- replace design-candidate continuation with runtime continuation；
-- pass unchanged 219/30 CI。
-
-禁止 runtime、API、package、geometry、interaction or test-behavior changes。
-
-## 007B runtime implementation order
-
-Planned branch：
+Playground exposes：
 
 ```text
-agent/007b-box-lasso-selection
+框选
+套索
+取消区域
 ```
 
-Binding order：
+Real Chromium covers explicit box replace、overlay visibility/cleanup、invalid lasso rejection persistence、direct retry、Store-order result and Primary. Final baseline is 32 tests.
 
-1. pure ScreenPoint、box、lasso、RDP and simple-topology utilities；
-2. `SelectionController.applyMany()`；
-3. exact projected Point/Line/Polygon/Multi predicates；
-4. MapLibre broad-phase resolver and Store ordering；
-5. replace immediate Shift capture with unified region adapter；
-6. DOM/SVG overlay and pointer lifecycle；
-7. public one-shot box/lasso API；
-8. Playground controls/status；
-9. actual Chromium flows；
-10. benchmark report；
-11. documentation、handover、current-head CI and squash merge。
+## 当前 documentation-only finalization
 
-## 007B runtime required tests
+`agent/007b-docs-benchmark-finalization` may only:
 
-### Node
+- bump root workspace/demo baseline to 0.0.22；
+- synchronize README、AGENTS、development plan and interaction documentation；
+- record actual PR #42/#43 squash and CI evidence；
+- add immutable runtime handover and update latest pointer；
+- document benchmark as pending without invented data；
+- pass unchanged 264/32 current-head CI。
 
-- box every direction、threshold and degenerate behavior；
-- lasso sampling、area、RDP and topology；
-- bow-tie、repeat、touch and overlap rejection；
-- Point/Line/MultiLine predicates；
-- Polygon containment/crossing/hole exclusion；
-- MultiPolygon/compound any-component hit；
-- applyMany ordering、Primary and no-op；
-- query duplicate/order normalization；
-- fail-closed query/generation/projection。
+Do not add selection runtime, new symbols, transforms, spatial indices or unrelated refactors.
 
-### Adapter/Chromium
+## Next slice：007B-P measured performance
 
-- Shift click still adds without immediate mousedown mutation；
-- Shift-empty additive box；
-- explicit replace/toggle/subtract box；
-- exact lasso excludes bbox false positives；
-- invalid lasso changes nothing；
-- DOM overlay/pointer/camera cleanup；
-- no History mutation；
-- region selection followed by translation/delete/undo；
-- all historical regressions。
+Create a separate branch from the final documentation `main`.
 
-## 007B runtime non-goals
+Required fixtures：
 
-- rotation or scale；
-- groups/locks/visibility/z-order；
-- snapping；
-- new symbols；
-- touch region gestures；
-- contain-only region selection；
-- persistent region tool mode；
-- unmeasured performance claims。
+```text
+100 features
+1,000 features
+10,000 features
+```
+
+Required reporting：
+
+- hardware、OS、Node/browser and MapLibre versions；
+- viewport、camera and device pixel ratio；
+- feature-type mix and generated-vertex counts；
+- Store size and broad-phase unique candidate count；
+- query time；
+- Registry generation and projection time；
+- exact-intersection time；
+- total latency；
+- warmup and repetition count；
+- median and p95；
+- memory if available。
+
+Decision after evidence：
+
+```text
+keep MapLibre rendered index only
+or
+introduce a documented persistent index with explicit invalidation
+```
+
+No public latency SLA exists before this slice.
 
 ## Milestone 007C：Rotation and scale
 
+Design-only first：
+
 - local-metre only initially；
-- pivot = selection authored-control bounds center；
+- pivot = authored-control bounds center of the complete selection；
 - positive clockwise user angle；
 - positive uniform scale `[0.01, 100]`；
-- no reflection/non-uniform scale；
-- atomic all-member Registry preflight。
+- no reflection or non-uniform scale；
+- no Store mutation during preview；
+- canonicalize and Registry-generate every candidate before one atomic batch command；
+- exact undo/redo of feature values、document order and selection。
+
+Do not implement 007C until its design PR freezes pivot、angle convention、handle geometry、failure policy and interaction priority.
 
 ## Milestone 007D：Canonical editor object state
 
-Groups、locks、visibility、z-order require formal PlotJSON schema and migration before runtime。Arbitrary metadata shortcuts are prohibited。
+Groups、locks、visibility and z-order require formal PlotJSON schema and migration before runtime. Arbitrary metadata shortcuts are prohibited.
 
-## Reference evidence
+## Runtime non-goals still in force
 
-```text
-Terra Draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
-MapLibre-Geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
-Mapbox GL Draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
-MapLibre GL JS@v6.0.0 — BSD-3-Clause
-```
+- new symbols inside professional-editing slices；
+- snapping without its own design；
+- touch region gestures；
+- contain-only or persistent region modes；
+- rotation/scale before 007C design；
+- groups/locks before schema migration；
+- unmeasured performance claims。
 
-Code reuse：`none`。
+## Merge order for this finalization
 
-## Finalization merge order
-
-1. update latest current-state docs and immutable post-merge handover；
+1. finish authority docs、version and immutable handover；
 2. open Draft documentation-only PR；
-3. pass exact-head Node 20.19/22、219 Node、30 Chromium、build and handover；
+3. pass exact-head Node 20.19/22、264 Node、32 Chromium、build and handover；
 4. confirm zero unresolved threads；
 5. mark Ready and Squash and merge with expected head SHA；
-6. create runtime branch from the new final `main`。
+6. verify `main` equals the returned squash SHA；
+7. create benchmark work only from that final `main`。
 
 ## 跨阶段工程任务
 
-1. 决定开源许可证；
-2. 统一 workspace/package versions；
-3. Changesets/release workflow；
-4. formal PlotJSON JSON Schema；
-5. docs/Registry baseline consistency automation；
-6. measured performance benchmark suite；
-7. npm package-boundary review；
-8. Playground code splitting；
-9. distinguish source/build/deploy/live verification；
-10. branch deletion automation or documented manual cleanup。
+1. decide open-source license；
+2. coordinate workspace/public package versions and release workflow；
+3. formal PlotJSON JSON Schema and migrations；
+4. docs/Registry/test baseline consistency automation；
+5. reproducible benchmark infrastructure；
+6. npm package-boundary review；
+7. Playground code splitting；
+8. distinguish source/build/deploy/live verification；
+9. branch deletion automation or documented manual cleanup。
