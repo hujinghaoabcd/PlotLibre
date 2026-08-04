@@ -1,8 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
+interface ScreenPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
 interface ProjectedBodies {
-  readonly a: { readonly x: number; readonly y: number };
-  readonly b: { readonly x: number; readonly y: number };
+  readonly a: ScreenPoint;
+  readonly b: ScreenPoint;
 }
 
 async function openEmptyPlayground(page: Page): Promise<void> {
@@ -17,11 +22,59 @@ async function canvasBox(page: Page) {
   return box;
 }
 
-async function seedTwoArrows(page: Page): Promise<ProjectedBodies> {
-  const projected = await page.evaluate(() => {
+async function findRenderedBodyPoint(
+  page: Page,
+  plotId: string,
+): Promise<ScreenPoint> {
+  return page.evaluate((id) => {
     const playground = window.__plotlibrePlayground;
     if (!playground) throw new Error("Playground API is unavailable.");
     const { plot, map } = playground;
+    const feature = plot.store.get(id);
+    const longitude =
+      feature.controlPoints.reduce((sum, point) => sum + point[0], 0) /
+      feature.controlPoints.length;
+    const latitude =
+      feature.controlPoints.reduce((sum, point) => sum + point[1], 0) /
+      feature.controlPoints.length;
+    const approximate = map.project([longitude, latitude]);
+    const layers = [
+      "plotlibre-selection-point",
+      "plotlibre-selection-line",
+      "plotlibre-point",
+      "plotlibre-line",
+      "plotlibre-fill",
+    ].filter((layerId) => map.getLayer(layerId) !== undefined);
+
+    for (let radius = 0; radius <= 36; radius += 2) {
+      for (let offsetX = -radius; offsetX <= radius; offsetX += 2) {
+        for (let offsetY = -radius; offsetY <= radius; offsetY += 2) {
+          if (radius > 0 && Math.abs(offsetX) < radius && Math.abs(offsetY) < radius) {
+            continue;
+          }
+          const x = approximate.x + offsetX;
+          const y = approximate.y + offsetY;
+          const rendered = map.queryRenderedFeatures([x, y], { layers });
+          if (
+            rendered.some(
+              (candidate) => candidate.properties?.plotId === id,
+            )
+          ) {
+            return { x, y };
+          }
+        }
+      }
+    }
+
+    throw new Error(`Could not find a rendered hit point for ${id}.`);
+  }, plotId);
+}
+
+async function seedTwoArrows(page: Page): Promise<ProjectedBodies> {
+  await page.evaluate(() => {
+    const playground = window.__plotlibrePlayground;
+    if (!playground) throw new Error("Playground API is unavailable.");
+    const { plot } = playground;
     plot.create({
       id: "selection-a",
       plotType: "arrow.straight",
@@ -38,12 +91,6 @@ async function seedTwoArrows(page: Page): Promise<ProjectedBodies> {
         [118.845, 32.075],
       ],
     });
-    const a = map.project([118.7775, 32.06]);
-    const b = map.project([118.8275, 32.06]);
-    return {
-      a: { x: a.x, y: a.y },
-      b: { x: b.x, y: b.y },
-    };
   });
 
   await expect
@@ -54,7 +101,11 @@ async function seedTwoArrows(page: Page): Promise<ProjectedBodies> {
       }),
     )
     .toBeGreaterThanOrEqual(4);
-  return projected;
+
+  return {
+    a: await findRenderedBodyPoint(page, "selection-a"),
+    b: await findRenderedBodyPoint(page, "selection-b"),
+  };
 }
 
 async function selectBoth(
@@ -189,14 +240,12 @@ test("Shift selection translates as one undoable body-drag transaction", async (
   const depthBeforeCancel = await page.evaluate(
     () => window.__plotlibrePlayground?.plot.history.undoDepth,
   );
-  await page.mouse.move(
-    box.x + projected.a.x + 42,
-    box.y + projected.a.y - 24,
-  );
+  const movedHit = await findRenderedBodyPoint(page, "selection-a");
+  await page.mouse.move(box.x + movedHit.x, box.y + movedHit.y);
   await page.mouse.down();
   await page.mouse.move(
-    box.x + projected.a.x + 70,
-    box.y + projected.a.y - 45,
+    box.x + movedHit.x + 28,
+    box.y + movedHit.y - 21,
     { steps: 4 },
   );
   await page.keyboard.press("Escape");
