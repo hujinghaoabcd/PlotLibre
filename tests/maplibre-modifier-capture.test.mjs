@@ -153,10 +153,9 @@ test("Shift feature selection commits on click and restores box zoom on destroy"
   const event = mouseEvent({ shiftKey: true });
   map.fire("mousedown", event);
 
-  // The unified region controller no longer mutates selection on MapLibre
-  // mousedown. A selectable Shift gesture remains owned by the normal click
-  // path so it can still be disambiguated from Shift-empty box selection.
-  assert.equal(map.queryPoint, undefined);
+  // A pre-click hit query is allowed, but selection mutation must remain owned
+  // by the normal click path so Shift-empty drag can still become box select.
+  assert.deepEqual(map.queryPoint, { x: 10, y: 20 });
   assert.deepEqual(plot.selectedIds, ["a"]);
   assert.equal(event.originalEvent.prevented, false);
   assert.equal(event.originalEvent.stopped, false);
