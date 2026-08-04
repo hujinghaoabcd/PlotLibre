@@ -28,19 +28,19 @@ It supports fixed/variable-point drawing, live preview, semantic handles, ordere
 ## Current baseline
 
 ```text
-main SHA:           c77c5c50ea5976f7afd40f0e48bc712515a99cd5
+main SHA:           409786f6a55aeab6e810651410954d78123e32d3
 workspace version:  0.0.22
 MapLibre GL JS:     6.0.0
 Node.js:            20.19+
-merged tests:       324 Node / 34 Chromium
-008B expected:      348 Node / 34 Chromium
+merged tests:       348 Node / 34 Chromium
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 MapLibre resources: 4 Sources / 10 Layers
 benchmark jobs:     region selection + selection transform
 007C:               merged PR #47–#50
 008 design:         merged PR #51/#52
 008A runtime:       merged PR #53/#54
-008B runtime:       Draft PR #55
+008B runtime:       merged PR #55
+next runtime:       008C safe reader and migration execution
 ```
 
 The root version is a development baseline, not yet a coordinated npm release across all public packages.
@@ -187,7 +187,7 @@ total authored controls: 1,000,000
 
 These are untrusted-input ceilings, not recommended document sizes, memory guarantees or latency SLAs.
 
-### 008B migration planning
+### Merged 008B migration planning
 
 008B adds descriptors, separate document/Definition graphs, deterministic planning and immutable report records:
 
@@ -303,6 +303,7 @@ docs/performance/selection-transform-benchmark.md
 docs/handover/LATEST.md
 docs/handover/2026-08-05-milestone-008a-post-merge-finalization.md
 docs/handover/2026-08-05-milestone-008b-migration-planning.md
+docs/handover/2026-08-05-milestone-008b-post-merge-finalization.md
 ```
 
-After 008B squash merge and post-merge synchronization, the next runtime slice is `agent/008c-plotjson-reader-runtime`. Parser/reader and Definition execution belong there; Store and MapLibre integration remain later milestones.
+The next runtime slice is `agent/008c-plotjson-reader-runtime`, created only after this Markdown-only post-merge synchronization reaches `main`. Parser/reader and Definition execution belong there; Store and MapLibre integration remain 008D work.
