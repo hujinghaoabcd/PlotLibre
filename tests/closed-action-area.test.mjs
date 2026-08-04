@@ -86,14 +86,15 @@ test("closed curve produces a finite closed counterclockwise simple ring", () =>
 });
 
 test("closed curve preserves footprint area under reversed traversal", () => {
+  const commonOrigin = closedControls[0];
   const forward = localRing(
     buildClosedCurveRing(closedControls),
-    closedControls[0],
+    commonOrigin,
   );
   const reversedControls = [...closedControls].reverse();
   const reversed = localRing(
     buildClosedCurveRing(reversedControls),
-    reversedControls[0],
+    commonOrigin,
   );
   const forwardArea = Math.abs(signedRingArea(forward));
   const reversedArea = Math.abs(signedRingArea(reversed));
