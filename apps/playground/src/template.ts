@@ -10,7 +10,7 @@ export const playgroundTemplate = `
       </a>
       <div class="header-links">
         <a href="https://github.com/hujinghaoabcd/PlotLibre" target="_blank" rel="noreferrer">GitHub</a>
-        <span class="version-badge">v0.0.19 demo</span>
+        <span class="version-badge">v0.0.20 demo</span>
       </div>
     </header>
 
@@ -109,6 +109,10 @@ export const playgroundTemplate = `
             <li>双头路线箭头：末点为精确目标，后方同向强调头自动派生。</li>
             <li>闭合曲线区域：沿边界点击至少三个途经点，双击末点或按 Enter 自动闭合。</li>
             <li>集结地：依次点击一侧翼点、前向冠点和另一侧翼点；第三点自动完成。</li>
+            <li>三点圆弧：依次点击起点、弧上经过点和终点；经过点决定小弧或大弧，第三点自动完成。</li>
+            <li>圆弓形区域：三个点定义圆弧，两个端点再由直线弦闭合。</li>
+            <li>扇形区域：圆心、半径起点和结束方位控制点固定三点完成；第三点距离不改变半径。</li>
+            <li>扇形的圆心至结束方位控制点以临时虚线显示，不进入 PlotJSON 或最终几何。</li>
             <li>可变多点标绘双击最后一点或按 Enter 完成；Backspace/Delete 逐点回退。</li>
             <li>完成后可拖动任一圆形语义控制点重新编辑。</li>
           </ol>
@@ -116,7 +120,7 @@ export const playgroundTemplate = `
 
         <section class="inspector-section technical-card">
           <span class="eyebrow">Architecture</span>
-          <p>PlotLibre 保存控制点、参数和样式。地图上的 Polygon 是派生结果，可随编辑、算法升级或地图样式重载重新生成。</p>
+          <p>PlotLibre 保存控制点、参数和样式。地图上的 LineString、Polygon 与语义引导线均为派生结果，可随编辑、算法升级或地图样式重载重新生成。</p>
         </section>
       </aside>
     </main>
