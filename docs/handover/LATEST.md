@@ -1,12 +1,13 @@
-# PlotLibre Development Handover — Milestone 006I Ready Candidate
+# PlotLibre Development Handover — Milestone 006I Merged / 006J Design Next
 
 日期：2026-08-04  
 仓库：`hujinghaoabcd/PlotLibre`  
-合并基线：`main@a883cbf382b61309e7d64e788e46d9319b8c0ea1`  
-活跃分支：`agent/006i-closed-action-area-group`  
-活跃 PR：`#31 Add closed action area symbol group`  
+当前 `main`：`f873052d44a98f7029f0eda27ea70cda8b1af347`  
+已合并 PR：`#31 Add closed action area symbol group`  
+合并方式：squash  
+Post-merge 分支：`agent/006i-post-merge-finalization`  
 Workspace：`0.0.19`  
-状态：006I 实现、Playground、文档和 immutable handover 已完成；run #292 全绿，等待包含最终交接文档的新 head CI
+状态：Milestone 006I 已合并到 `main`；当前仅同步合并后权威状态，下一实现阶段为 006J 语义设计
 
 ## Current state
 
@@ -19,22 +20,30 @@ public Arrow types: 14
 public Area types:  2
 Node tests:         163
 Chromium tests:     23
-base main SHA:      a883cbf382b61309e7d64e788e46d9319b8c0ea1
-active branch:      agent/006i-closed-action-area-group
-active PR:          #31
+main SHA:           f873052d44a98f7029f0eda27ea70cda8b1af347
+merged PR:          #31
+next milestone:     006J arc / sector / lune semantic design
 ```
 
-新增公共 Definitions：
+当前公共 Definitions：
 
 ```text
-area.closed-curve@1.0.0
-area.gathering-place@1.0.0
-```
-
-延期：
-
-```text
-area.route-loop
+arrow.straight
+arrow.fine
+arrow.fine.tailed
+arrow.assault-direction
+arrow.curved
+arrow.attack
+arrow.attack.tailed
+arrow.double
+arrow.pincer
+arrow.squad-combat
+arrow.route
+arrow.corridor
+arrow.route.bidirectional
+arrow.route.double-head
+area.closed-curve
+area.gathering-place
 ```
 
 Canonical state 仍为：
@@ -47,39 +56,39 @@ plot definition + authored control points + parameters + style + metadata
 
 ## Completed in this milestone
 
-- 冻结 closed action area group 的公共语义、控制点角色、拓扑和 PlotJSON 边界；
-- 增加 `area.closed-curve@1.0.0`，支持 3–64 个有序边界途经点；
-- 增加 `area.gathering-place@1.0.0`，支持 flank/crown/flank 固定三控制点；
-- 明确 `area.route-loop` 不在 006I 中实现；
-- 增加纯 periodic Hermite/Catmull–Rom closed-area geometry；
+- 冻结并实现 `area.closed-curve@1.0.0`；
+- 冻结并实现 `area.gathering-place@1.0.0`；
+- 将 `area.route-loop` 延期，避免没有独立语义的公共别名；
+- 增加 pure periodic Hermite/Catmull–Rom closed-area geometry；
 - 使用 circular longitude mean + mean latitude 建立与遍历顺序无关的局部投影中心；
 - 保证每个 authored control 被曲线插值；
-- 自动闭合并规范化 counterclockwise ring；
+- 自动闭合并规范化 counterclockwise simple ring；
 - duplicate、degenerate、invalid parameter 和 self-intersection fail closed；
-- gathering-place 只允许两个 flank 的 permutation-only canonicalization；
+- gathering-place 仅允许两个 flank 的 permutation-only canonicalization；
 - derived rear anchor 不进入 Store、History、handles 或 PlotJSON；
 - 增加独立 `DEFAULT_AREA_STYLE`；
-- 保留 `arrowSymbols` 兼容数组并新增 `areaSymbols`；
-- `builtInSymbols` 扩展到 16；
-- 增加 9 个 closed-area Node tests，Node 总数从 154 增至 163；
+- 保留 `arrowSymbols` 并新增 `areaSymbols`；
+- `builtInSymbols` 从 14 扩展到 16；
+- Node tests 从 154 增至 163；
+- Chromium tests 从 20 增至 23；
 - Playground 增加两类 selector、两类南京样例和独立交互提示；
 - 生产和无底图模式加载完整 16 类样例；
 - 基础 `?e2e=1` 保留原九类 selector compatibility surface；
 - extended E2E 增加 `areas=1`；
-- 增加 3 个 Area Chromium tests，suite 从 20 增至 23；
-- 修复 installer/start 顺序，保证 symbol-specific rejection guidance 不被 generic status 覆盖；
-- 根 workspace 提升到 `0.0.19`；
-- README、AGENTS、DEVELOPMENT_PLAN、PLAYGROUND、INTERACTION_MODEL、设计与算法索引已同步；
-- 新增 immutable handover：`docs/handover/2026-08-04-milestone-006i-closed-action-area.md`；
-- PR #31 当前无未解决评审线程，与 `main` 无分叉。
+- 修复 generic/specialized listener 顺序，保留 actionable rejection guidance；
+- root workspace 提升到 `0.0.19`；
+- 完成 README、AGENTS、路线图、Playground、interaction、design、algorithm 和 immutable handover；
+- PR #31 在 current-head CI 全绿、0 个未解决线程后标记 Ready；
+- PR #31 使用 expected head SHA squash 合并；
+- 实际 squash merge SHA 为 `f873052d44a98f7029f0eda27ea70cda8b1af347`。
 
 ## Validation
 
-权威实现候选 run：
+最终 PR head 验证：
 
 ```text
-GitHub Actions run: 30883349847 (#292)
-validated head SHA: 145e6fe007353c39c5f71a13f0e54cbfe509b949
+GitHub Actions run: 30883623452 (#294)
+validated head SHA: d39657ebbd0d450a8bb184a30dbc6d014821a913
 Node 20.19:         success
 Node 22:            success
 TypeScript:         success
@@ -91,41 +100,22 @@ Chromium tests:     23 passed / 0 failed
 unresolved threads: 0
 ```
 
-Chromium 日志明确记录：
+前一实现候选 run `#292` 也独立完成 163 Node / 23 Chromium 全绿。run #294 验证了包含 immutable handover 的最终 PR head，是实际 Ready 和 squash merge 门槛。
 
-```text
-Running 23 tests using 1 worker
-23 passed (1.3m)
-```
-
-run #292 验证了最终实现、16 类样例、兼容 E2E、钳形 rejection 恢复和全部新 Area tests。随后只新增 immutable handover 并更新本 current-state 文件，没有修改运行时代码、Definition、geometry、interaction、Playground 或 tests。
-
-最终 merge gate 仍要求对包含这两份交接文档的 current head 再执行：
-
-```text
-Node 20.19:        success
-Node 22:           success
-Node tests:        163 passed
-Chromium tests:    23 passed
-Playground build: success
-handover contract: success
-unresolved review threads: 0
-```
-
-PR #31 在最终文档 head 全绿前保持 Draft。
+本 post-merge finalization 只修改权威 Markdown 状态并增加合并记录，不改变 runtime、geometry、Definitions、interaction、Playground 或 tests。该 finalization 仍需在自己的 PR 中通过完整 CI 后进入 `main`。
 
 ## Next tasks
 
-1. 触发包含 immutable handover 与本 `LATEST.md` 的最终 current-head CI；
-2. 确认 163 Node、23 Chromium、build 和 handover contract 全绿；
-3. 再确认 unresolved review threads = 0；
-4. 将 PR #31 标记 Ready；
-5. 使用 expected final head SHA squash merge；
-6. 记录真实 squash merge SHA；
-7. 通过独立 post-merge finalization PR 把 `LATEST.md` 更新为 merged state；
-8. 从最终 `main` 创建 `agent/006j-arc-sector-lune-design`；
-9. 先研究控制点、方位角、弧方向、输出类型与 geodesic 边界，再实现 geometry；
-10. 不返回 pincer hardening，不扩展 route-head variants。
+1. 完成 `agent/006i-post-merge-finalization` 的文档一致性修复；
+2. 为该分支创建 Draft PR；
+3. 通过 Node 20.19、Node 22、163 Node、23 Chromium、build 和 handover contract；
+4. 全绿后 squash 合并 post-merge finalization；
+5. 从最终 `main` 创建 `agent/006j-arc-sector-lune-design`；
+6. 先研究并冻结 `area.arc`、`area.sector`、`area.lune` 的独立语义；
+7. 明确 center、radius、start/end bearing、arc direction 和 output type；
+8. 明确 local-metre / geodesic、antimeridian 和 high-latitude policy；
+9. 语义、控制点角色和拓扑未冻结前不写 006J geometry；
+10. 不返回 pincer hardening，不增加 route-head variants。
 
 ## Risks and decisions
 
@@ -137,10 +127,10 @@ PR #31 在最终文档 head 全绿前保持 Draft。
 - `area.closed-curve` 的 canonical order 不因 winding normalization 被重写；
 - `area.gathering-place` 的 crown 固定为 index 1，只有 flank pair 可交换；
 - sampled ring、closing duplicate 和 rear anchor 绝不能进入 canonical controls；
-- production sample catalog 为 16，基础 E2E 的 9-selector surface 是明确 compatibility mode，不是生产目录；
+- production sample catalog 为 16，基础 E2E 的 9-selector surface 是明确 compatibility mode；
 - generic 与 specialized Playground listener 顺序是可见行为契约；
-- Vite 生产 bundle 为约 `1,067.41 kB`，后续需评估 code splitting，但不阻塞 006I；
+- Vite 生产 bundle 为约 `1,067.41 kB`，后续需评估 code splitting；
 - connector 工作流无法删除已合并分支；
-- Pages 是否真实线上更新必须以 main deploy workflow 和 live verification 分别确认。
+- PR #31 合并触发的 Pages workflow 与 live page 人工核验是两个独立状态，不能仅凭源码宣称线上缓存已更新。
 
-Continuation：继续在 `agent/006i-closed-action-area-group` / PR #31 完成最终文档 head CI、Ready 与 squash merge。不要在该 PR 中加入 006J geometry。
+Continuation：完成 006I post-merge finalization 后，只进入 006J 语义设计。不要在 finalization PR 中加入任何新 geometry 或 public Definition。
