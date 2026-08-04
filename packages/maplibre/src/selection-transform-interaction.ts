@@ -74,6 +74,8 @@ const CAMERA_START_EVENTS = [
   "pitchstart",
 ] as const;
 const HARD_CANCEL_EVENTS = ["style.load", "resize"] as const;
+const MINIMUM_START_RADIUS_PIXELS = 4;
+const MINIMUM_VISUAL_FRAME_EDGE_PIXELS = 24;
 
 /**
  * Explicit one-shot MapLibre adapter for complete-selection rotation/scale.
@@ -97,6 +99,7 @@ export class MapLibreSelectionTransformInteraction {
   #session: SelectionTransformSession | undefined;
   #selectionSnapshot: SelectionSnapshot | undefined;
   #externalRejection: SelectionTransformRejection | undefined;
+  #ignoredOverlayPointerId: number | undefined;
   #dragPanWasEnabled: boolean | undefined;
   #revision = 0;
   #applying = false;
@@ -124,8 +127,40 @@ export class MapLibreSelectionTransformInteraction {
       return;
     }
 
+    const screenPivot = projectFramePivot(this.#map, this.#session.frame);
+    if (!screenPivot) {
+      this.#ignoredOverlayPointerId = event.pointerId;
+      this.#externalRejection = createAdapterRejection(
+        "SELECTION_TRANSFORM_POINTER_INVALID",
+        "Map adapter could not project the selection-transform pivot.",
+        this.#selectionSnapshot?.selectedIds ?? [],
+      );
+      this.#render();
+      this.#emit();
+      consumeOverlayEvent(event);
+      return;
+    }
+    if (
+      Math.hypot(
+        event.point.x - screenPivot.x,
+        event.point.y - screenPivot.y,
+      ) < MINIMUM_START_RADIUS_PIXELS
+    ) {
+      this.#ignoredOverlayPointerId = event.pointerId;
+      this.#externalRejection = createAdapterRejection(
+        "SELECTION_TRANSFORM_POINTER_RADIUS_TOO_SMALL",
+        `Selection transform must start at least ${MINIMUM_START_RADIUS_PIXELS} CSS pixels from the pivot.`,
+        this.#selectionSnapshot?.selectedIds ?? [],
+      );
+      this.#render();
+      this.#emit();
+      consumeOverlayEvent(event);
+      return;
+    }
+
     const local = this.#toLocalPoint(event.point);
     if (!local) {
+      this.#ignoredOverlayPointerId = event.pointerId;
       this.#externalRejection = createAdapterRejection(
         "SELECTION_TRANSFORM_POINTER_INVALID",
         "Map adapter could not convert the transform pointer into local metres.",
@@ -137,6 +172,7 @@ export class MapLibreSelectionTransformInteraction {
       return;
     }
 
+    this.#ignoredOverlayPointerId = undefined;
     const snapshot = this.#session.pointerDown(local);
     this.#externalRejection = undefined;
     if (snapshot.status === "active") this.#disableDragPan();
@@ -149,6 +185,10 @@ export class MapLibreSelectionTransformInteraction {
   readonly #onOverlayPointerMove = (
     event: SelectionTransformOverlayPointerEvent,
   ): void => {
+    if (event.pointerId === this.#ignoredOverlayPointerId) {
+      consumeOverlayEvent(event);
+      return;
+    }
     if (
       event.kind !== this.#kind ||
       !this.#session ||
@@ -180,6 +220,11 @@ export class MapLibreSelectionTransformInteraction {
   readonly #onOverlayPointerUp = (
     event: SelectionTransformOverlayPointerEvent,
   ): void => {
+    if (event.pointerId === this.#ignoredOverlayPointerId) {
+      this.#ignoredOverlayPointerId = undefined;
+      consumeOverlayEvent(event);
+      return;
+    }
     if (event.kind !== this.#kind || !this.#session) return;
     const local = this.#toLocalPoint(event.point);
     if (!local) {
@@ -246,6 +291,11 @@ export class MapLibreSelectionTransformInteraction {
   readonly #onOverlayPointerCancel = (
     event: SelectionTransformOverlayPointerEvent,
   ): void => {
+    if (event.pointerId === this.#ignoredOverlayPointerId) {
+      this.#ignoredOverlayPointerId = undefined;
+      consumeOverlayEvent(event);
+      return;
+    }
     if (!this.isActive) return;
     consumeOverlayEvent(event);
     this.cancel();
@@ -319,6 +369,7 @@ export class MapLibreSelectionTransformInteraction {
 
     this.#kind = kind;
     this.#externalRejection = undefined;
+    this.#ignoredOverlayPointerId = undefined;
     const selected = new Set(this.#selection.selectedIds);
     const originals = this.#store.list().filter((feature) => selected.has(feature.id));
     this.#selectionSnapshot = this.#selection.snapshot();
@@ -355,6 +406,7 @@ export class MapLibreSelectionTransformInteraction {
     this.#session = undefined;
     this.#selectionSnapshot = undefined;
     this.#externalRejection = undefined;
+    this.#ignoredOverlayPointerId = undefined;
     this.#overlay.clear();
     this.#syncCurrentSelection();
     this.#revision += 1;
@@ -527,6 +579,7 @@ export class MapLibreSelectionTransformInteraction {
     const selected = new Set(this.#selection.selectedIds);
     const originals = this.#store.list().filter((feature) => selected.has(feature.id));
     this.#selectionSnapshot = this.#selection.snapshot();
+    this.#ignoredOverlayPointerId = undefined;
     try {
       this.#session = new SelectionTransformSession(
         kind,
@@ -553,6 +606,7 @@ export class MapLibreSelectionTransformInteraction {
     this.#session = undefined;
     this.#selectionSnapshot = undefined;
     this.#externalRejection = undefined;
+    this.#ignoredOverlayPointerId = undefined;
     this.#overlay.clear();
     this.#syncCurrentSelection();
     this.#revision += 1;
@@ -583,17 +637,19 @@ function projectTransformFrame(
       { x: frame.boundsMeters.maxX, y: frame.boundsMeters.maxY },
       { x: frame.boundsMeters.minX, y: frame.boundsMeters.maxY },
     ] as const;
-    const corners = localCorners.map((local) => {
+    const projectedCorners = localCorners.map((local) => {
       const position = projection.unproject(local);
       const point = project.call(map, [position[0], position[1]]);
       return validateScreenPoint(point);
     }) as unknown as SelectionTransformOverlayFrame["corners"];
-    const pivot = validateScreenPoint(project.call(map, [
-      frame.pivot[0],
-      frame.pivot[1],
-    ]));
-    if (!pivot || corners.some((point) => !point)) return undefined;
+    const pivot = projectFramePivot(map, frame);
+    if (!pivot || projectedCorners.some((point) => !point)) return undefined;
 
+    const corners = ensureMinimumVisualFrame(
+      projectedCorners,
+      pivot,
+      MINIMUM_VISUAL_FRAME_EDGE_PIXELS,
+    );
     const scaleHandle = corners[2];
     const topMidpoint = {
       x: (corners[2].x + corners[3].x) / 2,
@@ -621,6 +677,85 @@ function projectTransformFrame(
   } catch {
     return undefined;
   }
+}
+
+function projectFramePivot(
+  map: MapLibreMapLike,
+  frame: SelectionTransformSession["frame"],
+): SelectionTransformScreenPoint | undefined {
+  const project = map.project;
+  if (!project) return undefined;
+  try {
+    return validateScreenPoint(project.call(map, [
+      frame.pivot[0],
+      frame.pivot[1],
+    ]));
+  } catch {
+    return undefined;
+  }
+}
+
+function ensureMinimumVisualFrame(
+  corners: SelectionTransformOverlayFrame["corners"],
+  pivot: SelectionTransformScreenPoint,
+  minimumEdgePixels: number,
+): SelectionTransformOverlayFrame["corners"] {
+  const horizontal = {
+    x: corners[1].x - corners[0].x,
+    y: corners[1].y - corners[0].y,
+  };
+  const vertical = {
+    x: corners[3].x - corners[0].x,
+    y: corners[3].y - corners[0].y,
+  };
+  const horizontalLength = Math.hypot(horizontal.x, horizontal.y);
+  const verticalLength = Math.hypot(vertical.x, vertical.y);
+
+  let horizontalUnit = horizontalLength > 1e-9
+    ? { x: horizontal.x / horizontalLength, y: horizontal.y / horizontalLength }
+    : undefined;
+  let verticalUnit = verticalLength > 1e-9
+    ? { x: vertical.x / verticalLength, y: vertical.y / verticalLength }
+    : undefined;
+
+  if (!horizontalUnit && !verticalUnit) {
+    horizontalUnit = { x: 1, y: 0 };
+    verticalUnit = { x: 0, y: -1 };
+  } else if (!horizontalUnit && verticalUnit) {
+    horizontalUnit = { x: verticalUnit.y, y: -verticalUnit.x };
+  } else if (horizontalUnit && !verticalUnit) {
+    verticalUnit = { x: -horizontalUnit.y, y: horizontalUnit.x };
+  }
+
+  const halfHorizontal = Math.max(horizontalLength / 2, minimumEdgePixels / 2);
+  const halfVertical = Math.max(verticalLength / 2, minimumEdgePixels / 2);
+  const horizontalVector = {
+    x: horizontalUnit!.x * halfHorizontal,
+    y: horizontalUnit!.y * halfHorizontal,
+  };
+  const verticalVector = {
+    x: verticalUnit!.x * halfVertical,
+    y: verticalUnit!.y * halfVertical,
+  };
+
+  return Object.freeze([
+    Object.freeze({
+      x: pivot.x - horizontalVector.x - verticalVector.x,
+      y: pivot.y - horizontalVector.y - verticalVector.y,
+    }),
+    Object.freeze({
+      x: pivot.x + horizontalVector.x - verticalVector.x,
+      y: pivot.y + horizontalVector.y - verticalVector.y,
+    }),
+    Object.freeze({
+      x: pivot.x + horizontalVector.x + verticalVector.x,
+      y: pivot.y + horizontalVector.y + verticalVector.y,
+    }),
+    Object.freeze({
+      x: pivot.x - horizontalVector.x + verticalVector.x,
+      y: pivot.y - horizontalVector.y + verticalVector.y,
+    }),
+  ]);
 }
 
 function validateScreenPoint(
