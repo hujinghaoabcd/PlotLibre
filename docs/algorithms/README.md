@@ -37,30 +37,22 @@ tests and deterministic fixtures
 | `arrow-route-multihead.md` | bidirectional/double-head route | 已实现 |
 | `closed-action-area.md` | closed curve/gathering place | 已实现 |
 | `circular-arc-foundation.md` | circular arc/segment/sector shared frame | 已实现并合并 |
-| `batch-edit-transaction.md` | selection、Store transaction、batch commands、translation/transform | 007A 部分已实现于 PR #38；007B–D 仍为后续设计 |
+| `batch-edit-transaction.md` | selection、Store transaction、batch commands、translation/transform | 007A transaction/translation 已实现并通过 PR #38 合并；007B–D 待后续设计 |
 
-基础通用几何另见：
-
-```text
-../GEOMETRY_FOUNDATION.md
-../ALGORITHM_POLICY.md
-```
-
-## 当前基线
+## 当前合并基线
 
 ```text
 workspace:          0.0.21
 public symbols:     19
-Node tests:         219 passed on runtime head
-Chromium tests:     30 passed on runtime head
+Node tests:         219 passed
+Chromium tests:     30 passed
 MapLibre Sources:   4
 MapLibre Layers:    10
-007A PR:            #38
-runtime head:       07449e7fda66069b148fa08c865b209d7dc365a3
-runtime CI:         #398 / 30904843935
+merged PR:          #38
+validated head:     2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
+validated CI:       #409 / 30906467230
+squash SHA:         04dca0b120b1440afb49a300eeee92faf6644a7d
 ```
-
-最终文档 head 仍需新的完整 current-head CI。
 
 ## 007A transaction implementation
 
@@ -98,29 +90,15 @@ No listener observes partial state。
 - they do not synchronously escape after commit；
 - CommandHistory records the committed edit consistently。
 
-### Ordered undo
+### Ordered undo and BatchEditCommand
 
 Batch delete undo restores original document order through exact ordered ids。Appending restored features is invalid because it changes rendering/z-order semantics。
 
-### BatchEditCommand
-
-Command captures exact before/after feature values, document order and selection snapshots：
-
-```text
-execute/redo:
-  exact Store after transaction
-  exact after selection
-
-undo:
-  exact Store before transaction
-  exact before selection
-```
-
-Redo reuses exact stored revisions and does not increment again。Selection reconciliation is suspended during Store mutation and followed by one explicit final restore。
+The command captures exact before/after feature values, document order and selection snapshots. Execute/redo uses exact after-state; undo uses exact before-state. Redo reuses stored revisions. Selection reconciliation is suspended during Store mutation and followed by one explicit final restore。
 
 ### Translation
 
-007A supports local-metre whole-selection translation：
+007A local-metre whole-selection translation：
 
 - all selected authored controls share one coordinate analysis, projection and metre delta；
 - projection origin is order-independent；
@@ -142,29 +120,13 @@ plotlibre-selection-line layer
 plotlibre-selection-point layer
 ```
 
-Polygon becomes boundary highlight, LineString remains line and Point remains point。Only Primary exposes semantic handles/guides。Style reload regenerates all transient resources from canonical state。
+Polygon becomes boundary highlight, LineString remains line and Point remains point。Only Primary exposes semantic handles/guides。Style reload regenerates transient resources from canonical state。
 
 ### Shift and box zoom
 
 MapLibre box zoom conflicts with Shift additive selection。PlotLibre records and disables box zoom during its lifecycle, handles Shift through the MapLibre `mousedown` path, and restores the previous state on destroy。
 
-## Later algorithms
-
-- 007B：screen-space box/lasso intersection selection；
-- 007C：local rotation and positive uniform scale around authored-control bounds center；
-- 007D：canonical groups/locks/visibility/z-order after PlotJSON migration design。
-
-## Clean-room references for 007
-
-```text
-JamesLMilner/terra-draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
-geoman-io/maplibre-geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
-mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
-```
-
-Studied only for observable mode separation、selection lifecycle、keyboard configuration、whole-feature/direct editing and test organization。Code reuse：`none`。
-
-## Implemented 007A fixture families
+## Implemented fixture families
 
 - selection ordering, modifier intents and Primary fallback；
 - immutable snapshots, no-op and Store reconciliation；
@@ -182,3 +144,36 @@ Studied only for observable mode separation、selection lifecycle、keyboard con
 - all historical 219 Node / 30 Chromium regressions。
 
 Performance measurements at 100/1,000/10,000 features remain a separate measured benchmark task and must not be claimed from functional tests alone。
+
+## Next algorithm design: 007B
+
+Freeze before runtime：
+
+- box gesture and screen-space rectangle；
+- default intersection policy；
+- candidate layer/source set；
+- `plotId` de-duplication；
+- deterministic Store/document ordering；
+- empty-result and Primary policy；
+- lasso closure and simple-ring validation；
+- self-intersection fail closed；
+- simplification and tolerance boundary；
+- spatial-index ownership and invalidation；
+- benchmark hardware、browser、feature mix and viewport reporting。
+
+007B must not include rotation/scale、groups/locks、snapping or new symbols。
+
+## Later algorithms
+
+- 007C：local rotation and positive uniform scale around authored-control bounds center；
+- 007D：canonical groups/locks/visibility/z-order after PlotJSON migration design。
+
+## Clean-room references for 007
+
+```text
+JamesLMilner/terra-draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
+geoman-io/maplibre-geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
+mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
+```
+
+Studied only for observable mode separation、selection lifecycle、keyboard configuration、whole-feature/direct editing and test organization。Code reuse：`none`。

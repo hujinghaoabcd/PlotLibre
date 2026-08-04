@@ -1,12 +1,15 @@
-# PlotLibre Development Handover — Milestone 007A Implemented / Final PR Validation Next
+# PlotLibre Development Handover — Milestone 007A Merged / 007B Design Next
 
 日期：2026-08-04  
 仓库：`hujinghaoabcd/PlotLibre`  
-Base `main`：`780c719860e2371fb41fe9db83685157181420e2`  
-当前分支：`agent/007a-selection-batch-translation`  
-当前 PR：`#38 Add selection and atomic batch editing foundation`  
+当前 `main`：`04dca0b120b1440afb49a300eeee92faf6644a7d`  
+已合并 PR：`#38 Add ordered selection and atomic batch editing`  
+合并方式：Squash and merge  
+最终实现 head：`2d499a1cb122abbf6fce7548ec32f1b0031dd8f2`  
+最终 CI：`#409 / 30906467230`  
+Post-merge 分支：`agent/007a-post-merge-finalization`  
 Workspace：`0.0.21`  
-状态：007A runtime、Playground、测试和权威文档已实现；下一步是最终 current-head CI、Ready review 与 squash merge
+状态：Milestone 007A 已合并；当前仅同步真实 squash 状态，下一阶段为 007B box/lasso selection design
 
 ## Current state
 
@@ -19,145 +22,136 @@ Node tests:         219
 Chromium tests:     30
 MapLibre Sources:   4
 MapLibre Layers:    10
-PR:                 #38 (Draft)
-branch:             agent/007a-selection-batch-translation
-base main:          780c719860e2371fb41fe9db83685157181420e2
-runtime tested head:07449e7fda66069b148fa08c865b209d7dc365a3
-runtime CI:         #398 / 30904843935
+main SHA:           04dca0b120b1440afb49a300eeee92faf6644a7d
+merged PR:          #38
+squash merge SHA:   04dca0b120b1440afb49a300eeee92faf6644a7d
+validated head:     2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
+validated CI:       #409 / 30906467230
+next milestone:     007B design
 ```
 
-The runtime head above passed the complete validation matrix. Version and documentation commits moved the branch afterward, so PR #38 is not yet Ready and must receive a new full current-head CI run.
-
-007 staging remains:
+007 staging：
 
 ```text
-007A ordered selection + atomic Store + batch delete + local translation
-007B box/lasso selection
-007C local rotation + positive uniform scale
-007D groups/locks/visibility/z-order after PlotJSON migration design
+007A ordered selection + atomic Store + batch delete + local translation — merged
+007B box/lasso selection — next design slice
+007C local rotation + positive uniform scale — deferred
+007D groups/locks/visibility/z-order after PlotJSON migration design — deferred
 ```
 
 ## Completed in this milestone
 
 ### Selection
 
-- implemented engine-independent ordered `SelectionController`；
-- added replace/add/subtract/toggle/clear/make-primary/restore/reconcile operations；
-- preserved acquisition order and final-id Primary invariant；
-- added immutable snapshots and one-event/no-op behavior；
-- added Store remove/clear reconciliation；
-- kept selection outside PlotJSON and feature revision；
-- preserved backward-compatible `select()` and `selectedId` aliases；
-- exposed complete ordered `selectedIds`。
+- engine-independent ordered `SelectionController`；
+- replace/add/subtract/toggle/clear/make-primary/restore/reconcile；
+- acquisition-order `selectedIds` and final-id Primary；
+- immutable monotonic snapshots；
+- one event per effective operation and no event for no-op；
+- Store remove/clear reconciliation；
+- selection excluded from PlotJSON and feature revision；
+- backward-compatible `select()` and `selectedId` aliases；
+- complete ordered `selectedIds` public access。
 
 ### Atomic Store and commands
 
-- implemented staged `PlotStore.applyTransaction()` for add/replace/remove/exact order；
-- guaranteed no partial mutation and one batch event；
-- isolated post-commit listener exceptions through `onListenerError`；
-- implemented exact-order restoration；
-- implemented selection-aware `BatchEditCommand`；
-- ensured execute/undo/redo replay exact feature revisions；
-- suspended intermediate selection reconciliation during batch command mutation。
+- staged `PlotStore.applyTransaction()` for add/replace/remove/exact order；
+- no partial mutation and one batch event；
+- exact document-order restoration；
+- post-commit listener exception isolation through `onListenerError`；
+- selection-aware `BatchEditCommand`；
+- exact execute/undo/redo feature revision replay；
+- one explicit final selection restoration without intermediate reconciliation events。
 
 ### MapLibre integration
 
-- added independent `plotlibre-selection` source；
-- added selection line and point layers；
-- increased renderer baseline to four Sources and ten Layers；
-- kept authored handles and Definition guides Primary-only；
-- implemented plain/Shift/Ctrl-Cmd/Alt selection semantics；
-- resolved Shift conflict by preserving/disabling/restoring MapLibre box zoom；
-- restored selection, drafts, handles and guides after style reload。
+- independent `plotlibre-selection` source；
+- selection line and point layers；
+- four Sources and ten Layers；
+- lightweight overlays for all selected objects；
+- authored handles and Definition guides only for Primary；
+- plain/Shift/Ctrl-Cmd/Alt selection semantics；
+- preserved/disabling/restoring MapLibre box zoom for Shift additive selection；
+- style reload restoration for committed、selection、draft、handles and guides。
 
-### Batch delete
+### Batch delete and translation
 
-- added `plot.removeSelected()`；
-- connected Delete/Backspace and Playground batch-delete action；
-- one action creates one `BatchEditCommand` and one Store transaction；
-- undo restores exact feature values, document order, selected ids and Primary；
-- redo restores exact after-state。
+- `plot.removeSelected()` and Delete/Backspace batch semantics；
+- one command and one Store transaction per batch delete；
+- undo restores exact values、order、selection and Primary；
+- one shared local projection and metre delta for whole-selection translation；
+- Store unchanged during preview；
+- Escape cancellation；
+- any invalid member rejects the complete batch；
+- parameters/style/metadata preserved；
+- one completed gesture creates one History entry。
 
-### Whole-selection translation
+### Playground, tests and documentation
 
-- added shared local-metre projection utilities；
-- one order-independent projection origin per selection；
-- one common metre delta applied to every authored control；
-- Store remains unchanged during transient preview；
-- pointer release commits one atomic command；
-- Escape cancels without History mutation；
-- invalid one-member candidate rejects the complete batch；
-- parameters/style/metadata remain unchanged；
-- handle drag retains priority and dragPan lifecycle is restored。
-
-### Playground and documentation
-
-- added selection count and Primary display；
-- made style editing Primary-only；
-- added batch delete and body-translation instructions/status；
-- updated workspace and badge to `0.0.21`；
-- updated README、AGENTS、development plan、Playground、interaction model、design and algorithm indices；
-- added immutable `2026-08-04-milestone-007a-selection-batch-translation.md`。
+- selection count and Primary display；
+- Primary-only style editing；
+- batch delete and translation/rejection status；
+- workspace and Playground badge `0.0.21`；
+- 219 Node tests；
+- 30 real Chromium tests；
+- README、AGENTS、development plan、Playground、interaction model、design/algorithm indices synchronized；
+- immutable 007A implementation handover added；
+- PR #38 marked Ready only after exact current-head CI and zero review threads；
+- PR #38 squash merged with expected head SHA。
 
 ## Validation
 
-Runtime validation evidence：
+Final PR validation：
 
 ```text
-GitHub Actions run: 30904843935 (#398)
-validated head:     07449e7fda66069b148fa08c865b209d7dc365a3
+GitHub Actions run: 30906467230 (#409)
+validated head:     2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
 Node 20.19:         success
 Node 22:            success
 Node tests:         219 passed / 0 failed
 Playground build:   success
 handover contract:  success
 Chromium tests:     30 passed / 0 failed
+unresolved threads: 0
+PR state before merge: Ready
+merge method:       squash
+squash SHA:         04dca0b120b1440afb49a300eeee92faf6644a7d
 ```
 
-The 30 Chromium tests include real rendered-feature selection, Shift additive selection, whole-selection body drag, transient preview with unchanged Store, one-command commit, exact undo/redo, Escape rollback and batch Delete order/Primary restoration.
+Real Chromium coverage includes rendered-feature Shift selection, body translation, unchanged Store during preview, one-command commit, exact undo/redo, Escape rollback and batch Delete order/Primary restoration.
 
-Required final validation：
-
-```text
-exact latest PR head
-Node 20.19 success
-Node 22 success
-219 Node tests passed
-Playground /PlotLibre/ build success
-handover contract success
-30 Chromium tests passed
-unresolved review threads = 0
-```
+This post-merge branch changes documentation only and must pass the unchanged 219/30 baseline before merge.
 
 ## Next tasks
 
-1. update PR #38 body from initial-stage wording to complete 007A scope；
-2. inspect exact current head SHA；
-3. trigger and complete full current-head CI；
-4. fix only evidence-backed failures, if any；
-5. inspect all review threads and resolve actionable items；
-6. confirm zero unresolved threads；
-7. mark PR #38 Ready for review；
-8. Squash and merge using `expected_head_sha`；
-9. delete the merged branch if tooling permits, otherwise disclose the limitation；
-10. verify new `main` and create a documentation-only finalization PR if actual squash SHA/deployment state must be recorded；
-11. begin 007B design only from the latest merged `main`。
+1. complete this documentation-only post-merge synchronization；
+2. open a Draft finalization PR against `main`；
+3. pass Node 20.19、Node 22、219 Node、30 Chromium、build and handover checks；
+4. confirm zero unresolved review threads；
+5. mark Ready and Squash and merge；
+6. delete merged branches if tooling permits；
+7. create 007B design branch from the final latest `main`；
+8. freeze screen-space box selection semantics；
+9. freeze simple lasso semantics and self-intersection failure policy；
+10. define `plotId` de-duplication and deterministic Store ordering；
+11. define spatial-index boundary before performance claims；
+12. keep rotation/scale、groups/locks、snapping and new symbols outside 007B。
 
 ## Risks and decisions
 
-- current full-green evidence applies to the runtime head, not later documentation commits；
 - selection remains transient and excluded from PlotJSON；
 - only Primary exposes authored handles/guides and accepts style editing；
-- batch operations are all-or-nothing；
-- listener exceptions after commit are isolated rather than rolled back；
+- batch mutation remains all-or-nothing；
+- listener errors after commit are isolated rather than rolled back；
 - exact document order is part of undo correctness；
-- translation is local-metre only and rejects antimeridian/high-latitude/large-extent selections；
-- translation modifies authored controls, never generated vertices；
-- MapLibre box zoom is temporarily disabled to reserve Shift selection and is restored on destroy；
-- 007A excludes box/lasso、rotation/scale、groups、locks、visibility、z-order、snapping and new symbols；
-- performance at 100/1,000/10,000 features remains an explicit measured benchmark task, not a completed guarantee；
+- translation remains local-metre only and rejects antimeridian/high-latitude/large-extent input；
+- whole-object editing transforms authored controls, never generated vertices；
+- MapLibre box zoom is temporarily disabled for Shift selection and restored on destroy；
+- 007B must remain a design-first slice；
+- performance at 100/1,000/10,000 features remains a measured benchmark task；
 - packages remain `UNLICENSED` and workspace/package versions remain uncoordinated；
 - production bundle still needs code splitting；
-- Pages live verification must be distinguished from source/build/CI success。
+- source/build/deploy/live verification remain separate claims；
+- the connector currently does not expose branch deletion in this session, so merged feature branches may require manual cleanup。
 
-Continuation：finish PR #38 current-head validation and merge discipline. Do not begin 007B runtime on this branch。
+Continuation：finish the 007A post-merge documentation PR, then begin 007B design from final `main`. Do not add runtime to the finalization branch。

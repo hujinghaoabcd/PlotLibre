@@ -30,22 +30,23 @@ public packages <- playground / wrappers
 - Playground consumes public APIs only;
 - circular dependencies are prohibited.
 
-## 3. Current 007A candidate baseline
+## 3. Current merged baseline
 
 ```text
+main SHA:           04dca0b120b1440afb49a300eeee92faf6644a7d
 workspace:          0.0.21
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 Node baseline:      219
 Chromium baseline:  30
 MapLibre Sources:   4
 MapLibre Layers:    10
-PR:                 #38
-branch:             agent/007a-selection-batch-translation
+Milestone 007A:     merged through PR #38
+validated head:     2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
+validated CI:       #409 / 30906467230
+squash SHA:         04dca0b120b1440afb49a300eeee92faf6644a7d
 ```
 
-The runtime slice was validated on head `07449e7fda66069b148fa08c865b209d7dc365a3` by CI run #398 before documentation synchronization. The final documentation head must receive a new full current-head CI run before Ready or merge.
-
-No new public symbol is part of 007A.
+The current `agent/007a-post-merge-finalization` branch is documentation-only. Runtime changes are prohibited on it.
 
 ## 4. Selection state boundary
 
@@ -108,6 +109,7 @@ Backward compatibility:
 ```text
 plot.select(id | undefined)
 plot.selectedId
+interaction.select(id | undefined)
 interaction.selectedId
 ```
 
@@ -138,23 +140,19 @@ Rules:
 10. no listener observes partial state;
 11. exact feature order is restorable on undo.
 
-Undo must never restore deleted features by appending them, because that changes document/render order.
+Undo must never restore deleted features by appending them.
 
 ## 7. Listener failure isolation
 
-Store listener errors occur after commit and therefore cannot safely trigger rollback after another listener has observed the state.
-
-Frozen policy:
+Store listener errors occur after commit and cannot safely trigger rollback after another listener has observed the state.
 
 - validation and precondition errors throw before commit;
-- after commit, every listener is invoked;
+- every listener is invoked after commit;
 - listener exceptions are collected;
 - collected errors are reported through `onListenerError`;
 - listener exceptions do not synchronously escape the committed transaction;
 - CommandHistory records the committed command;
 - renderer recovery may occur through explicit render or style reload.
-
-This prevents changed Store state without a History entry.
 
 ## 8. BatchEditCommand
 
@@ -172,23 +170,21 @@ label
 
 Execute/redo applies exact after-state and after-selection. Undo applies exact before-state and before-selection. Redo replays stored revisions and must not increment them again.
 
-Selection reconciliation is suspended during the Store transaction so execute, undo and redo each publish one explicit final selection change rather than intermediate removals.
+Selection reconciliation is suspended during Store mutation and followed by one explicit final selection restoration. One completed gesture or batch action creates one History entry.
 
-One completed gesture or batch action creates one History entry.
+## 9. Whole-object translation
 
-## 9. Whole-selection translation
-
-007A translation is local-metre only.
+Whole-selection translation is local-metre only.
 
 ```text
 selected authored controls
 → analyze one shared coordinate frame
 → derive one order-independent projection origin
-→ convert pointer start/end into that frame
-→ add one common metre delta to every authored control
-→ revision = original revision + 1
-→ canonicalize and generate every candidate
-→ all valid: preview and one atomic commit
+→ pointer metre delta
+→ add the same delta to every authored control
+→ revision = original + 1
+→ canonicalize/generate every candidate
+→ all valid: preview/commit batch
 → any invalid: no Store or History mutation
 ```
 
@@ -196,25 +192,23 @@ Rules:
 
 - parameters, style and metadata remain unchanged;
 - all selected members use one projection and one delta;
-- antimeridian, high-latitude, large-extent or non-finite selections reject;
+- antimeridian/high-latitude/large-extent/non-finite selections reject;
 - preview is transient and Store remains unchanged;
-- Escape cancels the complete preview;
-- movement below the configured CSS-pixel threshold remains a click;
-- zero local movement creates no command;
+- Escape cancels;
+- sub-threshold or zero movement creates no command;
 - one pointer gesture creates one History entry;
-- authored handle drag has priority over object-body translation;
-- dragPan is disabled only during an active transform and restored afterward;
-- every candidate receives full Registry canonicalization/generation preflight before commit.
+- authored handle drag has priority;
+- dragPan is disabled only during active translation and restored afterward.
 
 ## 10. Batch delete
 
-Delete/Backspace and the Playground action remove all selected features through one `BatchEditCommand`.
+Delete/Backspace and `removeSelected()` remove all selected features through one `BatchEditCommand`.
 
-- after-selection is empty;
-- undo restores exact feature values, document order, selected ids and Primary;
+- after selection is empty;
+- undo restores exact feature values, document order and previous selection/Primary;
 - redo restores exact after-state;
-- active drawing and authored-handle editing retain their existing key behavior and take priority;
-- lock-aware filtering is deferred until formal lock semantics exist.
+- active drawing and handle editing retain key priority;
+- lock-aware filtering remains deferred until formal lock semantics exist.
 
 ## 11. MapLibre derived resources
 
@@ -247,51 +241,24 @@ Selection overlay rules:
 - Polygon renders boundary highlight;
 - LineString renders line highlight;
 - Point renders point highlight;
-- compound output is de-duplicated by semantic geometry/`plotId`;
-- Primary is explicit derived metadata;
+- compound output is de-duplicated;
+- Primary is explicit transient overlay metadata;
 - only Primary handles remain in `plotlibre-handles`;
-- translation preview reuses derived selection rendering and does not mutate Store;
-- style reload reconstructs committed, selection, draft, handle and guide state from canonical data.
+- translation preview does not mutate Store;
+- style reload reconstructs committed, selection, draft, handle and guide state.
 
-## 12. Public API compatibility
+## 12. Required validation
 
-The following are stable compatibility surfaces during 007A:
-
-```text
-plot.select(id | undefined)
-plot.selectedId
-interaction.select(id | undefined)
-interaction.selectedId
-```
-
-New surfaces include ordered `selectedIds`, `selection`, `removeSelected()` and translation state. Do not remove single-selection aliases without a separately designed deprecation and migration milestone.
-
-## 13. Required validation
-
-Current candidate baseline:
+Current merged baseline:
 
 ```text
 219 Node
 30 Chromium
 ```
 
-Coverage includes:
+Coverage includes selection order/Primary/modifiers, transaction atomicity, listener isolation, exact ordered restoration, batch delete, local translation, invalid-member rejection, exact revision replay, actual overlays, style reload, Shift/box-zoom integration, real canvas body drag/Escape/Delete and all historical symbol regressions.
 
-- selection ordering, Primary fallback, immutable snapshots and modifier intents;
-- Store transaction preconditions and no partial mutation;
-- one batch event and listener-error isolation;
-- exact ordered restoration;
-- batch delete execute/undo/redo and selection restoration;
-- local translation common metre delta and unchanged non-coordinate state;
-- invalid one-member atomic rejection;
-- exact revision replay across execute/undo/redo;
-- actual MapLibre selection overlays and batch preview;
-- style reload resource restoration;
-- Shift/box-zoom integration;
-- real canvas multi-selection, body drag, Escape and Delete flows;
-- all historical symbol/drawing regressions.
-
-Before merge, the exact final head must pass:
+Every PR must pass on its exact current head:
 
 ```text
 Node 20.19 validation
@@ -305,7 +272,7 @@ zero unresolved review threads
 
 Never claim CI is green based on an earlier head.
 
-## 14. Clean-room references
+## 13. Clean-room references
 
 ```text
 JamesLMilner/terra-draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
@@ -315,16 +282,16 @@ mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
 
 Only observable selection/mode/transform behavior and test organization were studied. Code reuse: `none`.
 
-## 15. Documentation and handover
+## 14. Documentation and handover
 
 Every completed design or implementation milestone:
 
-- updates `README.md` and relevant authoritative docs;
+- updates README and relevant authoritative docs;
 - updates `docs/handover/LATEST.md`;
 - adds one immutable dated handover;
-- records exact branch, PR, tested head and CI evidence;
+- records exact branch, PR, tested head, CI and squash SHA;
 - does not rewrite older immutable handovers;
-- may require a small post-merge documentation PR to record the actual squash merge SHA.
+- uses a documentation-only post-merge finalization when actual merge state must be synchronized.
 
 `LATEST.md` must contain:
 
@@ -336,53 +303,50 @@ Every completed design or implementation milestone:
 ## Risks and decisions
 ```
 
-## 16. Pull request and merge discipline
+## 15. Pull request and merge discipline
 
-- work on a feature branch created from current `main`;
-- keep the PR Draft while implementation or documentation is incomplete;
-- do not locally merge the branch into `main`;
+- branch from current `main`;
+- keep PR Draft while incomplete;
+- do not locally merge into `main`;
 - resolve every actionable review thread;
 - mark Ready only after exact current-head CI is green;
-- merge with **Squash and merge** and `expected_head_sha`;
-- delete the merged feature branch when tooling permits;
-- if branch deletion is unavailable, disclose that limitation;
-- create subsequent work from the new latest `main`.
+- use **Squash and merge** with `expected_head_sha`;
+- delete merged branches when tooling permits;
+- disclose branch-cleanup limitations;
+- start subsequent work from the new latest `main`.
 
-## 17. Next slices
+## 16. Next slices
 
-007A explicitly excludes box/lasso selection, rotation/scale, groups, locks, visibility, z-order, snapping and new symbols.
+007B — box/lasso selection:
 
-### 007B — box/lasso selection
-
-Design before runtime. Initial direction:
-
-- screen-space intersection selection;
+- design before runtime;
+- screen-space intersection selection first;
 - candidate ids de-duplicated by `plotId`;
 - deterministic Store/document ordering;
 - contain policy deferred until exact projected containment exists;
 - lasso must be simple and reject self-intersection;
-- spatial indexing is required before claiming large-document support.
+- spatial indexing is required before large-document claims.
 
-### 007C — rotation and scale
+007C — rotation and scale:
 
 - local-metre only initially;
-- pivot based on selection authored-control bounds;
-- documented clockwise UI angle conversion;
+- pivot from selection authored-control bounds;
+- positive clockwise user rotation;
 - positive uniform scale `[0.01, 100]`;
 - no reflection or non-uniform scale;
-- all candidates preflight atomically;
-- parameters remain unchanged unless a future Definition explicitly opts into a pure transform hook.
+- all candidates preflight atomically.
 
-### 007D — groups, locks, visibility and z-order
+007D — groups, locks, visibility and z-order:
 
 Do not hide canonical editor state inside arbitrary metadata. Formal PlotJSON schema, migration and command semantics must precede runtime fields.
 
-## 18. Current continuation order
+## 17. Current continuation order
 
-1. finish 007A documentation and immutable handover on PR #38;
-2. run full CI on the final documentation head;
-3. confirm zero unresolved review threads;
-4. mark PR #38 Ready;
-5. Squash and merge with the exact expected head SHA;
-6. record the actual merge SHA in a documentation-only finalization PR if required;
-7. start 007B design only from the latest merged `main`.
+1. merge `agent/007a-post-merge-finalization` as documentation-only after full 219/30 CI;
+2. create 007B design branch from the resulting latest `main`;
+3. freeze box selection coordinate space, hit policy and ordering;
+4. freeze lasso ring validation and self-intersection policy;
+5. freeze `plotId` de-duplication and spatial-index boundary;
+6. add deterministic design fixtures and clean-room evidence;
+7. do not implement rotation/scale, groups/locks, snapping or new symbols in 007B;
+8. do not add runtime to the post-merge finalization branch.
