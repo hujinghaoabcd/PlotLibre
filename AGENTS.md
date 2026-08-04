@@ -12,6 +12,8 @@ PlotDefinition + authored controlPoints + parameters + style + metadata
 
 Rendered geometry, samples, local frames, pivots, selection/region/transform overlays and previews are derived. They must not replace authored state or enter PlotJSON.
 
+Core persisted editing state must use schema-owned fields. Groups, locks, visibility and z-order cannot be hidden in metadata.
+
 ## 2. Dependency direction
 
 ```text
@@ -23,11 +25,15 @@ public packages <- playground / wrappers
 
 Core and geometry cannot depend on MapLibre or DOM. Interaction math and commands remain engine-independent. MapLibre owns browser normalization, map projection and derived UI.
 
+PlotJSON parsing, migration, validation and import preparation belong in `@plotlibre/core`. MapLibre may delegate to core and atomically apply a prepared document, but it cannot own migration logic.
+
 ## 3. Current authority
 
 ```text
-main SHA:           2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0
+main SHA:           fa1648fcd7b263244dabdba31bcdb5b69f74f9a2
 workspace:          0.0.22
+current schema:     PlotJSON 1.0.0
+production migrations: none
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 Node baseline:      299
 Chromium baseline:  34
@@ -37,13 +43,13 @@ benchmark jobs:     region selection + selection transform
 007A:               merged PR #38/#39
 007B:               merged PR #40–#44
 007B-P:             merged PR #45/#46
-007C design:        merged PR #47/#48
-007C runtime:       merged PR #49
-current branch:     agent/007c-runtime-post-merge-finalization
-next design branch: agent/008-plotjson-migrations-design
+007C design/runtime: merged PR #47–#50
+current branch:     agent/008-plotjson-migrations-design
+next runtime branch: agent/008a-plotjson-version-json-safety-runtime
 ```
 
-PR #49 validated exact head `c9c8cadf678a0758075af76d078b2e5a5bfbd379` in CI `30943895213` / `#505`, then squash-merged as `2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0` with zero unresolved review threads.
+PR #49 runtime squash: `2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0`.  
+PR #50 post-merge synchronization squash/main: `fa1648fcd7b263244dabdba31bcdb5b69f74f9a2`.
 
 Never use old-head evidence for a newer head. Design, runtime and post-merge finalization remain separate scopes.
 
@@ -55,7 +61,7 @@ Selection is transient, ordered and Primary-last. It is excluded from PlotJSON a
 
 Preview, rejection, cancel and no-op must not enter Store or History.
 
-## 5. 007C canonical boundary
+## 5. Merged 007C transform boundary
 
 Transform authored controls only. Preserve:
 
@@ -71,11 +77,9 @@ selection order
 Primary
 ```
 
-Each effectively changed feature receives exact `revision + 1`.
+Each effectively changed feature receives exact `revision + 1`. Frame, pivot, angle, factor, handles and preview are transient.
 
-Frame, pivot, angle, factor, handles and preview are transient.
-
-## 6. Shared local frame and pivot
+Shared frame:
 
 ```text
 all selected authored controls
@@ -86,18 +90,14 @@ all selected authored controls
 → fixed AABB-center pivot
 ```
 
-Pivot is not Primary center, rendered centroid or screen bounds center. Empty, missing, non-finite, antimeridian, high-latitude, large-extent or degenerate selections reject before arming.
-
-## 7. Clockwise rotation
+Clockwise rotation:
 
 ```text
 x' = px + cosθ(x-px) + sinθ(y-py)
 y' = py - sinθ(x-px) + cosθ(y-py)
 ```
 
-User-positive angle is clockwise. The adapter unprojects pointer positions into the fixed local frame and accumulates successive signed vector deltas across ±180°. No snapping.
-
-## 8. Positive uniform scale
+Positive uniform scale:
 
 ```text
 k = current local radius / start local radius
@@ -106,165 +106,315 @@ y' = py + k(y-py)
 0.01 <= k <= 100
 ```
 
-Out-of-range rejects rather than clamps. Crossing pivot cannot reflect. Reflection, negative scale, non-uniform scale, skew and snapping are excluded.
+Reflection, negative/non-uniform scale, skew and snapping remain excluded. Registry generation remains authoritative when absolute parameter caps prevent strict rendered similarity.
 
-## 9. Parameter policy
+## 6. 008 design authority
 
-Parameters, style and metadata remain unchanged. Existing absolute ground caps such as `minimumWidthMeters` and `maximumWidthMeters` mean authored-control scaling does not universally guarantee strict rendered similarity. Registry generation is authoritative.
-
-Parameter-transform hooks and parameter-name heuristics are deferred.
-
-## 10. Runtime ownership
-
-Engine-independent runtime in `@plotlibre/interaction`:
-
-```ts
-deriveSelectionTransformFrame(features, policy)
-rotatePlotFeaturesLocal(features, frame, clockwiseRadians)
-scalePlotFeaturesLocal(features, frame, scaleFactor)
-SelectionTransformSession
-createSelectionTransformCommand(...)
-```
-
-MapLibre runtime:
+Binding documents:
 
 ```text
-MapLibreSelectionTransformInteraction
-MapLibreSelectionTransformOverlay
-PlotLibre public facade
+docs/PLOTJSON_SPEC.md
+docs/design/plotjson-migrations.md
+docs/design/plotjson-compatibility-matrix.md
+docs/algorithms/plotjson-migration-pipeline.md
+docs/handover/2026-08-05-milestone-008-plotjson-migrations-design.md
 ```
 
-Playground may call only the public facade. It must not duplicate transform math or commit directly to Store.
+This branch is Markdown-only. No parser, type, error, Store, Registry, MapLibre, test, workflow, package or fixture changes belong in the design PR.
 
-## 11. Explicit one-shot modes
+## 7. Version domains
 
-Public API:
+### Document schema version
+
+`PlotDocument.schemaVersion` owns:
+
+- document structure;
+- required/optional schema fields;
+- document order and references;
+- future groups/locks/visibility/z-order persistence;
+- extension containers and document invariants.
+
+### Definition version
+
+`PlotFeature.definitionVersion` owns:
+
+- authored control semantics for one `plotType`;
+- parameter names, types, defaults and units;
+- incompatible Definition algorithm semantics.
+
+They are independent and migrate in this order:
 
 ```text
-plot.selectionTransform
-plot.selectionTransformSnapshot
-plot.selectionTransformRejection
-plot.startSelectionRotation()
-plot.startSelectionScale()
-plot.cancelSelectionTransform()
+raw document
+→ current document schema
+→ current Definition version for every feature
+→ Registry preflight
+→ atomic Store replacement
 ```
 
-Transform and region modes are mutually exclusive. Primary handles/guides hide while transform is armed/active; selection overlays remain. Success exits. Invalid completion remains armed for retry.
+## 8. Persisted version syntax
 
-## 12. Overlay and gesture priority
-
-Use one DOM/SVG overlay with projected local-frame quadrilateral, pivot, scale handle, 28 CSS-pixel rotation handle and value label. A 24-pixel minimum visual frame cannot change canonical math. A transform gesture must start at least four CSS pixels from the projected pivot. Add no Source or Layer.
+Initial migration runtime accepts canonical numeric triples only:
 
 ```text
-active drawing
-> authored-handle drag
-> active selection transform
-> active region gesture
-> armed transform handle
-> armed region mode
-> neutral Shift-empty box
-> selected-body translation
-> click selection
-> camera gesture
+MAJOR.MINOR.PATCH
 ```
 
-Body translation is disabled while transform mode is armed. Modifiers have no transform meaning.
+No leading zeros, `v` prefix, prerelease or build metadata. Components are non-negative safe integers. Comparison is numeric tuple comparison.
 
-## 13. Preview and commit
+## 9. Migration registry
+
+Migration code is separate from `PlotDefinition.generate()` and from Registry aliases.
 
 ```text
-original selection
-→ pure control transform
-→ revision +1 candidates
-→ canonicalize every candidate
-→ Registry.generate every candidate
-→ complete preview or complete rejection
-→ one BatchEditCommand on valid effective pointerup
+PlotJsonMigrationRegistry
+├── document steps
+└── Definition steps keyed by plotType
 ```
 
-Partial preview/commit is prohibited. Failure preserves last-valid complete preview. Undo/redo use exact captured values and never recompute.
+Binding graph rules:
 
-No command for no-op, rejection or cancel.
+- one outgoing step per source version and scope;
+- strictly increasing versions;
+- no self edge;
+- no duplicate edge;
+- no cycles;
+- no branch ambiguity;
+- registration order cannot change a plan;
+- no arbitrary shortest-path selection.
 
-## 14. Rejections and lifecycle
+A plotType rename is an explicit Definition migration and must appear in the migration report. Unknown plot types fail closed.
 
-Stable codes:
+## 10. Migration purity
+
+Every step must:
+
+- be synchronous in the initial runtime;
+- return a new JSON object;
+- never mutate input;
+- never read clock, random, network, DOM, MapLibre, Store or History;
+- produce deterministic output and report;
+- preserve information not explicitly transformed;
+- pass JSON-safety and resource-limit scans after execution;
+- expose no partial result on failure.
+
+Migration code is application-installed trusted code. Documents cannot name or load executable migration modules.
+
+## 11. Current `1.0.0` compatibility
+
+Actual historical parser behavior is a compatibility baseline:
 
 ```text
-SELECTION_TRANSFORM_SELECTION_EMPTY
-SELECTION_TRANSFORM_FEATURE_MISSING
-SELECTION_TRANSFORM_COORDINATE_FRAME_UNSUPPORTED
-SELECTION_TRANSFORM_FRAME_DEGENERATE
-SELECTION_TRANSFORM_POINTER_INVALID
-SELECTION_TRANSFORM_POINTER_RADIUS_TOO_SMALL
-SELECTION_TRANSFORM_SCALE_OUT_OF_RANGE
-SELECTION_TRANSFORM_CANDIDATE_GENERATION_FAILED
-SELECTION_TRANSFORM_TRANSACTION_INVALID
+missing definitionVersion → "1.0.0"
+missing/non-record parameters → {}
+missing/non-record style → {}
+missing/non-record feature metadata → {}
+missing/non-integer revision → 0
+unknown root/feature schema fields → dropped
 ```
 
-Cancel without mutation on Escape, pointercancel, unexpected lost capture, style load, resize, active-drag camera movement, Store change, external selection revision, document lifecycle operation or destroy.
+Milestone 008 runtime keeps current target schema `1.0.0` and reports these normalizations. It cannot silently tighten same-version interpretation.
 
-## 15. Required validation
+Non-JSON values, cycles, non-finite numbers and resource-limit violations always reject.
 
-- order-independent frame and pivot;
-- clockwise cardinal fixtures and angle unwrap;
-- scale `0.01/1/100`, range rejection and no reflection;
-- local-frame failure policies;
-- all 19 Definitions rotation preflight and positive-scale smoke;
-- unchanged parameters/style/metadata;
-- all-member failure atomicity;
-- exact revision/order/selection/Primary/undo/redo;
-- explicit DOM handles and lifecycle;
-- four-pixel start-radius and 24-pixel visual-frame contracts;
-- multi-selection rotate and scale Chromium flows;
-- transform benchmark for `1/100/1,000` selected features;
-- all historical regressions.
+## 12. Read pipeline
 
-## 16. Validation gate
+Binding order:
 
-Every runtime-affecting exact head:
+```text
+input-size guard
+→ JSON.parse when string
+→ recursive JSON-safety/resource scan
+→ minimal type/schemaVersion envelope
+→ document migration plan and execution
+→ current-schema decode / 1.0 normalization
+→ document invariants and duplicate-id check
+→ Definition migration plan and execution for all features
+→ final Definition-version equality
+→ strict current feature decode
+→ Registry.canonicalize and Registry.generate every feature
+→ immutable report
+→ one atomic Store document replacement
+```
+
+No old-schema value may be interpreted as the current schema before document migration.
+
+## 13. Definition-version enforcement
+
+After migration:
+
+```text
+feature.definitionVersion === registry.get(feature.plotType).version
+```
+
+is mandatory.
+
+Older with complete chain migrates. Older without chain, newer version, malformed version and unknown Definition reject before Store mutation. Registry cannot silently render mismatched versions.
+
+## 14. JSON safety and resource limits
+
+Accepted direct data:
+
+```text
+null
+string
+boolean
+finite number
+array
+plain JSON object
+```
+
+Rejected:
+
+```text
+undefined
+NaN / Infinity
+BigInt / Symbol / function
+Date / Map / Set / typed array / class instance
+accessor / symbol key / cycle
+```
+
+Reader limits must cover:
+
+```text
+inputBytes
+depth
+totalNodes
+objectKeys
+stringLength
+features
+controlPointsPerFeature
+totalControlPoints
+```
+
+Concrete finite defaults are measured and published in runtime, not invented in design.
+
+## 15. Error surface
+
+Add a dedicated `PlotJsonError` family with stable code and optional path/feature/version context.
+
+Binding codes:
+
+```text
+PLOTJSON_SYNTAX_INVALID
+PLOTJSON_VALUE_NOT_JSON
+PLOTJSON_RESOURCE_LIMIT_EXCEEDED
+PLOTJSON_ROOT_INVALID
+PLOTJSON_DOCUMENT_TYPE_UNSUPPORTED
+PLOTJSON_SCHEMA_VERSION_INVALID
+PLOTJSON_SCHEMA_VERSION_UNSUPPORTED
+PLOTJSON_MIGRATION_PATH_MISSING
+PLOTJSON_MIGRATION_OUTPUT_INVALID
+PLOTJSON_CURRENT_SCHEMA_INVALID
+PLOTJSON_FEATURE_ID_DUPLICATE
+PLOTJSON_DEFINITION_NOT_FOUND
+PLOTJSON_DEFINITION_VERSION_INVALID
+PLOTJSON_DEFINITION_VERSION_UNSUPPORTED
+PLOTJSON_DEFINITION_MIGRATION_PATH_MISSING
+PLOTJSON_DEFINITION_MIGRATION_OUTPUT_INVALID
+PLOTJSON_REFERENCE_INVALID
+PLOTJSON_IMPORT_TRANSACTION_INVALID
+```
+
+Errors must not dump complete documents or sensitive metadata.
+
+## 16. Migration report
+
+A report-bearing read API records:
+
+```text
+source/target schema versions
+document steps
+Definition steps
+plotType renames
+1.0 normalization records
+stable warnings with JSON paths
+```
+
+`parsePlotDocument()` remains a compatibility wrapper returning only the current document.
+
+## 17. Atomic import
+
+Current `PlotLibre.importDocument()` preflights Registry generation, then calls `store.clear()` and repeated `store.add()`. Duplicate ids can fail after partial mutation.
+
+Milestone 008 runtime must prepare everything in memory and commit one complete ordered document transaction.
+
+Expected input failure preserves exactly:
+
+```text
+Store and order
+selection and Primary
+History
+active draw/region/translation/transform state
+```
+
+Success emits one Store batch event, installs exact document order, cancels interactions, clears selection and clears History.
+
+## 18. Compatibility fixtures
+
+Required fixture families:
+
+```text
+current exact/current normalization
+legacy/future/invalid
+migration graph and output
+Definition migration and rename
+duplicate ids/unknown Definition
+resource-limit boundaries
+Registry failure
+atomic import rollback
+exact successful order
+```
+
+Every migrator proves deterministic output, input immutability, target-version correctness and repeat-read idempotence.
+
+## 19. 008 runtime slices
+
+```text
+008A version + JSON safety + limits + errors
+008B migration registry + plan + report
+008C current reader compatibility + invariants
+008D Registry-aware preparation + atomic import
+008E docs, CI, immutable handover and post-merge sync
+```
+
+The next branch is strictly 008A. It must not implement migration graph execution, parser replacement or MapLibre import changes.
+
+## 20. 007D unblock condition
+
+Groups/locks/visibility/z-order cannot enter runtime until 008 foundation is merged.
+
+Future schema requirements:
+
+- feature array order is bottom-to-top z-order;
+- lock/visibility are schema-owned core state, not metadata;
+- stable group ids and feature references;
+- first group model assigns one feature to at most one group;
+- deterministic feature/group effective lock and visibility;
+- production old-to-new document migration;
+- golden compatibility fixtures.
+
+The exact future schema shape belongs to 007D design, not 008 runtime foundation.
+
+## 21. Validation gate
+
+Every exact head:
 
 ```text
 Node 20.19
 Node 22
-299 Node tests
+299 current Node tests plus milestone tests
 Playground typecheck/build
 handover contract
-region benchmark job/artifact
-selection-transform benchmark job/artifact
-34 Chromium E2E
+region benchmark
+selection-transform benchmark
+34 current Chromium tests plus milestone tests
 zero unresolved review threads
 ```
 
-Measured transform performance is observational only. Do not publish a latency SLA or add a persistent cache/index without a reproducible need. Authority:
+Design PR must additionally prove Markdown-only scope.
 
-```text
-docs/performance/selection-transform-benchmark.md
-```
-
-## 17. Next design boundary: PlotJSON migrations
-
-Groups, locks, visibility and z-order remain blocked until document persistence and migration semantics are frozen. The next branch is documentation/design only:
-
-```text
-agent/008-plotjson-migrations-design
-```
-
-It must define:
-
-- current PlotJSON schema inventory and compatibility guarantees;
-- schema-version versus Definition-version responsibilities;
-- parse, validation and migration ordering;
-- unknown field and unknown Definition behavior;
-- document ordering and future group-reference semantics;
-- persistence boundaries for lock, visibility and z-order;
-- migration registry API and stable fail-closed errors;
-- golden fixtures and a backward/forward compatibility matrix;
-- implementation milestones that unblock 007D.
-
-No migration runtime, group runtime or schema mutation belongs in the design PR.
-
-## 18. Clean-room references
+## 22. Clean-room references
 
 ```text
 Terra Draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
@@ -274,8 +424,8 @@ MapLibre GL JS@v6.0.0 — BSD-3-Clause
 code reuse: none
 ```
 
-## 19. Merge discipline
+## 23. Merge discipline
 
-Design, runtime and finalization use separate branches. Keep runtime Draft until exact-head green; resolve threads; write immutable handover; mark Ready; squash with expected SHA; verify main; start post-merge synchronization only from latest main; never merge locally.
+Design, runtime and finalization use separate branches. Runtime remains Draft until exact-head green; every thread is resolved; immutable handover is written; Ready state does not change head; squash merge uses expected SHA; main is verified; post-merge authority synchronization starts only from latest main.
 
-Current runtime excludes reflection, non-uniform scale, groups/locks/visibility/z-order, snapping, touch transforms, new symbols and PlotJSON shortcuts.
+Current exclusions include reflection, non-uniform scale, groups/locks/visibility/z-order runtime, snapping, touch transforms, new symbols, unresolved-feature mode, future-version best effort, downgrade migrations and PlotJSON shortcuts.
