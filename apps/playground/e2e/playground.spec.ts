@@ -223,9 +223,9 @@ test("loads nine base symbols from the GitHub Pages project path", async ({ page
   await expect(page.getByTestId("symbol-select").locator("option")).toHaveCount(9);
 });
 
-test("loads all sixteen Nanjing samples without the optional basemap", async ({ page }) => {
+test("loads all nineteen Nanjing samples without the optional basemap", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
-  await expect(page.getByTestId("plot-count")).toHaveText("16 个标绘");
+  await expect(page.getByTestId("plot-count")).toHaveText("19 个标绘");
   const types = await page.evaluate(() => {
     const playground = window.__plotlibrePlayground;
     if (!playground) throw new Error("Playground API is unavailable.");
@@ -248,14 +248,17 @@ test("loads all sixteen Nanjing samples without the optional basemap", async ({ 
     "arrow.route.double-head",
     "area.closed-curve",
     "area.gathering-place",
+    "line.circular-arc",
+    "area.circular-segment",
+    "area.sector",
   ]) {
     expect(types).toContain(expected);
   }
 });
 
-test("renders all sixteen sample types through committed layers", async ({ page }) => {
+test("renders all nineteen sample types through committed layers", async ({ page }) => {
   await page.goto("/PlotLibre/?basemap=none");
-  await expect(page.getByTestId("plot-count")).toHaveText("16 个标绘");
+  await expect(page.getByTestId("plot-count")).toHaveText("19 个标绘");
   await expect
     .poll(async () =>
       page.evaluate(() => {
@@ -267,7 +270,7 @@ test("renders all sixteen sample types through committed layers", async ({ page 
         });
         const types = new Set(source.map((feature) => feature.properties?.plotType));
         return {
-          featureCount: source.length >= 18,
+          featureCount: source.length >= 21,
           straight: types.has("arrow.straight"),
           fine: types.has("arrow.fine"),
           tailed: types.has("arrow.fine.tailed"),
@@ -284,6 +287,9 @@ test("renders all sixteen sample types through committed layers", async ({ page 
           doubleHead: types.has("arrow.route.double-head"),
           closedCurve: types.has("area.closed-curve"),
           gatheringPlace: types.has("area.gathering-place"),
+          circularArc: types.has("line.circular-arc"),
+          circularSegment: types.has("area.circular-segment"),
+          sector: types.has("area.sector"),
           rendered: rendered.length > 0,
         };
       }),
@@ -306,6 +312,9 @@ test("renders all sixteen sample types through committed layers", async ({ page 
       doubleHead: true,
       closedCurve: true,
       gatheringPlace: true,
+      circularArc: true,
+      circularSegment: true,
+      sector: true,
       rendered: true,
     });
 });
