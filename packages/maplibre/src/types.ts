@@ -32,9 +32,11 @@ export interface MapLibreRenderedFeatureLike {
 
 export type MapLibreEventListener = (event: unknown) => void;
 
-export interface MapCanvasMouseEventLike {
-  readonly offsetX: number;
-  readonly offsetY: number;
+export interface MapCanvasPointerEventLike {
+  readonly clientX?: number;
+  readonly clientY?: number;
+  readonly offsetX?: number;
+  readonly offsetY?: number;
   readonly shiftKey?: boolean;
   readonly ctrlKey?: boolean;
   readonly metaKey?: boolean;
@@ -63,6 +65,10 @@ export interface MapCanvasLike {
     listener: (event: any) => void,
     options?: boolean | { readonly capture?: boolean },
   ): void;
+  getBoundingClientRect?(): {
+    readonly left: number;
+    readonly top: number;
+  };
   focus?(): void;
 }
 
