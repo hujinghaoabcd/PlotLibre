@@ -17,23 +17,26 @@
 ## 当前基线
 
 ```text
-main SHA:          6012868d4c74e64374bfbeb3c032ee47a4a9fb2c
+main SHA:          add70f52eb252b1167f7abfb4ecf4b93370bfbdf
 workspace:         0.0.22
 PlotJSON schema:   1.0.0
 production migrations: none
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
-Node tests:        299
+historical Node:   299
+008A expected Node: 324
 Chromium tests:    34
 MapLibre Sources:  4
 MapLibre Layers:   10
 benchmark jobs:    region selection + selection transform
 completed:         007A + 007B + 007B-P + 007C + 008 Design
-current slice:     008 design post-merge authority synchronization
-current branch:    agent/008-plotjson-design-post-merge-finalization
-next branch:       agent/008a-plotjson-version-json-safety-runtime
+current slice:     008A version / JSON safety / limits / errors
+current branch:    agent/008a-plotjson-version-json-safety-runtime
+current PR:        #53
+next branch:       agent/008b-plotjson-migration-registry-runtime
 ```
 
-PR #51 exact head `908ab22401d71dfefe0a9d28add67e28723c13c0` passed CI `30947578825` / `#510` and squash-merged as `6012868d4c74e64374bfbeb3c032ee47a4a9fb2c`.
+PR #51 design squash：`6012868d4c74e64374bfbeb3c032ee47a4a9fb2c`。  
+PR #52 design-finalization squash/main：`add70f52eb252b1167f7abfb4ecf4b93370bfbdf`。
 
 ## Milestones
 
@@ -43,17 +46,19 @@ PR #51 exact head `908ab22401d71dfefe0a9d28add67e28723c13c0` passed CI `30947578
 | 007A | selection、atomic Store、delete、translation | PR #38/#39，已完成 |
 | 007B | box/lasso design/runtime/Playground/docs | PR #40–#44，已完成 |
 | 007B-P | resolver benchmark 与索引决策 | PR #45/#46，已完成 |
-| 007C | shared-pivot rotation + positive uniform scale design/runtime/finalization | PR #47–#50，已完成 |
-| 008 Design | PlotJSON versioning、migration、compatibility、atomic import | PR #51，已合并 |
-| 008 Design Finalization | merge-state authority synchronization | 当前 Markdown-only 分支 |
-| 008A | version / JSON safety / limits / errors | 下一阶段 |
-| 008B | migration registry / planner / report | 008A 后 |
+| 007C | shared-pivot rotation + positive uniform scale | PR #47–#50，已完成 |
+| 008 Design | PlotJSON versioning、migration、compatibility、atomic import | PR #51/#52，已完成 |
+| 008A | version / JSON safety / limits / errors | PR #53，收尾中 |
+| 008A Finalization | merge-state authority synchronization | PR #53 合并后 |
+| 008B | migration registry / planner / report | 008A 同步后 |
 | 008C | current reader compatibility / invariants | 008B 后 |
 | 008D | Registry-aware preparation / atomic import | 008C 后 |
 | 008E | docs / CI / immutable handover / post-merge sync | runtime 收尾 |
 | 007D | groups / locks / visibility / z-order + production schema migration | 008 完成后解除阻塞 |
 
-## Merged 008 design authority
+## 008 authority
+
+Design:
 
 ```text
 docs/PLOTJSON_SPEC.md
@@ -64,11 +69,21 @@ docs/handover/2026-08-05-milestone-008-plotjson-migrations-design.md
 docs/handover/2026-08-05-milestone-008-design-post-merge-finalization.md
 ```
 
-## Repository findings driving runtime
+008A runtime:
+
+```text
+packages/core/src/plotjson-version.ts
+packages/core/src/plotjson-error.ts
+packages/core/src/plotjson-safety.ts
+docs/design/plotjson-version-json-safety-runtime.md
+docs/handover/2026-08-05-milestone-008a-plotjson-foundations.md
+```
+
+## Repository findings driving 008
 
 ### Current parser
 
-`parsePlotDocument()`:
+`parsePlotDocument()` still:
 
 - accepts only exact `PlotLibreDocument` / `1.0.0`;
 - combines syntax parsing、structure checks and default normalization;
@@ -79,6 +94,8 @@ docs/handover/2026-08-05-milestone-008-design-post-merge-finalization.md
 - has no migration chain、report、limits or dedicated errors;
 - does not detect document-wide duplicate feature ids;
 - does not enforce the registered Definition version.
+
+008A deliberately does not integrate its new primitives into this parser. That compatibility-sensitive work remains 008C.
 
 ### Current Registry
 
@@ -109,10 +126,11 @@ Owns document structure、order、references and future persisted editor state.
 
 Owns control roles、parameters and one symbol Definition's authored semantics.
 
-### Required order
+### Required future order
 
 ```text
 raw input
+→ input byte guard and JSON safety
 → document schema migration
 → current schema decode
 → Definition migration for every feature
@@ -123,7 +141,7 @@ raw input
 
 ## Current `1.0.0` compatibility
 
-The actual accepted parser behavior remains the historical normalization baseline:
+Historical normalization remains binding:
 
 ```text
 missing definitionVersion → 1.0.0
@@ -134,30 +152,135 @@ missing/non-integer revision → 0
 unknown schema fields → dropped
 ```
 
-008 runtime reports these changes but does not silently tighten the same version. Strict future fields require a new schema version and migration.
+008A exports primitives only. It does not silently tighten same-version interpretation. 008C must preserve and report these normalizations.
 
-## 008A — version、JSON safety、limits、errors
+## 008A delivered runtime
 
-Create from synchronized main:
+### Version primitives
 
-```text
-agent/008a-plotjson-version-json-safety-runtime
+```ts
+PLOTJSON_DOCUMENT_TYPE
+CURRENT_PLOTJSON_SCHEMA_VERSION
+parsePlotJsonVersion(...)
+comparePlotJsonVersions(...)
+isCanonicalPlotJsonVersion(...)
 ```
 
-### Scope
+Contract:
 
-1. `CURRENT_PLOTJSON_SCHEMA_VERSION` and document type constants;
-2. canonical numeric version type/parser/comparator;
-3. dedicated PlotJSON error base and complete stable code union;
-4. JSON-safe iterative traversal and deep clone;
-5. plain-object/prototype/accessor/symbol-key/cycle rejection;
-6. deterministic JSON paths;
-7. resource-limit type, validation and finite defaults;
-8. scans before/after clone with immutable statistics;
-9. public core exports;
-10. pure Node tests and immutable handover.
+- canonical numeric `MAJOR.MINOR.PATCH`;
+- non-negative safe-integer components;
+- no leading zeros except `0`;
+- no prefix、prerelease、build、decimal or exponent form;
+- numeric tuple comparison;
+- frozen parsed results;
+- forged parsed records reject;
+- invalid messages do not echo untrusted payloads.
 
-### Explicit exclusions
+### Structured errors
+
+`PlotJsonError` extends `PlotLibreError` and exports the complete Milestone 008 code union. It can expose scalar path、feature、plotType、version、limit and cause context without retaining complete documents or metadata.
+
+### Iterative JSON safety
+
+Accepted:
+
+```text
+null / string / boolean / finite number
+dense arrays
+plain and null-prototype objects
+```
+
+Rejected:
+
+```text
+undefined / NaN / Infinity / BigInt / Symbol / function
+Date / Map / Set / RegExp / typed arrays / class instances
+custom prototypes / accessors / hidden properties / symbol keys
+sparse arrays / custom array properties / cycles
+```
+
+Implementation rules:
+
+- explicit traversal stack, not recursion;
+- descriptor inspection without getter invocation;
+- lexicographic object-key order;
+- repeated non-cyclic references cloned independently;
+- own `__proto__` and `constructor` remain safe data properties;
+- caller input is not mutated;
+- clone shares no nested containers with input;
+- result envelope、limits and statistics are frozen.
+
+### Resource limits
+
+```text
+inputBytes:               16 MiB
+maximum depth:            128
+value nodes:              1,000,000
+object keys:              250,000
+string/key length:        1,000,000 UTF-16 code units
+features:                 100,000
+controls per feature:     10,000
+total controls:           1,000,000
+```
+
+These are finite security ceilings, not document-size recommendations or latency SLAs. Overrides must be finite positive safe integers. UTF-8 input bytes are measured separately; string length applies to values and keys.
+
+### Statistics
+
+```text
+totalNodes
+objectKeys
+maximumDepth
+maximumStringLength
+features
+maximumControlPointsPerFeature
+totalControlPoints
+```
+
+Feature/control observations recognize only `$.features` and `$.features[i].controlPoints`; they are not schema validation.
+
+## 008A validation
+
+New test files:
+
+```text
+tests/plotjson-version-foundation.test.mjs
+tests/plotjson-safety.test.mjs
+tests/plotjson-safety-hardening.test.mjs
+```
+
+Coverage:
+
+- valid/invalid/unsafe version triples;
+- lexical-order traps and forged records;
+- bounded malformed-version messages;
+- all accepted/prohibited value families;
+- getter non-invocation;
+- null/custom prototypes and prototype-pollution keys;
+- sparse/custom arrays;
+- direct/indirect cycles and repeated references;
+- insertion-order-independent paths;
+- 2,000-level iterative traversal;
+- UTF-8 bytes;
+- all limit categories;
+- immutable statistics and limits;
+- all historical regressions.
+
+Expected final exact-head gate:
+
+```text
+Node 20.19 and 22
+324 Node tests
+Playground typecheck/build
+handover contract
+region benchmark
+selection-transform benchmark
+34 Chromium tests
+0 unresolved review threads
+```
+
+## 008A explicit exclusions
 
 ```text
 migration registration or execution
@@ -171,74 +294,57 @@ schema bump
 007D fields
 ```
 
-### Required tests
+## 008B — migration registry、planner、report types
 
-Version:
+Create only after 008A squash merge and post-merge synchronization:
 
-- valid `0.0.0`, `1.0.0`, large safe components;
-- invalid prefix、missing component、leading zero、negative、decimal、prerelease、build、unsafe integer;
-- numeric comparison versus string-order traps;
-- immutable parsed result.
+```text
+agent/008b-plotjson-migration-registry-runtime
+```
 
-JSON safety:
+Scope:
 
-- primitives、arrays、plain objects;
-- nested path accuracy;
-- caller input not mutated;
-- clone has no shared nested references;
-- NaN/Infinity、undefined、BigInt、function、Symbol;
-- Date/Map/Set/typed array/class instance;
-- accessor and symbol key;
-- direct and indirect cycles;
-- `__proto__`/`constructor` keys without prototype pollution;
-- deterministic own-key traversal.
+1. document and Definition migration step types;
+2. registry registration APIs;
+3. one outgoing edge per source version/scope;
+4. strict version increase;
+5. duplicate/self/decreasing/cycle/branch rejection;
+6. deterministic linear chain planning independent of registration order;
+7. immutable migration report record types;
+8. pure test migrations proving determinism and input immutability;
+9. public core exports and immutable handover.
 
-Limits:
+Excluded from 008B:
 
-- below、exact and one-over boundaries;
-- depth、nodes、keys、string length、features、per-feature controls、total controls;
-- invalid configured limits;
-- immutable statistics and context.
-
-Errors:
-
-- stable code、path、feature/version context and cause;
-- no complete document dump;
-- `instanceof PlotLibreError` and `instanceof PlotJsonError`.
-
-## 008B — migration registry and report
-
-After 008A merges:
-
-- document/Definition migration step registration;
-- one outgoing edge per source version;
-- strictly increasing versions;
-- duplicate/self/decreasing/cycle/branch rejection;
-- deterministic chain planning independent of registration order;
-- immutable migration report records;
-- test-only pure migrators proving input immutability and deterministic output.
+```text
+parsePlotDocument replacement
+current 1.0 normalization integration
+production symbol migrations
+Registry-version enforcement
+Store/MapLibre changes
+schema bump
+```
 
 ## 008C — reader compatibility and invariants
 
-- `readPlotDocument()` report-bearing API;
+- report-bearing `readPlotDocument()`;
 - `parsePlotDocument()` compatibility wrapper;
-- historical `1.0.0` normalizations;
-- strict JSON/current-schema invariants;
+- 1.0 historical normalization records;
+- JSON/current-schema invariants;
 - duplicate feature-id detection;
-- Definition-version migration/equality;
+- Definition migration/equality;
 - current/legacy/future/invalid fixture tree;
 - repeat-read idempotence.
 
 ## 008D — Registry-aware preparation and atomic import
 
-- prepare a complete canonical document before mutation;
-- canonicalize and generate every feature;
+- complete canonical preparation before mutation;
+- all-feature canonicalize/generate;
 - dedicated Store document replacement with reused ids and exact order;
 - one Store batch event;
 - no mutation on expected failure;
 - interaction/selection/History cleanup after successful commit;
-- MapLibre facade integration;
-- Chromium import and rollback regressions.
+- MapLibre integration and Chromium rollback regressions.
 
 ## 008E — closure
 
@@ -246,32 +352,7 @@ After 008A merges:
 - compatibility matrix populated from real fixtures;
 - exact-head CI and artifacts;
 - immutable runtime handover;
-- post-merge authority synchronization.
-
-## Required fixture structure
-
-```text
-tests/fixtures/plotjson/current
-tests/fixtures/plotjson/legacy
-tests/fixtures/plotjson/future
-tests/fixtures/plotjson/invalid
-```
-
-Coverage:
-
-- exact current round trip;
-- historical normalization;
-- malformed/non-JSON input;
-- old/current/future version behavior;
-- migration graph failures;
-- Definition migration and plotType rename;
-- duplicate ids and unknown Definitions;
-- limit boundaries;
-- invalid migration output;
-- Registry failure;
-- atomic import rollback;
-- exact successful order;
-- deterministic/idempotent repeated reads.
+- post-merge synchronization.
 
 ## 007D unblock condition
 
@@ -288,40 +369,6 @@ one feature in at most one first-generation group
 deterministic group/feature effective state
 production old-to-new schema migration
 golden compatibility fixtures
-```
-
-The exact future schema JSON belongs to 007D design, not 008 foundation runtime.
-
-## Exact design evidence
-
-```text
-PR:                    #51
-validated head:        908ab22401d71dfefe0a9d28add67e28723c13c0
-CI:                    30947578825 / #510
-Node 20.19 / 22:       success
-Node tests:            299 passed
-Playground typecheck:  success
-Playground build:      success
-handover check:        success
-region artifact:       8907720007
-transform artifact:    8907717329
-Chromium tests:        34 passed
-review threads:        0
-merge method:          squash
-squash SHA:            6012868d4c74e64374bfbeb3c032ee47a4a9fb2c
-```
-
-## Runtime validation gate
-
-```text
-Node 20.19 and 22
-299 historical Node tests plus milestone tests
-Playground typecheck/build
-handover contract
-both observational benchmarks
-34 historical Chromium tests plus milestone tests
-0 unresolved review threads
-immutable runtime handover
 ```
 
 ## Cross-stage tasks
