@@ -81,9 +81,9 @@ function validateParsedVersion(value: PlotJsonVersion): PlotJsonVersion {
 }
 
 function invalidVersion(value: unknown): PlotJsonError {
-  const display = typeof value === "string" ? `"${value}"` : typeof value;
+  const receivedType = value === null ? "null" : typeof value;
   return new PlotJsonError(
     "PLOTJSON_SCHEMA_VERSION_INVALID",
-    `PlotJSON version ${display} must be a canonical numeric MAJOR.MINOR.PATCH triple.`,
+    `PlotJSON version must be a canonical numeric MAJOR.MINOR.PATCH triple; received ${receivedType}.`,
   );
 }
