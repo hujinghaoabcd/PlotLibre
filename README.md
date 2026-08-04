@@ -2,7 +2,7 @@
 
 **PlotLibre** is a MapLibre-native, engine-independent framework for drawing, editing, rendering and exchanging semantic parametric situation plots and tactical graphics.
 
-> PlotLibre 保存“符号类型 + authored controls + 参数 + 样式 + 元数据”。地图中的 LineString、Polygon、采样点、选择轮廓、区域选择路径、平移预览和语义引导线均为可重新生成的派生结果。
+> PlotLibre 保存“符号类型 + authored controls + 参数 + 样式 + 元数据”。地图中的 LineString、Polygon、采样点、选择轮廓、区域选择路径、平移/旋转/缩放预览、变换框和语义引导线均为可重新生成的派生结果。
 
 ## Live Playground
 
@@ -32,7 +32,7 @@ area.circular-segment
 area.sector
 ```
 
-It supports exact fixed-point and variable-point drawing, live preview, structured rejection feedback, semantic handle editing, ordered multi-selection, box/lasso selection, atomic batch delete, whole-selection local-metre translation, undo/redo, style editing, nineteen Nanjing samples and PlotJSON import/export.
+It supports exact fixed-point and variable-point drawing, live preview, structured rejection feedback, semantic handle editing, ordered multi-selection, box/lasso selection, atomic batch delete, whole-selection local-metre translation, clockwise rotation, positive uniform scale, undo/redo, style editing, nineteen Nanjing samples and PlotJSON import/export.
 
 ## Current baseline
 
@@ -40,11 +40,12 @@ It supports exact fixed-point and variable-point drawing, live preview, structur
 workspace version: 0.0.22
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
-Node tests:        264
-Chromium tests:    32
+Node tests:        299
+Chromium tests:    34
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
 MapLibre sources:  4
 MapLibre layers:   10
+benchmark jobs:    region selection + selection transform
 ```
 
 The root workspace version is a development baseline, not yet a coordinated npm release across all public packages.
@@ -192,6 +193,42 @@ The Store remains unchanged during preview. Escape cancels the gesture. If any m
 
 Handle drag retains priority over body translation. PlotLibre reserves Shift for selection and temporarily disables MapLibre box zoom while the region controller is installed.
 
+### Whole-selection rotation and positive uniform scale
+
+Milestone 007C transforms the complete ordered selection in one shared local-metre frame. The fixed pivot is the center of the authored-control local AABB; it is not a rendered centroid, Primary center or persisted object.
+
+Public APIs:
+
+```ts
+plot.selectionTransform
+plot.selectionTransformSnapshot
+plot.selectionTransformRejection
+plot.startSelectionRotation()
+plot.startSelectionScale()
+plot.cancelSelectionTransform()
+```
+
+Canonical behavior:
+
+```text
+all selected authored controls
+→ one order-independent local frame
+→ one fixed AABB-center pivot
+→ clockwise rotation or positive uniform scale
+→ revision +1 candidates
+→ canonicalize and Registry.generate every member
+→ complete transient preview or complete rejection
+→ one stale-safe BatchEditCommand
+```
+
+Rotation uses positive clockwise angles. Uniform scale accepts only `[0.01, 100]`; out-of-range values reject instead of clamping, and radial scale cannot reflect across the pivot. Parameters, style, metadata, Store order, selection order and Primary remain unchanged.
+
+The Playground exposes `旋转`、`缩放` and `取消变换`. Explicit transform and region modes are mutually exclusive. A successful transform exits the mode; invalid pointerup preserves canonical Store state and leaves the mode available for direct retry.
+
+The DOM/SVG overlay contains a projected frame, pivot, scale handle, rotation guide/handle and transient value label. Tiny selections receive a minimum 24 CSS-pixel visual frame without changing canonical math. A gesture must start at least four CSS pixels from the projected pivot. The overlay adds no MapLibre Source or Layer.
+
+Preview, rejection, cancel and no-op never enter Store or History. Undo and redo restore exact captured values and never recompute the transform.
+
 ## Rendering resources
 
 Four derived GeoJSON sources:
@@ -218,7 +255,7 @@ plotlibre-handle-guide
 plotlibre-handle
 ```
 
-The DOM/SVG box/lasso overlay is outside these resources. Style reload reconstructs committed geometry, selection overlays, drafts, handles and guides from canonical state.
+The DOM/SVG region and selection-transform overlays are outside these resources. Style reload reconstructs committed geometry, selection overlays, drafts, handles and guides from canonical state and cancels active transient modes safely.
 
 ## Architecture
 
@@ -232,11 +269,11 @@ public packages <- playground / wrappers
 - `@plotlibre/core`: domain types, Registry, transactional Store, commands, History and PlotJSON;
 - `@plotlibre/geometry`: pure planar, circular, closed-area and geodesic geometry;
 - `@plotlibre/symbols`: built-in parametric Definitions;
-- `@plotlibre/interaction`: draw sessions, ordered selection, screen-region algorithms, batch commands and local translation;
-- `@plotlibre/maplibre`: rendering, broad-phase queries, exact projected region resolution, overlays, handles and gesture adapters;
+- `@plotlibre/interaction`: draw sessions, ordered selection, screen-region algorithms, batch commands, local translation and engine-independent selection transforms;
+- `@plotlibre/maplibre`: rendering, broad-phase queries, exact projected region resolution, DOM/SVG overlays, handles and gesture adapters;
 - `@plotlibre/playground`: browser demo, E2E and GitHub Pages site.
 
-Canonical state remains engine-independent. Rendered geometry, region paths and interaction overlays cannot become authored state.
+Canonical state remains engine-independent. Rendered geometry, region paths, transform frames and interaction overlays cannot become authored state.
 
 ## Symbol families
 
@@ -259,39 +296,28 @@ PlotLibre includes exact two-point arrows, curved and attack-path arrows, flat a
 
 Widths, heads, necks, notches, bridges, mirrored points and samples are derived; authored semantic roles are preserved.
 
-## Validation
+## Validation and performance
+
+Root validation:
 
 ```bash
-npm install
 npm run check
 npm run playground:e2e
+npm run benchmark:region-selection
+npm run benchmark:selection-transform
 npm run handover:check
 ```
 
-Final 007B evidence:
+The transform benchmark records reproducible `1/100/1,000` complete-selection cases and uploads JSON/Markdown artifacts. It is observational and defines no browser latency SLA. Exact measured evidence and limitations are documented in:
 
 ```text
-PR #42 runtime foundation
-head: 812183a47413bdac554fbd6ca75e1443026ac474
-CI:   #437 / 30920263173
-Node: 264 passed
-E2E:  30 passed
-merge: e18183df5be4b98c38ba177e8440b28e859c2c90
-
-PR #43 Playground/browser finalization
-head: f7d9e107221d4ee3fc4278f697a7c0ba84d95a59
-CI:   #445 / 30924648279
-Node: 264 passed
-E2E:  32 passed
-merge: f98483d3504ce464c93e5a03a49f7f856d1cc1a0
+docs/performance/selection-transform-benchmark.md
 ```
 
-Pull requests remain Draft while incomplete. Merge only after current-head Node 20.19/22 validation, Node tests, Playground build, handover contract, Chromium E2E and review threads are green. Use Squash and merge with the exact expected head SHA; never merge feature branches locally.
+007C architecture and runtime boundaries are documented in:
 
-## Current boundaries and next work
-
-- no hard region-selection latency guarantee is published;
-- measure 100 / 1,000 / 10,000 feature fixtures before adding a persistent spatial index;
-- rotation and positive uniform scale belong to Milestone 007C;
-- groups, locks, visibility and z-order require formal PlotJSON schema/migration design first;
-- touch region gestures, snapping, contain-only selection, persistent region tools, coordinated package releases and Playground code splitting remain deferred.
+```text
+docs/design/rotation-uniform-scale.md
+docs/design/rotation-uniform-scale-runtime.md
+docs/algorithms/selection-local-transform.md
+```
