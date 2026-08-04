@@ -308,8 +308,8 @@ test("rejected scale preserves Store and retries directly in the same explicit m
     before.features.map((feature) => feature.style),
   );
   expect(after.features.map((feature) => feature.metadata)).toEqual(
-    before.features.map((feature) => feature.metadata,
-  ));
+    before.features.map((feature) => feature.metadata),
+  );
   await expect
     .poll(() =>
       page.evaluate(() =>
