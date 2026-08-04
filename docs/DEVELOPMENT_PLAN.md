@@ -9,26 +9,27 @@
 - 为增加数量复制整套生成器；
 - 仅通过不同默认参数伪造新公共符号；
 - 将 rendered GeoJSON 反写为 canonical controls；
-- 为提高成功率关闭 simple-ring 或完整生成 preflight；
-- 在多个复杂符号族之间并行扩散范围。
+- 为提高成功率关闭 topology 或完整生成 preflight；
+- 在多个复杂符号族之间并行扩散范围；
+- 在语义设计尚未合并时先写运行时代码。
 
 钳形箭头边界加固继续冻结；路线头部变体暂不扩展。
 
 ## 当前基线
 
 ```text
-main SHA:          f873052d44a98f7029f0eda27ea70cda8b1af347
-merged PR:         #31 Add closed action area symbol group
+main SHA:          b3a1a18c5aaf0b26a4c7c5e42a6e307eaa331873
 workspace:         0.0.19
 public symbols:    16 (14 Arrow + 2 Area)
 Node tests:        163
 Chromium tests:    23
-completed:         006I closed action area group
-next milestone:    006J arc / sector / lune semantic design
-finalization:      agent/006i-post-merge-finalization
+completed:         006I implementation + post-merge finalization
+active milestone:  006J circular arc family semantic design
+active branch:     agent/006j-arc-sector-lune-design
+runtime changes:   prohibited on the design branch
 ```
 
-公开 Definitions：
+当前公开 Definitions：
 
 ```text
 arrow.straight
@@ -61,11 +62,11 @@ area.gathering-place
 | 006E | 分队战斗箭头 | 已完成并合并 |
 | 006F–006G | 路线箭头 + 走廊箭头共享 PathRibbon | 已完成并合并 |
 | 006H | 双向路线 + 双头路线共享多头路径基础 | 已完成并最终同步 |
-| 006I | 闭合曲线 + 集结地共享周期闭合曲线基础 | 已通过 PR #31 合并 |
+| 006I | 闭合曲线 + 集结地共享周期闭合曲线基础 | PR #31、#32 已合并 |
 
 ## Milestone 006I：闭合行动区域组
 
-### 最终公共范围
+最终公共范围：
 
 ```text
 area.closed-curve@1.0.0
@@ -78,156 +79,179 @@ area.gathering-place@1.0.0
 area.route-loop
 ```
 
-`area.route-loop` 只有在具有独立路线、方向、入口/出口或行动语义时才可进入公共 API。换样式或参数的 closed curve 不是新 Definition。
-
-### `area.closed-curve`
-
-Canonical controls 是 3–64 个有序边界途经点：
+最终验证：
 
 ```text
-0..n-1 authored boundary waypoints
-```
-
-契约：
-
-- 周期 Hermite/Catmull–Rom 曲线插值每个 authored control；
-- 最后一个 span 自动回到首点；
-- authored controls 不重复首点；
-- 双击末点或 Enter 完成；
-- reversal 保持 footprint，canonical authored order 不被静默重写；
-- sampled vertices、closing duplicate 和 Polygon ring 全部派生。
-
-### `area.gathering-place`
-
-固定三个 authored controls：
-
-```text
-0 flank A
-1 front crown
-2 flank B
-```
-
-契约：
-
-- 两个 flank 是无序语义对，只允许 indices 0/2 的确定性 permutation；
-- crown 必须保持 exact index 1；
-- rear closure anchor 从 flank midpoint 和 crown direction 派生；
-- 第三次点击自动完成；
-- derived rear anchor 不进入 Store、History、handles 或 PlotJSON；
-- 与三点 closed curve 保持独立语义和默认样式。
-
-### 共享纯几何基础
-
-`packages/geometry/src/closed-area.ts` 负责：
-
-- WGS84 authored controls 的局部米制投影；
-- 顺序无关的 circular-longitude/mean-latitude projection origin；
-- periodic Hermite/Catmull–Rom sampling；
-- authored control interpolation；
-- gathering-place rear-anchor derivation；
-- explicit ring closure；
-- counterclockwise winding normalization；
-- finite、area 和 simple-ring validation；
-- WGS84 反投影。
-
-共享基础不包含 arrow head、neck、notch、shaft width 或 route ribbon 语义。
-
-### 失败策略
-
-以下情况在 Store mutation 前 fail closed：
-
-- 控制点数量错误；
-- 非有限 WGS84 坐标；
-- pairwise duplicate controls；
-- 无法确定稳定局部投影中心的全球尺度输入；
-- 参数越界；
-- derived rear anchor collapse；
-- zero/near-zero area；
-- sampled ring self-intersection。
-
-不允许静默删除 controls、polygonize 自交或回退到 raw authored polygon。
-
-### PlotJSON 契约
-
-只持久化：
-
-```text
-plotType
-Definition version
-ordered canonical authored controls
-explicit parameters
-style
-metadata
-revision
-```
-
-不得持久化：
-
-```text
-closing duplicate
-sampled curve points
-derived rear anchor
-winding-normalized copies
-Polygon coordinates
-```
-
-### Playground 与交互
-
-- `area.closed-curve`：至少三个点；pointer candidate 形成完整 draft；双击/Enter 完成；
-- `area.gathering-place`：第三个 pointer candidate 形成完整 draft；第三次点击自动完成；
-- 两者均使用 schema-driven `MultiPointDrawSession`；
-- committed handles 仅对应 authored controls；
-- production selector 与样例总数为 16；
-- 基础兼容 E2E 保留原九类 selector；
-- extended E2E 使用 `?e2e=1&squad=1&paths=1&areas=1`；
-- generic status listener 先绑定，symbol-specific guidance 后绑定。
-
-### 006I 最终验证
-
-```text
-PR:                #31
-squash merge SHA:  f873052d44a98f7029f0eda27ea70cda8b1af347
-final head run:    #294 / 30883623452
-Node 20.19:        success
-Node 22:           success
+implementation PR: #31
+implementation SHA: f873052d44a98f7029f0eda27ea70cda8b1af347
+finalization PR:   #32
+final main SHA:    b3a1a18c5aaf0b26a4c7c5e42a6e307eaa331873
 Node tests:        163 passed
 Chromium tests:    23 passed
-Playground build: success
-handover check:   success
-review threads:   0 unresolved
 ```
 
-## Milestone 006J：弧形与扇形区域组
+关键契约：
 
-候选研究对象：
+- closed curve 保存 3–64 个 authored boundary waypoints；
+- gathering place 保存 flank / crown / flank 三控制点；
+- closing duplicate、curve samples、rear anchor 和 Polygon ring 全部派生；
+- local-metre projection、counterclockwise ring 和 simple-ring validation；
+- invalid geometry 在 Store mutation 前 fail closed。
+
+## Milestone 006J：圆弧族语义设计
+
+### 设计冻结候选
 
 ```text
-area.arc
-area.sector
+line.circular-arc@1.0.0
+area.sector@1.0.0
+area.circular-segment@1.0.0
+```
+
+延期：
+
+```text
 area.lune
 ```
 
-006J 第一阶段是**语义设计**，不是立即实现。只有满足独立公共语义、可解释 authored controls、稳定拓扑和测试契约的候选才进入 runtime。
+### 命名决策
 
-实现前冻结：
+- open LineString 不使用 `area.arc`，而使用 `line.circular-arc`；
+- 参考库的 `Lune/弓形` 是“一条圆弧 + 一条弦”的 circular segment；
+- PlotLibre 使用 `area.circular-segment`，不在 1.0 中添加误导性 `area.lune` alias；
+- 真正的数学 lune 需要两条圆弧和独立控制点语义，另行设计。
 
-1. 哪些是 Polygon、LineString 或复合输出；
-2. authored centre、radius、start/end bearing 的角色；
-3. clockwise/counterclockwise arc direction；
-4. 大于 180° 和跨 0° 方位行为；
-5. 两点/三点输入是否等价；
-6. radius 单位与 geodesic/local-metre 边界；
-7. antimeridian/high-latitude 策略；
-8. arc sampling 与 exact endpoint contract；
-9. sector center 是否进入 ring；
-10. lune 的两个圆弧如何选择合法交集区域；
-11. canonicalization 是否仅做角色 permutation；
-12. PlotJSON migration 和 deterministic fixtures；
-13. 哪些候选只是参数变体，不能成为独立 Definition；
-14. interaction completion 是 fixed-count 还是 explicit completion；
-15. actual-rendered browser matrix 和 degenerate-input cases。
+### `line.circular-arc`
 
-不得把三个名字实现成同一几何换默认样式。语义设计、clean-room reference matrix、license review 和测试计划未冻结前，不创建 geometry 或 public identifier。
+固定三个 exact controls：
+
+```text
+0 start
+1 through
+2 end
+```
+
+契约：
+
+- 三点定义稳定 circumcircle；
+- through-point 选择 minor 或 major directed sweep；
+- 输出一个 open LineString；
+- start、through、end 必须在 samples 中精确存在；
+- reversal 输出同一 footprint 的反向遍历；
+- 第三次点击自动完成；
+- 两点状态只能显示 semantic guide。
+
+### `area.circular-segment`
+
+固定三个 exact controls：
+
+```text
+0 arc/chord start
+1 through-point on arc
+2 arc/chord end
+```
+
+契约：
+
+- 共享 three-point circular frame；
+- boundary 为 selected arc + straight chord；
+- minor 与 major circular segment 均可；
+- 输出一个无孔 simple Polygon；
+- ring winding normalization 不重写 authored order。
+
+### `area.sector`
+
+固定三个 controls：
+
+```text
+0 center
+1 exact radius/start-boundary point
+2 end-bearing handle
+```
+
+契约：
+
+- control 1 定义唯一 radius 和 exact start；
+- control 2 只定义 end bearing，其距离不定义第二 radius；
+- rendered end-boundary point 在 start radius 上派生；
+- 显式参数：`sweepDirection = clockwise | counterclockwise`；
+- 支持 crossing 0° 与 sweep > 180°；
+- 拒绝 zero/full sweep；
+- 第三次点击自动完成；
+- selected/draft state 需要 centre → bearing handle semantic guide。
+
+### 共享数学基础
+
+设计中的 pure circular frame 负责：
+
+- local-metre projection；
+- scale-aware three-point circumcentre；
+- radius 与 angle derivation；
+- clockwise/counterclockwise directed deltas；
+- through-point minor/major sweep selection；
+- crossing-0° angle unwrapping；
+- two-sub-arc exact-through sampling；
+- `segmentsPerCircle` density-only parameter；
+- LineString、arc+chord ring 和 sector ring construction；
+- finite、area 和 simple-ring validation。
+
+### Coordinate-mode policy
+
+Version 1.0 只允许 local-metre mode。以下输入 fail closed：
+
+- antimeridian crossing；
+- high latitude；
+- extent 超过 local threshold；
+- coincident controls；
+- collinear/near-collinear controls；
+- non-finite or excessive circumradius；
+- ambiguous through sweep。
+
+不允许 silent geodesic fallback。现有 `geodesic.ts` 可供未来版本使用，但 1.0 不混合算法。
+
+### Clean-room references
+
+```text
+sakitam-fdd/ol-plot@c919e60b4edeaeca53c08f9552f793b2ae9537f0
+sakitam-fdd/maptalks.plot@37dab8d0dd31650540146e1e0f03f54982f01799
+```
+
+两者均已核对 MIT License。用途仅限 public behavior、terminology 和 test expectation；code reuse 为 `none`。
+
+### 设计 PR 完成条件
+
+- public identifiers 与 output type 一致；
+- controls 和 derived state 边界无歧义；
+- direction、major/minor、crossing 0° 和 reversal 明确；
+- local/geodesic 与 radius policy 明确；
+- PlotJSON、interaction、failure policy 和 fixtures 完整；
+- reference revision、license 和 no-code-reuse 完整；
+- branch 中没有 geometry、Definition、Registry、Playground 或 tests；
+- Node 20.19、Node 22、163 Node、23 Chromium、build 和 handover 全绿；
+- 0 unresolved review threads。
+
+### 实现顺序
+
+设计 PR 合并后，从最终 `main` 创建：
+
+```text
+agent/006j-circular-arc-family
+```
+
+顺序：
+
+1. pure circular frame；
+2. deterministic Node fixtures；
+3. circular arc LineString；
+4. circular-segment ring；
+5. sector ring；
+6. Definition 与 Registry；
+7. PlotJSON preflight；
+8. interaction guides；
+9. Playground selectors/samples；
+10. actual-rendered Chromium matrix；
+11. immutable handover；
+12. current-head green 后 squash merge。
 
 ## Milestone 007：专业编辑
 
@@ -248,7 +272,8 @@ area.lune
 
 - control measures 与更多 area families；
 - triangle、rectangle、curve、swallowtail flags；
-- callout、leader label、text、image 和 SVG annotation。
+- callout、leader label、text、image 和 SVG annotation；
+- true two-arc lune（如独立语义成立）。
 
 ## Milestone 010：IO 和项目管理
 
@@ -295,5 +320,5 @@ area.lune
 6. 自动检查 README、LATEST、Playground 和 Registry 数量一致性；
 7. 建立性能基准与大对象数量测试；
 8. 在正式 0.1.0 前完成 npm package boundary review；
-9. 评估 Playground 单 bundle 超过 1 MB 的 code splitting；
+9. 评估 Playground 单 bundle超过 1 MB 的 code splitting；
 10. 持续区分 source/build ready、workflow deployed 与 live manually verified。
