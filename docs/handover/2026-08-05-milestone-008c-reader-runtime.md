@@ -15,7 +15,7 @@ workspace:             0.0.22
 persisted schema:      PlotLibreDocument / 1.0.0
 production migrations: none
 public Definitions:    19
-candidate Node tests:  372
+candidate Node tests:  375
 Chromium baseline:     34
 Store mutation:        excluded
 MapLibre mutation:     excluded
@@ -147,10 +147,14 @@ When the map is supplied:
 - an exact target performs no migration and emits no feature-step record;
 - other targets require an exact 008B migration chain;
 - every step receives frozen cloned feature JSON;
-- every output is cloned and safety/resource scanned;
+- every output is cloned and generically safety/resource scanned;
+- every step enforces `controlPointsPerFeature` explicitly;
 - output feature id must remain stable;
 - output plotType and Definition version must match the exact step target;
+- final structural decode failures are attributed to Definition migration;
 - final decoded feature must match the requested target reference.
+
+After all Definition migrations, the complete current document is rebuilt and rescanned. This re-establishes document semantic roles and enforces aggregate budgets, including `totalControlPoints`, which cannot be inferred from an independently scanned feature root.
 
 Explicit plotType renames are retained in the immutable report.
 
@@ -213,7 +217,7 @@ Node tests: 364 passed
 Chromium:   34 passed
 ```
 
-### Hardening discovery
+### Initial hardening discovery
 
 The first 372-test run exposed two incorrect test expectations rather than runtime defects:
 
@@ -222,14 +226,26 @@ The first 372-test run exposed two incorrect test expectations rather than runti
 
 Both expectations were corrected without removing security assertions.
 
+### Semantic-budget review
+
+A subsequent code review found a real semantic-limit gap. Generic cloning of an individual Definition feature correctly enforced JSON limits, but the root role was not `features[i]`; therefore it could not infer the `controlPoints` semantic role or accumulate document-wide controls.
+
+The runtime was hardened to:
+
+1. enforce `controlPointsPerFeature` after every Definition migration step;
+2. attribute malformed final feature decoding to `PLOTJSON_DEFINITION_MIGRATION_OUTPUT_INVALID`;
+3. rebuild and scan the complete final document after all Definition migrations;
+4. enforce aggregate `totalControlPoints` and all other complete-document limits;
+5. add three regression tests, raising the candidate total from 372 to 375.
+
 ### Final exact-head validation
 
-Pending after this handover commit. The PR must not become Ready until the final head passes:
+Pending after the semantic-budget code and documentation commits. The PR must not become Ready until the final head passes:
 
 ```text
 Node 20.19
 Node 22
-372 Node tests
+375 Node tests
 Playground typecheck/build
 handover check
 region-selection benchmark
@@ -238,7 +254,7 @@ selection-transform benchmark
 0 unresolved review threads
 ```
 
-The final PR body must record exact head, run id, artifact ids/digests and review-thread count. This handover must be updated with that evidence before Ready/merge, followed by one final exact-head CI run.
+The final PR body must record exact head, run id, artifact ids/digests and review-thread count. This handover will be updated with that evidence before Ready/merge, followed by one final exact-head CI run.
 
 ## 12. 008D frozen boundary
 
