@@ -87,3 +87,25 @@ test("malformed version errors do not echo the untrusted version payload", () =>
     },
   );
 });
+
+test("deep input uses iterative traversal rather than the JavaScript call stack", () => {
+  const depth = 2_000;
+  let input = 0;
+  for (let index = 0; index < depth; index += 1) input = [input];
+
+  const result = clonePlotJsonValue(input, {
+    limits: {
+      depth,
+      totalNodes: depth + 1,
+    },
+  });
+  assert.equal(result.statistics.maximumDepth, depth);
+  assert.equal(result.statistics.totalNodes, depth + 1);
+
+  let cursor = result.value;
+  for (let index = 0; index < depth; index += 1) {
+    assert.equal(Array.isArray(cursor), true);
+    cursor = cursor[0];
+  }
+  assert.equal(cursor, 0);
+});
