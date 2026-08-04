@@ -13,6 +13,8 @@ import type {
   SelectionTransformKind,
 } from "./selection-transform-session.js";
 
+const EFFECTIVE_COORDINATE_EPSILON_DEGREES = 1e-12;
+
 export class SelectionTransformCommandError extends Error {
   public readonly code:
     | "SELECTION_TRANSFORM_FEATURE_MISSING"
@@ -46,9 +48,10 @@ export interface CreateSelectionTransformCommandOptions {
 /**
  * Builds one stale-safe atomic command from a preflighted transform completion.
  *
- * Members whose authored controls remain exactly at the shared pivot are not
- * replaced and retain their original revision. The command validates the exact
- * mixed post-state before undo, so it cannot overwrite later Store changes.
+ * Members whose authored controls remain effectively at the shared pivot are
+ * not replaced and retain their original revision. The coordinate epsilon only
+ * absorbs local projection roundoff; exact Store-state validation remains in
+ * force for every feature that the command actually observes.
  */
 export function createSelectionTransformCommand(
   store: PlotStore,
@@ -65,7 +68,7 @@ export function createSelectionTransformCommand(
   const actualPostState: PlotFeature[] = [];
   for (const [index, original] of originals.entries()) {
     const next = transformed[index]!;
-    if (sameControlPoints(original, next)) {
+    if (sameControlPointsWithinTransformEpsilon(original, next)) {
       actualPostState.push(original);
       continue;
     }
@@ -267,14 +270,33 @@ function sameFeature(left: PlotFeature, right: PlotFeature): boolean {
     left.plotType === right.plotType &&
     left.definitionVersion === right.definitionVersion &&
     left.revision === right.revision &&
-    sameControlPoints(left, right) &&
+    sameControlPointsExact(left, right) &&
     sameJson(left.parameters, right.parameters) &&
     sameJson(left.style, right.style) &&
     sameJson(left.metadata, right.metadata)
   );
 }
 
-function sameControlPoints(left: PlotFeature, right: PlotFeature): boolean {
+function sameControlPointsWithinTransformEpsilon(
+  left: PlotFeature,
+  right: PlotFeature,
+): boolean {
+  return (
+    left.controlPoints.length === right.controlPoints.length &&
+    left.controlPoints.every((position, index) => {
+      const candidate = right.controlPoints[index];
+      return (
+        candidate !== undefined &&
+        Math.abs(candidate[0] - position[0]) <=
+          EFFECTIVE_COORDINATE_EPSILON_DEGREES &&
+        Math.abs(candidate[1] - position[1]) <=
+          EFFECTIVE_COORDINATE_EPSILON_DEGREES
+      );
+    })
+  );
+}
+
+function sameControlPointsExact(left: PlotFeature, right: PlotFeature): boolean {
   return (
     left.controlPoints.length === right.controlPoints.length &&
     left.controlPoints.every((position, index) => {
