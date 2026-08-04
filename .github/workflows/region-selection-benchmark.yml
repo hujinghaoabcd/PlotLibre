@@ -1,16 +1,7 @@
 name: Region Selection Benchmark
 
 on:
-  push:
-    paths:
-      - ".github/workflows/region-selection-benchmark.yml"
-      - "package.json"
-      - "scripts/benchmark-region-selection.mjs"
-      - "packages/core/**"
-      - "packages/geometry/**"
-      - "packages/interaction/**"
-      - "packages/maplibre/**"
-      - "packages/symbols/**"
+  workflow_call:
   workflow_dispatch:
 
 permissions:
