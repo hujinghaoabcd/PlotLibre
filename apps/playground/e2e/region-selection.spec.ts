@@ -68,7 +68,7 @@ async function seedRegionArrows(page: Page): Promise<ScreenBounds> {
     if (!playground) throw new Error("Playground API is unavailable.");
     const points = ["region-a", "region-b"].flatMap((id) =>
       playground.plot.store.get(id).controlPoints.map((coordinate) =>
-        playground.map.project(coordinate),
+        playground.map.project([coordinate[0], coordinate[1]]),
       ),
     );
     return {
