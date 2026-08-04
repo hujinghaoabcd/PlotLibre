@@ -26,7 +26,7 @@ Core and geometry cannot depend on MapLibre or DOM. Interaction math and command
 ## 3. Current authority
 
 ```text
-main SHA:           9a1c761b3e9d1f94c944485137fb21a92bdcc786
+main SHA:           2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0
 workspace:          0.0.22
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 Node baseline:      299
@@ -38,11 +38,14 @@ benchmark jobs:     region selection + selection transform
 007B:               merged PR #40–#44
 007B-P:             merged PR #45/#46
 007C design:        merged PR #47/#48
-007C runtime:       Draft PR #49
-current branch:     agent/007c-rotation-scale-runtime
+007C runtime:       merged PR #49
+current branch:     agent/007c-runtime-post-merge-finalization
+next design branch: agent/008-plotjson-migrations-design
 ```
 
-Never use old-head evidence for a newer head. Runtime completion requires exact-head CI, immutable handover, zero review threads and Ready-for-review state before merge.
+PR #49 validated exact head `c9c8cadf678a0758075af76d078b2e5a5bfbd379` in CI `30943895213` / `#505`, then squash-merged as `2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0` with zero unresolved review threads.
+
+Never use old-head evidence for a newer head. Design, runtime and post-merge finalization remain separate scopes.
 
 ## 4. Selection and atomic editing
 
@@ -219,7 +222,7 @@ Cancel without mutation on Escape, pointercancel, unexpected lost capture, style
 
 ## 16. Validation gate
 
-Every exact head:
+Every runtime-affecting exact head:
 
 ```text
 Node 20.19
@@ -239,7 +242,29 @@ Measured transform performance is observational only. Do not publish a latency S
 docs/performance/selection-transform-benchmark.md
 ```
 
-## 17. Clean-room references
+## 17. Next design boundary: PlotJSON migrations
+
+Groups, locks, visibility and z-order remain blocked until document persistence and migration semantics are frozen. The next branch is documentation/design only:
+
+```text
+agent/008-plotjson-migrations-design
+```
+
+It must define:
+
+- current PlotJSON schema inventory and compatibility guarantees;
+- schema-version versus Definition-version responsibilities;
+- parse, validation and migration ordering;
+- unknown field and unknown Definition behavior;
+- document ordering and future group-reference semantics;
+- persistence boundaries for lock, visibility and z-order;
+- migration registry API and stable fail-closed errors;
+- golden fixtures and a backward/forward compatibility matrix;
+- implementation milestones that unblock 007D.
+
+No migration runtime, group runtime or schema mutation belongs in the design PR.
+
+## 18. Clean-room references
 
 ```text
 Terra Draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
@@ -249,8 +274,8 @@ MapLibre GL JS@v6.0.0 — BSD-3-Clause
 code reuse: none
 ```
 
-## 18. Merge discipline
+## 19. Merge discipline
 
-Design, runtime and finalization use separate branches. Keep Draft until exact-head green; resolve threads; write immutable handover; mark Ready; squash with expected SHA; verify main; start post-merge synchronization only from latest main; never merge locally.
+Design, runtime and finalization use separate branches. Keep runtime Draft until exact-head green; resolve threads; write immutable handover; mark Ready; squash with expected SHA; verify main; start post-merge synchronization only from latest main; never merge locally.
 
-Runtime still excludes reflection, non-uniform scale, groups/locks/visibility/z-order, snapping, touch transforms, new symbols and PlotJSON shortcuts.
+Current runtime excludes reflection, non-uniform scale, groups/locks/visibility/z-order, snapping, touch transforms, new symbols and PlotJSON shortcuts.
