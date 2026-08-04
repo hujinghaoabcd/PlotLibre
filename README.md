@@ -28,18 +28,18 @@ It supports fixed/variable-point drawing, live preview, semantic handles, ordere
 ## Current baseline
 
 ```text
-main SHA:           add70f52eb252b1167f7abfb4ecf4b93370bfbdf
+main SHA:           d8b2d889dee81064069f96e555dd75b1c851ccf3
 workspace version:  0.0.22
 MapLibre GL JS:     6.0.0
 Node.js:            20.19+
-historical tests:   299 Node / 34 Chromium
-008A target:        324 Node / 34 Chromium
+tests:              324 Node / 34 Chromium
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 MapLibre resources: 4 Sources / 10 Layers
 benchmark jobs:     region selection + selection transform
 007C:               merged PR #47–#50
 008 design:         merged PR #51/#52
-008A runtime:       PR #53
+008A runtime:       merged PR #53
+next runtime:       008B migration registry / planner / report records
 ```
 
 The root version is a development baseline, not yet a coordinated npm release across all public packages.
@@ -160,7 +160,7 @@ PlotLibreDocument / schemaVersion 1.0.0
 
 Document `schemaVersion` owns document structure. Feature `definitionVersion` owns one symbol's authored semantics. They are independent migration domains.
 
-### 008A public foundations
+### Merged 008A foundations
 
 ```ts
 PLOTJSON_DOCUMENT_TYPE
@@ -259,7 +259,7 @@ docs/performance/region-selection-benchmark.md
 docs/performance/selection-transform-benchmark.md
 
 docs/handover/LATEST.md
-docs/handover/2026-08-05-milestone-008a-plotjson-foundations.md
+docs/handover/2026-08-05-milestone-008a-post-merge-finalization.md
 ```
 
-The next runtime slice is `agent/008b-plotjson-migration-registry-runtime`: migration step types, graph validation, deterministic linear planning and immutable report record types only. Parser, Registry, Store and MapLibre integration remain later milestones.
+The next runtime slice is `agent/008b-plotjson-migration-registry-runtime`: migration step/reference types, graph validation, deterministic linear planning and immutable report record types only. Parser, Registry, Store and MapLibre integration remain later milestones.
