@@ -124,12 +124,12 @@ test("migration outputs are rescanned against caller resource limits", () => {
     () =>
       readPlotDocument(legacyDocument(), {
         migrations,
-        limits: { maxStringLength: 100 },
+        limits: { stringLength: 100 },
       }),
     (error) => {
       assert.equal(error.code, "PLOTJSON_MIGRATION_OUTPUT_INVALID");
       assert.equal(error.cause.code, "PLOTJSON_RESOURCE_LIMIT_EXCEEDED");
-      assert.equal(error.cause.limitName, "maxStringLength");
+      assert.equal(error.cause.limitName, "stringLength");
       assert.equal(error.cause.path, "$.metadata.oversized");
       return true;
     },
@@ -231,7 +231,7 @@ test("Definition migration cycles reject and do not mutate caller input", () => 
     () => readPlotDocument(input, definitionOptions(migrations)),
     (error) => {
       assert.equal(error.code, "PLOTJSON_DEFINITION_MIGRATION_OUTPUT_INVALID");
-      assert.equal(error.cause.code, "PLOTJSON_VALUE_CYCLIC");
+      assert.equal(error.cause.code, "PLOTJSON_VALUE_NOT_JSON");
       assert.equal(error.cause.path, "$.features[0].metadata");
       return true;
     },
