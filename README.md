@@ -37,6 +37,7 @@ It supports exact fixed-point and variable-point drawing, live preview, structur
 ## Current baseline
 
 ```text
+main SHA:          2b06d02ba851a9c6ae01d0db1fc503ad5f8699c0
 workspace version: 0.0.22
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
@@ -46,7 +47,10 @@ public symbols:    19 (14 Arrow + 1 Line + 4 Area)
 MapLibre sources:  4
 MapLibre layers:   10
 benchmark jobs:    region selection + selection transform
+007C status:       merged through PR #49
 ```
+
+Milestone 007C is merged on `main`: complete ordered selections can be rotated clockwise or scaled positively and uniformly through the public `PlotLibre` facade, with complete Registry preflight, one atomic history command and exact undo/redo.
 
 The root workspace version is a development baseline, not yet a coordinated npm release across all public packages.
 
@@ -320,4 +324,11 @@ docs/performance/selection-transform-benchmark.md
 docs/design/rotation-uniform-scale.md
 docs/design/rotation-uniform-scale-runtime.md
 docs/algorithms/selection-local-transform.md
+```
+
+The next design milestone freezes PlotJSON migration and compatibility semantics before groups, locks, visibility or z-order can enter runtime:
+
+```text
+docs/handover/2026-08-05-milestone-007c-runtime-post-merge-finalization.md
+agent/008-plotjson-migrations-design
 ```
