@@ -1,17 +1,17 @@
 # PlotLibre Algorithm Records
 
-本目录记录复杂参数化符号和共享几何组的独立算法说明、来源边界、退化输入策略与测试要求。
+本目录记录参数化符号、共享几何基础以及专业编辑事务的独立算法说明、来源边界、失败策略与测试要求。
 
 每份记录至少包含：
 
 ```text
-public Definition or shared algorithm
-canonical authored controls
-mathematical construction
+public Definition / state model / shared algorithm
+canonical authored state
+mathematical or transaction construction
 coordinate-mode policy
-derived geometry boundary
-parameter contract
-failure policy
+derived/transient boundary
+parameter or operation contract
+failure and rollback policy
 clean-room references and revisions
 license review
 code reuse declaration
@@ -36,7 +36,8 @@ tests and deterministic fixtures
 | `arrow-route-corridor.md` | route/corridor PathRibbon | 已实现 |
 | `arrow-route-multihead.md` | bidirectional/double-head route | 已实现 |
 | `closed-action-area.md` | closed curve/gathering place | 已实现 |
-| `circular-arc-foundation.md` | circular arc/segment/sector shared frame | 已通过 PR #34 实现并合并 |
+| `circular-arc-foundation.md` | circular arc/segment/sector shared frame | 已实现并合并 |
+| `batch-edit-transaction.md` | selection、Store transaction、batch commands、translation/transform | Milestone 007 design freeze candidate |
 
 基础通用几何另见：
 
@@ -45,98 +46,120 @@ tests and deterministic fixtures
 ../ALGORITHM_POLICY.md
 ```
 
-## Milestone 006J 最终算法状态
-
-`packages/geometry/src/circular-arc.ts` 已按照 `circular-arc-foundation.md` 独立实现：
-
-- order-independent local projection origin；
-- scale-aware three-point circumcenter；
-- finite minimum/maximum radius policy；
-- exact start/through/end directed sweep；
-- minor/major 和 clockwise/counterclockwise selection；
-- crossing-0° normalization；
-- two-sub-arc exact-through sampling；
-- `segmentsPerCircle` density-only parameter；
-- circular arc LineString；
-- circular-segment arc+chord ring；
-- directed sector frame/ring；
-- end-bearing distance isolation；
-- counterclockwise/simple Polygon validation；
-- local-only coordinate-mode rejection。
-
-Public Definitions：
-
-```text
-line.circular-arc@1.0.0
-area.circular-segment@1.0.0
-area.sector@1.0.0
-```
-
-Deferred：
-
-```text
-area.lune
-```
-
-## Clean-room provenance
-
-固定 references：
-
-```text
-sakitam-fdd/ol-plot@c919e60b4edeaeca53c08f9552f793b2ae9537f0
-sakitam-fdd/maptalks.plot@37dab8d0dd31650540146e1e0f03f54982f01799
-```
-
-两者均已核对 MIT License。用途只限 observable behavior、traditional terminology 和 independent test expectations。Code reuse：`none`。
-
-PlotLibre 不采用参考实现的：
-
-- two-point committed fallback；
-- collinear polyline fallback；
-- circular-segment triangle degradation；
-- implicit positive-only sweep helper；
-- hidden control movement；
-- engine-specific class structure。
-
-## Semantic guide extension
-
-Sector 的 end-bearing handle 通常不在 rendered endpoint 上。006J 增加通用 Core hook：
-
-```text
-deriveSemanticGuidePaths(feature)
-```
-
-MapLibre 将该纯 WGS84 path 作为 transient dashed guide 渲染。该机制不属于 circular geometry 本身，不进入 Store、History、PlotJSON 或 committed RenderBundle。
-
-## Validation and merge evidence
+## Milestone 006J merge evidence
 
 ```text
 workspace:          0.0.20
 public symbols:     19
 Node tests:         184 passed
 Chromium tests:     28 passed
-final CI:           #337 / 30893450723
-validated head:     608567d4f8f662242b0356c54742a2ffcb087c66
 implementation PR: #34
-squash merge SHA:  297d0a644eaa3427f8fd59b82b7bc3582221d49e
+finalization PR:   #35
+final main SHA:    4ce59d189b65c8257bf49beabc308a4020249cd0
 ```
 
-Node coverage includes minor/major arcs、clockwise/counterclockwise、crossing 0°、exact through-point、reversal、density isolation、circular-segment areas、sector endpoint/bearing isolation、failure policy、Registry、PlotJSON、semantic guide 和 style reload。
+Circular geometry remains governed by `circular-arc-foundation.md` and its local-only、strict topology、authored-control and clean-room contracts。
 
-Chromium coverage includes actual circular arc line、circular-segment and sector Polygon、fixed-three draft/completion、actual radial guide、guide exclusion from committed source、19-symbol production samples and all historical regressions。
+## Milestone 007 transaction design
 
-## Next algorithmic work
+`batch-edit-transaction.md` freezes the first professional editing foundation：
 
-Milestone 007 is not a geometry-family expansion. Its design must freeze professional editing state and transaction algorithms before runtime：
+### Selection representation
 
-- ordered multi-selection and primary selection；
-- box/lasso hit testing；
-- authored-control translation；
-- deterministic transform pivots；
-- local/geodesic rotation and scale policy；
-- group/lock/z-order canonical model；
-- batch command preflight；
-- all-or-nothing mutation and rollback；
-- undo/redo memory and performance fixtures。
+```text
+ordered selectedIds
+Set membership index
+primaryId = final selected id
+selection revision
+```
 
-No Milestone 007 runtime should be added before a documentation-only design PR is merged。
+Selection is transient and excluded from PlotJSON。Replace/add/subtract/toggle/reconcile operations emit one immutable event per effective change。
+
+### Store transaction
+
+```text
+validate all add/replace/remove operations
+→ build staged ordered feature Map
+→ any error: no mutation
+→ commit once
+→ emit one batch event
+```
+
+No listener may observe a partial transaction。
+
+### Listener failure isolation
+
+Current single-command flow can mutate Store before a listener throws, leaving state changed without a history entry。007 design changes the contract：
+
+- post-commit listener errors are collected；
+- all listeners still run；
+- errors are reported through `onListenerError`；
+- they do not synchronously escape after commit；
+- validation errors still throw before mutation；
+- command history records the committed edit consistently。
+
+### Ordered undo
+
+Batch delete undo must restore original document order。The transaction design therefore needs an explicit ordered-id sequence or equivalent complete ordered state。Appending restored features is invalid because it changes rendering/z-order semantics。
+
+### BatchEditCommand
+
+Command captures exact before/after feature snapshots and selection snapshots：
+
+```text
+execute/redo:
+  Store after transaction
+  restore after selection
+
+undo:
+  Store inverse transaction
+  restore before selection
+```
+
+Redo reuses exact after revisions and does not increment again。
+
+### Translation
+
+007A supports local-metre whole-object translation only：
+
+- all selected authored controls share one projection and meter delta；
+- parameters/style/metadata remain unchanged；
+- every candidate is canonicalized/generated before commit；
+- one invalid member rejects the complete batch；
+- preview is transient；
+- one gesture commits one command；
+- zero movement commits nothing；
+- Escape cancels。
+
+### Later algorithms
+
+- 007B：screen-space box/lasso intersection selection；
+- 007C：local rotation and positive uniform scale around authored-control bounds center；
+- 007D：canonical groups/locks/visibility/z-order after PlotJSON migration design。
+
+## Clean-room references for 007
+
+```text
+JamesLMilner/terra-draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
+geoman-io/maplibre-geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
+mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
+```
+
+Studied only for observable mode separation、selection lifecycle、keyboard configuration、whole-feature/direct editing and test organization。Code reuse：`none`。
+
+## Required 007A fixture families
+
+- selection ordering and primary fallback；
+- batch transaction preconditions and no-partial-mutation；
+- listener exception isolation；
+- exact document-order restoration；
+- mixed Definition translation；
+- invalid one-member rollback；
+- revision execute/undo/redo；
+- selection overlay and primary handles；
+- style reload recovery；
+- one gesture / one history entry；
+- 100/1,000/10,000 feature performance measurements；
+- all existing 184 Node / 28 Chromium regressions。
+
+No professional-editing runtime belongs on the documentation-only design branch。
