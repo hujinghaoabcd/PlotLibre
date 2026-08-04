@@ -240,7 +240,7 @@ test("one invalid translated feature rejects the complete batch", () => {
     validate() {
       return { valid: true, issues: [] };
     },
-    generate(feature) {
+    generate({ feature }) {
       const id = `${feature.id}:point`;
       return {
         fills: [],
