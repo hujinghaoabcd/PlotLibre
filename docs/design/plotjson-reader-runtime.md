@@ -66,9 +66,12 @@ JSON-safe cloned root
 → resolve explicit Definition target by source plotType
 → deterministic Definition migration plan
 → execute every Definition step on frozen cloned feature JSON
-→ clone and safety-scan every step output
+→ clone and generic safety/resource-scan every step output
+→ enforce per-feature authored-control ceiling
 → require stable feature id and exact target type/version
-→ decode migrated feature
+→ decode migrated feature and attribute decode failure to migration
+→ rebuild and scan the complete current document
+→ enforce aggregate document semantic budgets
 → deeply freeze document and report
 ```
 
@@ -199,12 +202,27 @@ Each planned step receives a frozen cloned feature object and context:
 Each output must:
 
 - be a new synchronous JSON object;
-- pass descriptor-safe cloning and resource limits;
+- pass descriptor-safe cloning and generic resource limits;
+- remain within `controlPointsPerFeature` after every step;
 - retain the original feature id;
 - match the step's exact target `plotType`;
 - match the step's exact target `definitionVersion`.
 
-After the final step, the feature is decoded again under current structural rules and must match the requested final reference. Violations become `PLOTJSON_DEFINITION_MIGRATION_OUTPUT_INVALID`.
+After the final step, the feature is decoded again under current structural rules and must match the requested final reference. A malformed final feature is attributed to `PLOTJSON_DEFINITION_MIGRATION_OUTPUT_INVALID`, with the structural decode error retained as scalar cause.
+
+A standalone feature scan cannot infer document semantic roles such as `features[]` and aggregate controls. Therefore the reader rebuilds and scans the complete final document after every feature has migrated. This final scan re-enforces:
+
+```text
+features
+controlPointsPerFeature
+totalControlPoints
+depth
+totalNodes
+objectKeys
+stringLength
+```
+
+The complete-document scan prevents multiple individually valid Definition outputs from exceeding the aggregate authored-control budget.
 
 The report retains explicit source, target and every applied Definition edge so type renames remain auditable.
 
@@ -274,6 +292,9 @@ Runtime tests cover:
 - missing targets and missing paths;
 - Definition id/type/version output enforcement;
 - cyclic/accessor Definition outputs;
+- per-feature authored-control limit after Definition migration;
+- aggregate authored-control limit after all Definition migrations;
+- malformed final Definition output attribution;
 - immutable reports and repeat-read determinism.
 
 ## 13. Explicit non-effects
