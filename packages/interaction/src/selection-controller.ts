@@ -43,6 +43,7 @@ export class SelectionController {
   readonly #unsubscribeStore: () => void;
   #selectedIds: string[] = [];
   #revision = 0;
+  #storeReconciliationPauseDepth = 0;
 
   public constructor(store: PlotStore) {
     this.#store = store;
@@ -166,6 +167,20 @@ export class SelectionController {
   }
 
   /**
+   * Runs one synchronous Store mutation without intermediate automatic
+   * reconciliation. Selection-aware commands use this to emit exactly one
+   * explicit history selection event after a successful atomic commit.
+   */
+  public runWithoutStoreReconciliation<T>(operation: () => T): T {
+    this.#storeReconciliationPauseDepth += 1;
+    try {
+      return operation();
+    } finally {
+      this.#storeReconciliationPauseDepth -= 1;
+    }
+  }
+
+  /**
    * Restores semantic membership/primary state while issuing a fresh monotonic
    * interaction revision. Stored snapshot.revision is intentionally not reused.
    */
@@ -208,6 +223,7 @@ export class SelectionController {
   }
 
   #reconcileStore(): void {
+    if (this.#storeReconciliationPauseDepth > 0) return;
     const surviving = this.#selectedIds.filter((id) => this.#store.has(id));
     this.#commit(surviving, "store-reconcile");
   }
