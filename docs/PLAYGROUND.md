@@ -6,28 +6,25 @@
 https://hujinghaoabcd.github.io/PlotLibre/
 ```
 
-`apps/playground` 同时承担真实 MapLibre 浏览器应用、人工验收入口、Playwright 测试目标、GitHub Pages 站点和公共 API 使用示例。
-
-Playground 只能通过公开 PlotLibre packages 工作，不得直接调用内部 geometry 或修改 MapLibre Source 绕过 Store、Registry 和 CommandHistory。
+`apps/playground` 同时承担真实 MapLibre 应用、人工验收入口、Playwright 测试目标、GitHub Pages 站点和公共 API 示例。它只能通过公开 PlotLibre packages 工作，不得绕过 Store、Registry、CommandHistory 或公开 renderer API。
 
 ## 2. 当前技术基线
 
 ```text
-PlotLibre workspace:  0.0.19
-MapLibre GL JS:       6.0.0
-Vite:                 8.1.5
-Playwright:           1.61.1
-Node.js:              20.19+
-Pages base:           /PlotLibre/
-Node tests:           163
-Chromium tests:       23
-public symbols:       16 (14 Arrow + 2 Area)
-main SHA:             f873052d44a98f7029f0eda27ea70cda8b1af347
+workspace:          0.0.20
+MapLibre GL JS:     6.0.0
+Vite:               8.1.5
+Playwright:         1.61.1
+Node.js:            20.19+
+Pages base:         /PlotLibre/
+Node tests:         184
+Chromium tests:     28
+public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 ```
 
-公共 packages 仍为开发期独立版本，Playground package 仍为 `0.0.3`。根 workspace `0.0.19` 是里程碑基线，不代表统一 npm release。
+公共 packages 仍使用开发期独立版本。根 workspace `0.0.20` 是里程碑基线，不代表统一 npm release。
 
-## 3. 当前公共符号
+## 3. 当前公共目录
 
 ```text
 arrow.straight              直箭头
@@ -44,13 +41,16 @@ arrow.route                 路线箭头
 arrow.corridor              走廊
 arrow.route.bidirectional   双向路线箭头
 arrow.route.double-head     双头路线箭头
+line.circular-arc           三点圆弧
 area.closed-curve           闭合曲线区域
 area.gathering-place        集结地
+area.circular-segment       圆弓形区域
+area.sector                 扇形区域
 ```
 
 ## 4. 绘制模式
 
-### 4.1 精确两点符号
+### 4.1 精确两点
 
 ```text
 arrow.straight
@@ -59,9 +59,9 @@ arrow.fine.tailed
 arrow.assault-direction
 ```
 
-第二次点击自动完成。两个 authored controls 分别是 tail/origin 和 exact tip/objective。
+第二次点击自动完成。
 
-### 4.2 可变路径箭头
+### 4.2 可变路径
 
 ```text
 arrow.curved
@@ -72,9 +72,10 @@ arrow.route
 arrow.corridor
 arrow.route.bidirectional
 arrow.route.double-head
+area.closed-curve
 ```
 
-双击末点或按 Enter 完成。Backspace/Delete 逐点回退，Escape 取消。Definition 决定控制点角色、两点最小形态、exact tip、tail edge 或 centre path 语义。
+双击末点或按 Enter 完成。Backspace/Delete 逐点回退，Escape 取消。
 
 ### 4.3 固定复合箭头
 
@@ -83,56 +84,94 @@ arrow.double  4 controls
 arrow.pincer  5 controls
 ```
 
-达到最大 authored control 数量后自动尝试完成。无效候选保留 active session，并通过 `drawRejection` 暴露稳定 issue codes。派生的镜像目标、branch、bridge 或 curve samples 不持久化。
+达到最大 authored controls 后自动尝试完成。无效候选保留 active session 和结构化 rejection。
 
-### 4.4 闭合曲线区域
-
-`area.closed-curve@1.0.0` 使用 3–64 个有序边界途经点：
+### 4.4 固定三点符号
 
 ```text
-0..n-1 authored boundary waypoints
+area.gathering-place
+line.circular-arc
+area.circular-segment
+area.sector
 ```
 
-操作：
+第三个 pointer candidate 可形成完整 draft，第三次有效点击自动完成。
 
-1. 点击至少三个边界控制点；
-2. 从第三个完整 candidate 开始显示 derived closed Polygon draft；
-3. 双击末点或按 Enter 完成；
-4. 自动闭合不增加 authored control；
-5. Backspace/Delete 逐点撤销；
-6. 完成后每个 authored waypoint 显示 semantic handle。
-
-周期曲线、重复首点、winding normalization 和 final Polygon coordinates 均为派生数据。
-
-### 4.5 集结地
-
-`area.gathering-place@1.0.0` 固定三个 controls：
+#### Circular arc
 
 ```text
-0 flank A
-1 front crown
-2 flank B
+0 start
+1 through
+2 end
 ```
 
-操作：
+输出 open LineString。经过点精确选择小弧或大弧。
 
-1. 点击一侧翼点；
-2. 点击前向冠点；
-3. 移动指针时第三个 candidate 形成完整 draft；
-4. 点击另一侧翼点后自动完成。
+#### Circular segment
 
-后部闭合锚点由两翼中点和 crown direction 派生，不能成为 handle 或 PlotJSON control。两个 flank 可以 canonical permutation，crown 必须保持 exact index 1。
+```text
+0 arc/chord start
+1 through-point on arc
+2 arc/chord end
+```
 
-## 5. Completion 与地图生命周期
+输出 selected arc + exact chord 的 Polygon。
+
+#### Sector
+
+```text
+0 center
+1 exact radius/start-boundary point
+2 end-bearing handle
+```
+
+第三点只定义结束方位，其距离不改变半径。默认顺时针，Definition 参数可选择逆时针。
+
+## 5. Draft、Guide 与 Rejection
+
+PlotLibre 区分：
+
+- **complete draft**：完整合法派生图形，尚未进入 Store；
+- **last-valid draft**：当前 pointer 无效时保留最近合法图形；
+- **incomplete semantic guide**：控制点不足时的临时路径/点；
+- **Definition semantic guide path**：完整图形中仍需解释 authored control 与 rendered geometry 关系的路径；
+- **completion rejection**：明确完成失败后的结构化问题。
+
+Sector 使用 Definition hook：
+
+```text
+deriveSemanticGuidePaths(feature)
+```
+
+返回 `center → end-bearing handle`。MapLibre 在以下状态渲染 `plotlibre-handle-guide` 虚线：
+
+- 完整 draft；
+- 已选中；
+- handle drag preview。
+
+该 guide 不进入：
+
+```text
+committed source
+Store
+History
+PlotJSON
+Definition committed RenderBundle
+```
+
+MapLibre style reload 必须恢复该 layer 和选中对象的 guide。
+
+## 6. Completion transaction
 
 固定最大点数：
 
 ```text
 maximum-point candidate
+→ canonical authored controls
 → Registry validation
 → full generation preflight
 → valid: auto-complete
-→ invalid: active session + visible rejection
+→ invalid: active session + rejection
 ```
 
 可变多点：
@@ -146,53 +185,33 @@ double-click / Enter
 → Store
 ```
 
-绘制多点符号期间临时关闭 MapLibre double-click zoom。恢复必须发生在当前原生 `dblclick` 调用栈结束后，避免完成时额外缩放。Cancel 与 destroy 可立即恢复。
-
-## 6. Draft、Guide 与 Rejection
-
-PlotLibre 区分：
-
-- **完整合法 draft**：Definition 已生成 RenderBundle，但尚未进入 Store；
-- **last-valid draft**：当前 pointer candidate 无效时保留最近合法图形；
-- **semantic guide**：尚不能生成 Polygon 时显示 authored path/control guide；
-- **completion rejection**：明确完成尝试失败后的结构化问题。
-
-所有临时状态均不得进入 Store、History、handles 或 PlotJSON。
-
-Playground 的通用事件监听器必须先注册，symbol-specific 监听器后注册。这样钳形等复杂符号的 actionable rejection guidance 不会被通用“继续点击”文案覆盖。
+绘制多点符号期间临时关闭 double-click zoom。恢复必须在当前原生 `dblclick` 调用栈结束后进行。
 
 ## 7. 示例数据
 
-生产模式和 `?basemap=none` 模式加载 16 类南京示例：
+生产模式和 `?basemap=none` 加载 19 类南京示例：
 
 ```text
-14 × Arrow Definitions
-2 × Area Definitions
+14 Arrow
+1 Line
+4 Area
 ```
 
-示例只通过公开 `create()` 和 Registry preflight 进入 Store。首次启动流程为：
+示例只通过公开 `create()` 与 Registry preflight 进入 Store。
+
+启动流程：
 
 ```text
 PlaygroundApp.start()
-→ register generic listeners and base sample
+→ bind generic listeners
 → install symbol-group wrappers/listeners
 → reload complete wrapped sample catalog
-→ 16 semantic features
+→ 19 semantic features
 ```
 
-基础兼容 E2E `?e2e=1` 保持空 Store 和原九类 selector，以验证早期公共交互表面没有意外破坏。完整目录 E2E 使用显式 feature flags。
+基础兼容 E2E `?e2e=1` 保持空 Store 和原九类 selector，验证早期公共交互表面没有意外破坏。
 
-## 8. 启动、底图与 E2E 模式
-
-在线资源不能阻塞标绘：
-
-```text
-local background style
-→ MapLibre load
-→ optional raster basemap
-→ PlotLibre renderer
-→ PlaygroundApp
-```
+## 8. 启动与 E2E 模式
 
 禁用在线底图：
 
@@ -206,30 +225,33 @@ local background style
 ?e2e=1
 ```
 
-完整 16 类功能 E2E：
+完整 19 类 E2E：
 
 ```text
-?e2e=1&squad=1&paths=1&areas=1
+?e2e=1&squad=1&paths=1&areas=1&circular=1
 ```
 
-`basemap=none` 只能改变底图，不得改变符号目录、示例或 semantic behavior。
+底图状态只能改变背景，不能改变符号目录、示例或语义行为。
 
-## 9. MapLibre 6 Worker
+## 9. MapLibre Sources 与 Layers
 
-构建时从安装的 `maplibre-gl` 复制：
+Sources：
 
 ```text
-maplibre-gl-worker.mjs
-maplibre-gl-shared.mjs
+plotlibre-committed
+plotlibre-draft
+plotlibre-handles
 ```
 
-创建地图前设置：
+新增 guide layer：
 
-```ts
-setWorkerUrl(`${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`);
+```text
+plotlibre-handle-guide
 ```
 
-Worker entry 和 shared module 必须来自同一 MapLibre 版本。详见 `MAPLIBRE_WORKER_PACKAGING.md`。
+完整 layer 数量当前为 8。`style.load` 后 renderer 必须幂等恢复 Sources、Layers、committed features、draft 和 selected handles/guides。
+
+`querySourceFeatures()` 可按瓦片返回重复 Feature。控制点数量必须按 `plotId + handleIndex` 去重，Store 中 `controlPoints.length` 才是权威值。
 
 ## 10. 本地运行与验证
 
@@ -238,7 +260,7 @@ npm install
 npm run playground:dev
 ```
 
-默认开发地址：
+默认地址：
 
 ```text
 http://127.0.0.1:5173/PlotLibre/
@@ -256,83 +278,38 @@ npx playwright install --with-deps chromium
 npm run playground:e2e
 ```
 
-## 11. 当前 Chromium 覆盖
+## 11. Chromium 覆盖
 
-23 个 Chromium tests 覆盖：
+28 项 Chromium tests 覆盖：
 
-- `/PlotLibre/` base path；
-- Worker entry/shared module；
-- 无远程底图启动；
-- 基础 9-selector compatibility surface；
-- 生产 16-sample catalog；
-- committed/draft/handles Sources；
-- fill/line/handle Layers；
-- actual `queryRenderedFeatures()`；
-- 两点符号绘制；
-- curved/attack/squad/path multi-point 绘制；
-- double-arrow transient preview 与 fixed-four completion；
-- pincer natural order、actionable rejection 与恢复；
+- Pages base、Worker entry/shared module；
+- remote-basemap-independent startup；
+- base 9-selector compatibility surface；
+- production 19-symbol catalog and samples；
+- actual committed/draft/handle-guide rendering；
+- 两点、可变路径、固定三/四/五点 completion；
+- pincer actionable rejection and recovery；
 - route/corridor/multi-head route；
-- closed-curve draft、double-click completion 和 rendered Polygon；
-- gathering-place third-pointer draft、fixed-three completion 和 rendered Polygon；
-- 14 Arrow visibility matrix；
-- 16 类 sample committed layer presence；
-- handle edit、revision、history 和 undo；
-- style reload、delete、PlotJSON；
-- camera stability 和 zoom restoration。
+- closed curve and gathering place；
+- circular arc LineString；
+- circular-segment Polygon；
+- sector derived endpoint and authored bearing handle；
+- sector transient radial guide；
+- committed source 不包含 guide；
+- handles、edit、revision、undo；
+- style reload、delete、PlotJSON、camera and zoom restoration。
 
-当前权威基线：
-
-```text
-Node tests:      163 passed
-Chromium tests:  23 passed
-public symbols:  16
-final PR run:    #294 / 30883623452
-merged PR:       #31
-```
-
-## 12. `querySourceFeatures()` 注意事项
-
-MapLibre 可以按瓦片返回同一 GeoJSON Feature 的多个副本。语义 handle 数量必须按：
+目标权威基线：
 
 ```text
-plotId + handleIndex
+Node:      184 passed
+Chromium:  28 passed
+symbols:   19
 ```
 
-去重。Store 中 `controlPoints.length` 才是 authored semantic control 数量的权威值。
+## 12. Pages 部署
 
-## 13. Geometry validation policy
-
-所有 topology-sensitive Definitions 在 Store mutation 前完成 full generation preflight：
-
-- controls 满足 Definition 数量和角色；
-- 参数有限且处于范围；
-- 输出 geometry 有限；
-- Polygon ring 闭合并规范化方向；
-- simple-ring validation；
-- exact authored controls 按 Definition contract 保留；
-- invalid handle preview 不进入 Store/History；
-- derived samples、heads、notches、bridges、offsets、closure anchors 和 final vertices 不作为 handles。
-
-## 14. Pages 部署
-
-`.github/workflows/pages.yml` 仅从 `main` 部署，监听：
-
-```text
-apps/playground/**
-packages/**
-package.json
-tsconfig*.json
-.github/workflows/pages.yml
-```
-
-构建命令：
-
-```bash
-npm run playground:build
-```
-
-部署目录：
+`.github/workflows/pages.yml` 仅从 `main` 构建并部署：
 
 ```text
 apps/playground/dist
@@ -346,33 +323,21 @@ workflow deployed
 live page manually verified
 ```
 
-不能仅根据源码或 workflow 配置宣称线上缓存已人工核验。
+不能仅凭源码或 workflow 声称线上缓存已人工核验。
 
-## 15. 强制约束
+## 13. 强制约束
 
-- Playground 不直接编辑 MapLibre Source；
-- Polygon 不是原始数据；
-- 应用层不复制 geometry；
+- Playground 不直接编辑 MapLibre Sources；
+- rendered geometry 不是原始数据；
+- UI 不复制 geometry validation；
 - 底图失败不能阻塞 PlotLibre；
-- dev、preview、E2E 和 Pages 统一 `/PlotLibre/`；
-- 每个新公共符号同阶段加入 selector、样例和 browser coverage；
-- browser tests 必须验证 actual rendered feature；
-- completion instructions 与 Definition schema 一致；
-- topology-sensitive symbols 验证 invalid preview 不进入 Store/History；
-- derived controls 与 generated vertices 不暴露为 canonical handles；
-- Playground 错误提示使用 Registry issue codes，不复制 geometry validation；
-- Area family 使用独立命名、样式与说明；
-- generic/specialized listener ordering 必须有回归测试保护。
+- 每个新公共符号同阶段加入 selector、sample、instructions 和 actual-rendered tests；
+- semantic guides 必须由 Definition 声明并保持 transient；
+- completion 文案必须与 `controlSchema` 一致；
+- invalid preview 不进入 Store/History；
+- generic listeners 先绑定，specialized listeners 后绑定；
+- dev、preview、E2E 和 Pages 统一 `/PlotLibre/`。
 
-## 16. 下一步
+## 14. 下一步
 
-006I 已通过 PR #31 合并。完成 post-merge 文档同步后进入 006J 语义设计：
-
-1. 研究 arc/sector/lune 的公共行为、术语、固定 revision 和许可证；
-2. 冻结 center、radius、start/end bearings 和 arc direction roles；
-3. 明确 LineString、Polygon 或 compound output；
-4. 决定 local-metre 与 geodesic 策略；
-5. 定义 crossing 0°、sweep > 180°、exact endpoints 和 degenerate radius；
-6. 决定哪些候选具有独立 public semantics；
-7. 冻结 interaction、PlotJSON、deterministic fixtures 和 browser matrix；
-8. 设计未冻结前不增加 selector、样例、geometry 或 public Definition。
+PR #34 完成最终 current-head CI、交接与 squash merge 后，进入 Milestone 007 专业编辑语义设计：多选、框选/套索、整体平移、旋转/缩放、多对象 transaction 和 atomic rollback。006J PR 不再增加新符号或 geodesic circular fallback。
