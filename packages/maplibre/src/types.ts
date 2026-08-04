@@ -79,6 +79,7 @@ export interface MapLibreMapLike {
 
 export interface PlotLibreSourceIds {
   readonly committed: string;
+  readonly selection: string;
   readonly draft: string;
   readonly handles: string;
 }
@@ -87,6 +88,8 @@ export interface PlotLibreLayerIds {
   readonly fill: string;
   readonly line: string;
   readonly point: string;
+  readonly selectionLine: string;
+  readonly selectionPoint: string;
   readonly draftFill: string;
   readonly draftLine: string;
   readonly draftPoint: string;
