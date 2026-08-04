@@ -3,6 +3,8 @@ import {
   type PlotStore,
 } from "@plotlibre/core";
 
+export type SelectionIntent = "replace" | "add" | "subtract" | "toggle";
+
 export type SelectionChangeReason =
   | "replace"
   | "add"
@@ -71,6 +73,31 @@ export class SelectionController {
 
   public has(id: string): boolean {
     return this.#selectedIds.includes(id);
+  }
+
+  /**
+   * Applies an adapter-normalized click/selection intent without inspecting any
+   * browser or map-engine modifier keys.
+   */
+  public applyIntent(
+    id: string | undefined,
+    intent: SelectionIntent,
+  ): SelectionSnapshot {
+    if (id === undefined) {
+      return intent === "replace" ? this.clear() : this.snapshot();
+    }
+
+    this.#assertExists(id);
+    switch (intent) {
+      case "replace":
+        return this.has(id) ? this.makePrimary(id) : this.replace([id]);
+      case "add":
+        return this.add([id]);
+      case "subtract":
+        return this.has(id) ? this.subtract([id]) : this.snapshot();
+      case "toggle":
+        return this.toggle(id);
+    }
   }
 
   public replace(
