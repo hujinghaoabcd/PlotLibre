@@ -10,20 +10,20 @@ Runtime PR：#57
 ## Current state
 
 ```text
-base main:           dead641a40852758bcdecbfad99cbf2215024916
-workspace:           0.0.22
-PlotJSON schema:     1.0.0
+base main:            dead641a40852758bcdecbfad99cbf2215024916
+workspace:            0.0.22
+PlotJSON schema:      1.0.0
 production migrations: none
-public symbols:      19 (14 Arrow + 1 Line + 4 Area)
+public symbols:       19 (14 Arrow + 1 Line + 4 Area)
 merged Node baseline: 348
-008C candidate:      372 Node tests
-Chromium baseline:   34
-MapLibre Sources:    4
-MapLibre Layers:     10
-008A runtime:        merged PR #53/#54
-008B runtime:        merged PR #55/#56
-008C runtime:        Draft PR #57
-next milestone:      008D atomic import
+008C candidate:       375 Node tests
+Chromium baseline:    34
+MapLibre Sources:     4
+MapLibre Layers:      10
+008A runtime:         merged PR #53/#54
+008B runtime:         merged PR #55/#56
+008C runtime:         Draft PR #57
+next milestone:       008D atomic import
 ```
 
 ## Completed in this milestone
@@ -44,6 +44,10 @@ next milestone:      008D atomic import
 - enforced document-wide unique feature ids;
 - supported explicit Definition target maps and plotType rename chains;
 - required Definition outputs to preserve feature id and exact target reference;
+- enforced `controlPointsPerFeature` after each Definition step;
+- attributed malformed final Definition structures to migration output failure;
+- rebuilt and scanned the complete final document for aggregate semantic limits;
+- enforced final `totalControlPoints` after all Definition migrations;
 - produced deeply frozen detached documents and migration reports;
 - kept Store, Registry generation, History, selection and MapLibre mutation out of scope.
 
@@ -73,14 +77,14 @@ docs/handover/LATEST.md
 
 ## Validation status
 
-The first structured reader head passed 364 Node tests and 34 Chromium tests. The final 372-test hardening head and documentation head still require exact-head CI before Ready/merge. Old-head evidence must not be used for the final PR head.
+The structured reader head passed 364 Node tests and 34 Chromium tests. A later 372-test head passed the runtime gate before semantic-budget review. The current 375-test semantic-budget candidate requires its own exact-head CI; old-head evidence must not be reused.
 
 Required final gate:
 
 ```text
 Node 20.19
 Node 22
-372 Node tests
+375 Node tests
 Playground typecheck/build
 handover check
 region-selection benchmark
@@ -91,17 +95,18 @@ selection-transform benchmark
 
 ## Next tasks
 
-1. complete the immutable 008C handover with the final exact head;
-2. verify the final changed-file scope;
-3. run exact-head CI and capture both benchmark artifacts;
-4. confirm 372 Node and 34 Chromium tests;
-5. confirm zero unresolved review threads;
-6. mark PR #57 Ready without changing its head;
-7. squash merge with expected head;
-8. verify the returned squash SHA as current `main`;
-9. create a Markdown-only 008C post-merge finalization branch;
-10. synchronize README, AGENTS, architecture, PlotJSON spec and roadmap;
-11. merge finalization and create `agent/008d-plotjson-atomic-import-runtime` from synchronized main.
+1. verify the current 375-test exact head and changed-file scope;
+2. run exact-head CI and capture both benchmark artifacts;
+3. confirm 375 Node and 34 Chromium tests;
+4. confirm zero unresolved review threads;
+5. write exact head/run/artifact evidence into both handover files;
+6. run one final exact-head CI after evidence synchronization;
+7. mark PR #57 Ready without changing its head;
+8. squash merge with expected head;
+9. verify the returned squash SHA as current `main`;
+10. create a Markdown-only 008C post-merge finalization branch;
+11. synchronize README, AGENTS, architecture, PlotJSON spec and roadmap;
+12. merge finalization and create `agent/008d-plotjson-atomic-import-runtime` from synchronized main.
 
 ## 008D frozen boundary
 
@@ -123,6 +128,7 @@ MapLibre derived rendering
 
 - migration functions are trusted synchronous application code; JavaScript execution cannot be sandboxed by this runtime;
 - frozen inputs, same-object rejection, Promise rejection and output rescanning limit accidental or malformed behavior;
+- a standalone Definition feature scan cannot infer document aggregate semantic roles, so the final whole-document scan is mandatory;
 - `definitionTargets` is explicit application configuration until 008D binds the reader to `PlotRegistry`;
 - omitting `definitionTargets` preserves parser-only 1.0 compatibility and does not claim live Definition equality;
 - normalizations are compatibility facts, not silent undocumented coercions;
