@@ -26,7 +26,7 @@ MapLibre Layers:     10
 next milestone:      008D atomic import
 ```
 
-## Delivered in 008C
+## Completed in this milestone
 
 - added `readPlotDocument()` as the report-bearing safe reader;
 - retained `parsePlotDocument()` as a compatibility wrapper;
