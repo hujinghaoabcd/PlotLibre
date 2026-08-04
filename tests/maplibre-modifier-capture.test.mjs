@@ -35,6 +35,10 @@ class FakeCanvas {
     }
   }
 
+  getBoundingClientRect() {
+    return { left: 100, top: 50 };
+  }
+
   focus() {}
 }
 
@@ -44,6 +48,7 @@ class FakeMap {
   listeners = new Map();
   canvas = new FakeCanvas();
   targetId = undefined;
+  queryPoint = undefined;
   boxZoomEnabled = true;
   boxZoom = {
     disable: () => {
@@ -103,7 +108,8 @@ class FakeMap {
     return this.canvas;
   }
 
-  queryRenderedFeatures() {
+  queryRenderedFeatures(point) {
+    this.queryPoint = point;
     return this.targetId === undefined
       ? []
       : [{ properties: { plotId: this.targetId } }];
@@ -121,7 +127,7 @@ function addArrow(plot, id, offset) {
   });
 }
 
-test("canvas capture reserves Shift selection and restores box zoom on destroy", () => {
+test("canvas pointer capture reserves Shift and restores box zoom on destroy", () => {
   const map = new FakeMap();
   const plot = new PlotLibre(map, {
     definitions: [straightArrowDefinition],
@@ -134,8 +140,8 @@ test("canvas capture reserves Shift selection and restores box zoom on destroy",
   map.targetId = "b";
 
   const event = {
-    offsetX: 10,
-    offsetY: 20,
+    clientX: 110,
+    clientY: 70,
     shiftKey: true,
     prevented: false,
     immediateStopped: false,
@@ -147,8 +153,9 @@ test("canvas capture reserves Shift selection and restores box zoom on destroy",
       this.immediateStopped = true;
     },
   };
-  map.canvas.fire("mousedown", event);
+  map.canvas.fire("pointerdown", event);
 
+  assert.deepEqual(map.queryPoint, { x: 10, y: 20 });
   assert.deepEqual(plot.selectedIds, ["a", "b"]);
   assert.equal(plot.selectedId, "b");
   assert.equal(event.prevented, true);
@@ -156,4 +163,5 @@ test("canvas capture reserves Shift selection and restores box zoom on destroy",
 
   plot.destroy();
   assert.equal(map.boxZoomEnabled, true);
+  assert.equal(map.canvas.listeners.get("pointerdown")?.size ?? 0, 0);
 });
