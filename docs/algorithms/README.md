@@ -1,8 +1,8 @@
 # PlotLibre Algorithm Records
 
-本目录记录参数化符号、共享几何基础以及专业编辑事务的独立算法说明、来源边界、失败策略与测试要求。公式与行为说明用于解释 PlotLibre 的独立实现，不代表允许复制参考源码。
+本目录记录参数化符号、共享几何和专业编辑事务的独立算法、失败策略与测试要求。
 
-## 当前算法记录
+## Current records
 
 | 文档 | 公共符号或共享基础 | 状态 |
 |---|---|---|
@@ -18,149 +18,94 @@
 | `arrow-route-corridor.md` | route/corridor PathRibbon | 已实现 |
 | `arrow-route-multihead.md` | bidirectional/double-head route | 已实现 |
 | `closed-action-area.md` | closed curve/gathering place | 已实现 |
-| `circular-arc-foundation.md` | circular arc/segment/sector shared frame | 已实现并合并 |
-| `batch-edit-transaction.md` | selection、Store transaction、batch commands、translation | 007A 已实现并合并 |
-| `screen-region-selection.md` | box/lasso capture、topology、screen intersection、batch intent | 设计已通过 PR #40 合并；runtime 下一步 |
+| `circular-arc-foundation.md` | circular arc/segment/sector | 已实现 |
+| `batch-edit-transaction.md` | atomic Store、selection、batch command、translation | 已实现 |
+| `screen-region-selection.md` | box/lasso、exact screen resolver | 已实现 |
+| `selection-local-transform.md` | shared-pivot rotation and positive uniform scale | 007C design freeze candidate |
 
-## 当前基线
+## Current baseline
 
 ```text
-main:               a9b9efc090c01f45133f3f136a0049a97ee52b90
-workspace:          0.0.21
+main:               349a09160ac2e17883e2270123d371c164ef28c2
+workspace:          0.0.22
 public symbols:     19
-Node tests:         219
-Chromium tests:     30
+Node tests:         264
+Chromium tests:     32
 Sources/Layers:     4 / 10
-007B design PR:     #40
-validated head:     4a8ee1102bb923801ada95c648a258225ccb9ec4
-validated CI:       #413 / 30912109618
+benchmark job:      required
+current branch:     agent/007c-rotation-scale-design
+runtime:            prohibited
 ```
 
-## 007A algorithm foundation
+## 007C algorithm summary
 
-Detailed record：`batch-edit-transaction.md`.
+Detailed record：`selection-local-transform.md`.
 
-- ordered transient selection；
-- atomic Store transaction；
-- listener failure isolation；
-- exact-order BatchEditCommand；
-- batch delete；
-- local-metre whole-selection translation。
-
-## 007B merged screen-region algorithms
-
-Detailed record：`screen-region-selection.md`.
-
-### Numeric policy
+### Shared frame
 
 ```text
-box activation:       4 CSS px
-lasso sample spacing: 2 CSS px
-lasso RDP tolerance:  1.5 CSS px
-minimum lasso area:   16 CSS px²
-minimum points:       3
+all selected authored controls
+→ validate one local coordinate domain
+→ order-independent geographic seed
+→ one local projection
+→ local authored-control AABB
+→ fixed AABB-center pivot
 ```
 
-### Lasso topology
+### Clockwise rotation
 
 ```text
-raw samples
-→ remove consecutive duplicates
-→ reject repeated non-consecutive vertices
-→ reject non-adjacent crossing/touch/overlap
-→ RDP simplify
-→ validate simplified closed ring again
+x' = px + cosθ(x-px) + sinθ(y-py)
+y' = py - sinθ(x-px) + cosθ(y-py)
 ```
 
-Simplification cannot hide an invalid raw loop。
+Pointer angle accumulates successive signed local-vector deltas, avoiding ±180° discontinuity.
 
-### Broad/narrow candidate resolution
+### Positive uniform scale
 
 ```text
-screen bounding box
-→ MapLibre committed fill/line/point query
-→ plotId dedup
-→ Store-order normalization
-→ Registry.generate once per unique candidate
-→ project fills/lines/points
-→ exact screen intersection
+k = current local radius / start local radius
+x' = px + k(x-px)
+y' = py + k(y-py)
+0.01 <= k <= 100
 ```
 
-- Point center；
-- LineString/MultiLineString segments；
-- Polygon/MultiPolygon crossing and containment with holes；
-- compound any-component semantics；
-- boundary inclusive；
-- CSS stroke/radius and transient layers ignored；
-- query/generation/projection failure fails closed。
+Out-of-range factor rejects rather than clamps. Crossing pivot cannot reflect because `k` remains positive.
 
-### Deterministic selection intent
+### Canonical mutation
 
-```text
-replace  candidates
-add      current + new candidates
-subtract current survivors
-toggle   current survivors + newly selected candidates
-```
+- authored controls only；
+- each changed feature revision +1；
+- parameters/style/metadata unchanged；
+- all candidates canonicalized and generated before preview/commit；
+- partial preview and partial transaction prohibited；
+- one `BatchEditCommand`；
+- undo/redo reuse exact captured values。
 
-`SelectionController.applyMany()` must produce at most one immutable event. Region selection is not a History command。
+### Parameter caveat
 
-### Screen overlay and lifecycle
+The catalog contains absolute ground limits such as `minimumWidthMeters` and `maximumWidthMeters`. 007C v1 does not transform parameters and therefore does not promise strict rendered similarity when an absolute cap becomes active. A future parameter-transform hook is a separate design.
 
-- DOM/SVG overlay；
-- no new Source/Layer；
-- pointer capture and dragPan/boxZoom restoration；
-- synthetic click suppression；
-- cancel on camera/style/resize/Store/external selection/programmatic lifecycle changes。
+## Required runtime fixtures
 
-## Runtime fixture families
-
-### Pure algorithms
-
-- box quadrant/threshold/degenerate fixtures；
-- lasso sample/area/RDP/simple-ring fixtures；
-- repeat、bow-tie、touch and overlap rejection；
-- Point/Line/MultiLine predicates；
-- Polygon crossing/containment/hole exclusion；
-- MultiPolygon/compound hit；
-- applyMany ordering、Primary and no-op；
-- broad-phase duplicate/query-order normalization；
-- fail-closed query/generation/projection。
-
-### Adapter/Chromium
-
-- Shift click after immediate mousedown mutation removal；
-- neutral additive box；
-- explicit replace/toggle/subtract box；
-- lasso bbox false-positive removal；
-- invalid lasso no mutation；
-- DOM overlay/pointer/camera cleanup；
-- no History mutation；
-- region selection followed by translation/delete/undo；
-- all historical regressions。
+- order-independent frame/pivot；
+- clockwise cardinal rotations and distance preservation；
+- angle unwrapping；
+- scale `0.01/1/100` and range rejection；
+- pointer crossing pivot without reflection；
+- antimeridian/high-latitude/large-extent rejection；
+- all 19 Definitions Registry smoke；
+- all-member failure atomicity；
+- revision、selection and document-order preservation；
+- exact execute/undo/redo；
+- explicit transform-mode overlay/lifecycle；
+- historical 264 Node / 32 Chromium regressions。
 
 ## Performance boundary
 
-MapLibre rendered index is the first broad phase. Runtime must generate only unique candidates, not every Store feature when candidate count is smaller。
+Runtime must measure at least `1 / 100 / 1,000` selected features and report generation, total preview preparation and memory. The design PR publishes no latency threshold.
 
-Measured fixtures：`100 / 1,000 / 10,000` features。Record environment、camera、feature mix、vertices、candidate count、query/narrow/total times、median and p95。No hard latency guarantee before measurements。
-
-## Runtime implementation order
-
-```text
-screen utilities
-→ applyMany
-→ exact predicates
-→ candidate resolver
-→ unified region adapter
-→ DOM/SVG overlay
-→ public API
-→ Playground/E2E/benchmarks
-```
-
-Planned branch：`agent/007b-box-lasso-selection` after finalization merges。
-
-## Clean-room references
+## Clean-room boundary
 
 ```text
 Terra Draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
