@@ -21,6 +21,12 @@ export const DEFAULT_AREA_STYLE: PlotStyle = {
   lineWidth: 2,
 };
 
+export const DEFAULT_LINE_STYLE: PlotStyle = {
+  lineColor: "#6a1b9a",
+  lineOpacity: 1,
+  lineWidth: 3,
+};
+
 export function createRenderProperties(
   feature: PlotFeature,
   role: PlotRenderRole,
