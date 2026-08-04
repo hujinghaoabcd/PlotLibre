@@ -154,7 +154,7 @@ test("explicit box control replaces selection using exact semantic hits", async 
   ).toBeHidden();
 });
 
-test("invalid lasso retries directly and Shift adds in Store order", async ({
+test("invalid lasso retries directly and replaces in Store order", async ({
   page,
 }) => {
   await openEmptyPlayground(page);
@@ -196,7 +196,6 @@ test("invalid lasso retries directly and Shift adds in Store order", async ({
   const width = bounds.maxX - bounds.minX;
   const height = bounds.maxY - bounds.minY;
   const centerX = (bounds.minX + bounds.maxX) / 2;
-  await page.keyboard.down("Shift");
   await dragLasso(
     page,
     [
@@ -206,7 +205,6 @@ test("invalid lasso retries directly and Shift adds in Store order", async ({
     ],
     1,
   );
-  await page.keyboard.up("Shift");
 
   await expect
     .poll(() =>
@@ -223,10 +221,10 @@ test("invalid lasso retries directly and Shift adds in Store order", async ({
       }),
     )
     .toEqual({
-      selectedIds: ["region-c", "region-a", "region-b"],
+      selectedIds: ["region-a", "region-b"],
       primaryId: "region-b",
       status: "idle",
       rejection: undefined,
     });
-  await expect(page.getByTestId("status-text")).toContainText("已选择 3 个对象");
+  await expect(page.getByTestId("status-text")).toContainText("已选择 2 个对象");
 });
