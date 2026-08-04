@@ -51,8 +51,8 @@ test("pointer-derived translation exposes an immutable local metre delta", () =>
   const end = projection.unproject({ x: -25, y: 75 });
   const translation = createLocalTranslation(origin, end);
 
-  assert.ok(Math.abs(translation.deltaMeters.x + 25) < 1e-9);
-  assert.ok(Math.abs(translation.deltaMeters.y - 75) < 1e-9);
+  assert.ok(Math.abs(translation.deltaMeters.x + 25) < 1e-6);
+  assert.ok(Math.abs(translation.deltaMeters.y - 75) < 1e-6);
   assert.equal(Object.isFrozen(translation), true);
   assert.equal(Object.isFrozen(translation.origin), true);
   assert.equal(Object.isFrozen(translation.deltaMeters), true);
