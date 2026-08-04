@@ -3,6 +3,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+artifacts/
 apps/playground/public/assets/maplibre-gl-worker.mjs
 apps/playground/public/assets/maplibre-gl-shared.mjs
 *.tsbuildinfo
