@@ -10,7 +10,7 @@ Canonical feature state:
 PlotDefinition + authored controlPoints + parameters + style + metadata
 ```
 
-Rendered geometry, samples, selection/transform overlays, local frames, pivots, screen regions and previews are derived. They must not replace authored state or enter PlotJSON.
+Rendered geometry, samples, local frames, pivots, selection/region/transform overlays and previews are derived. They must not replace authored state or enter PlotJSON.
 
 ## 2. Dependency direction
 
@@ -21,12 +21,12 @@ core + interaction <- maplibre
 public packages <- playground / wrappers
 ```
 
-Core/geometry cannot depend on MapLibre or DOM. Interaction math and commands are engine-independent. MapLibre owns browser normalization, map projection and derived UI.
+Core/geometry cannot depend on MapLibre or DOM. Interaction math and commands remain engine-independent. MapLibre owns browser normalization, map projection and derived UI.
 
 ## 3. Current baseline
 
 ```text
-main SHA:           349a09160ac2e17883e2270123d371c164ef28c2
+main SHA:           ace18bcd58466d2eadd2b647cb0e2b67a7b546b2
 workspace:          0.0.22
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 Node baseline:      264
@@ -34,103 +34,90 @@ Chromium baseline:  32
 MapLibre Sources:   4
 MapLibre Layers:    10
 benchmark job:      required
-007A:               merged through PR #38/#39
-007B:               merged through PR #40–#44
-007B-P:             merged through PR #45/#46
+007A:               merged PR #38/#39
+007B:               merged PR #40–#44
+007B-P:             merged PR #45/#46
+007C design:        merged PR #47
 ```
 
 Current branch:
 
 ```text
-agent/007c-rotation-scale-design
-scope: rotation + positive uniform scale design only
+agent/007c-design-post-merge-finalization
+scope: actual PR #47 merge-state synchronization only
 runtime: prohibited
 ```
 
+PR #47 evidence:
+
+```text
+validated head:     a19444d1c76cad266fe84e3e454afa6d146c7e4d
+CI:                 #468 / 30936185645
+Node tests:         264 passed on 20.19 and 22
+benchmark artifact: 8903197454
+Chromium:           32 passed
+threads:            0
+squash SHA:         ace18bcd58466d2eadd2b647cb0e2b67a7b546b2
+```
+
+Never use old-head evidence for a newer head.
+
 ## 4. Selection and atomic editing
 
-Selection remains transient, ordered and Primary-last. It is excluded from PlotJSON and feature revision.
+Selection is transient, ordered and Primary-last. It is excluded from PlotJSON and feature revision.
 
-`PlotStore.applyTransaction()` commits one staged batch. `BatchEditCommand` owns exact before/after feature values, document order and selection snapshots. Batch delete and local translation remain unchanged.
+`PlotStore.applyTransaction()` commits one staged batch. `BatchEditCommand` owns exact before/after features, document order and selection. Batch delete and local translation remain unchanged.
 
 Every completed whole-selection transform must be one `BatchEditCommand`; preview, rejection and cancel must not enter Store or History.
 
-## 5. 007C canonical transform boundary
+## 5. 007C canonical boundary
 
-007C transforms authored control coordinates only.
+Transform authored controls only. Preserve id, plotType, parameters, style, metadata, Store order, selection order and Primary. Each effectively changed feature gets exact `revision + 1`.
 
-Preserve:
-
-```text
-id
-plotType
-parameters
-style
-metadata
-selection membership/order/Primary
-Store document order
-```
-
-For each effectively changed feature:
-
-```text
-revision = original revision + 1
-```
-
-Rendered vertices, samples, frame, pivot, angle, factor and screen handles remain derived.
+Frame, pivot, angle, factor, handles and preview are transient.
 
 ## 6. Shared local frame and pivot
 
-Flatten every selected authored control, validate one local coordinate domain and derive one order-independent geographic seed. Project all controls into one local-metre frame.
-
-Pivot:
-
 ```text
-px = (minLocalX + maxLocalX) / 2
-py = (minLocalY + maxLocalY) / 2
+all selected authored controls
+→ validate one local coordinate domain
+→ order-independent geographic seed
+→ one local projection
+→ local authored-control AABB
+→ fixed AABB-center pivot
 ```
 
-This is the complete selection authored-control AABB center. It is not the Primary center, rendered centroid, arithmetic sample centroid or screen-bounds center. It is transient and fixed for the gesture.
-
-Empty/missing/invalid/antimeridian/high-latitude/large-extent/degenerate selections reject before arming.
+Pivot is not Primary center, rendered centroid or screen bounds center. Empty, missing, non-finite, antimeridian, high-latitude, large-extent or degenerate selections reject before arming.
 
 ## 7. Clockwise rotation
 
-Local axes are east/north. User-positive angle is clockwise:
-
 ```text
-dx = x - px
-dy = y - py
-x' = px + cosθ*dx + sinθ*dy
-y' = py - sinθ*dx + cosθ*dy
+x' = px + cosθ(x-px) + sinθ(y-py)
+y' = py - sinθ(x-px) + cosθ(y-py)
 ```
 
-Pointer positions are `map.unproject()`-ed into the fixed local frame. The session accumulates successive signed pointer-vector deltas so ±180° crossings do not jump. UI display normalizes to `(-180°,180°]`; canonical state stores no angle.
-
-No angle snapping in 007C.
+User-positive angle is clockwise. The adapter unprojects pointer positions into the fixed local frame and accumulates successive signed vector deltas across ±180°. No snapping.
 
 ## 8. Positive uniform scale
 
 ```text
 k = current local radius / start local radius
-x' = px + k*(x-px)
-y' = py + k*(y-py)
+x' = px + k(x-px)
+y' = py + k(y-py)
 0.01 <= k <= 100
 ```
 
-Out-of-range factor rejects; do not clamp. Crossing pivot cannot reflect because `k` is radial and positive.
-
-No reflection, negative scale, non-uniform scale, skew or scale snapping.
+Out-of-range rejects rather than clamps. Crossing pivot cannot reflect. Reflection, negative scale, non-uniform scale, skew and snapping are excluded.
 
 ## 9. Parameter policy
 
-007C v1 does not transform parameters, style or metadata.
+Parameters, style and metadata remain unchanged. Existing absolute ground caps such as `minimumWidthMeters` and `maximumWidthMeters` mean authored-control scaling does not universally guarantee strict rendered similarity. Registry generation is authoritative.
 
-The catalog contains relative parameters plus absolute ground caps such as `minimumWidthMeters` and `maximumWidthMeters`. Therefore authored-control scaling does not promise strict rendered similarity when an absolute cap becomes active. Registry generation is authoritative.
+Parameter-transform hooks and parameter-name heuristics are deferred.
 
-A future pure/versioned parameter-transform hook requires a separate design. Parameter-name heuristics are prohibited.
+## 10. Pure runtime order
 
-## 10. Pure API direction
+Required runtime APIs:
 
 ```ts
 deriveSelectionTransformFrame(features, policy)
@@ -138,18 +125,20 @@ rotatePlotFeaturesLocal(features, frame, clockwiseRadians)
 scalePlotFeaturesLocal(features, frame, scaleFactor)
 ```
 
-Candidate state:
+Implement in this order after post-merge synchronization:
 
-```ts
-type SelectionTransformKind = "rotate" | "scale";
-type SelectionTransformStatus = "idle" | "armed" | "active" | "rejected";
-```
-
-The pure layer cannot read DOM, MapLibre events or CSS pixels.
+1. shared frame and pure math;
+2. transform session and rejections;
+3. all-Definition Registry fixtures;
+4. BatchEditCommand preview/commit integration;
+5. MapLibre explicit controller;
+6. DOM/SVG frame and handles;
+7. public API and Playground;
+8. Chromium flows and transform benchmark.
 
 ## 11. Explicit one-shot modes
 
-Candidate public API:
+Candidate API:
 
 ```text
 plot.selectionTransform
@@ -160,30 +149,11 @@ plot.startSelectionScale()
 plot.cancelSelectionTransform()
 ```
 
-- rotate and scale are explicit one-shot modes;
-- starting transform cancels region mode without changing selection;
-- starting region mode cancels transform mode;
-- Primary handles/guides hide while transform mode is armed/active;
-- selection overlays remain visible;
-- success exits mode;
-- invalid completion retains rejection and remains armed for retry;
-- cancel restores ordinary selection presentation.
+Transform and region modes are mutually exclusive. Primary handles/guides hide while transform is armed/active; selection overlays remain. Success exits. Invalid completion remains armed for retry.
 
-## 12. Overlay and handles
+## 12. Overlay and gesture priority
 
-Use one DOM/SVG transform overlay; add no geographic Source or Layer.
-
-Contents:
-
-- projected local-frame quadrilateral;
-- pivot marker;
-- scale handle at projected local `maxX/maxY` corner;
-- rotation handle 28 CSS px outside visual top edge;
-- transient angle/factor label.
-
-A visual minimum frame of 24 CSS px is allowed for usability but must not change canonical bounds/pivot/math. Transform starts only from the active explicit-mode handle.
-
-## 13. Gesture priority
+Use one DOM/SVG overlay with projected local-frame quadrilateral, pivot, scale handle, 28 CSS-pixel rotation handle and value label. A 24-pixel minimum visual frame cannot change canonical math. Add no Source/Layer.
 
 ```text
 active drawing
@@ -191,44 +161,34 @@ active drawing
 > active selection transform
 > active region gesture
 > armed transform handle
-> armed explicit region mode
+> armed region mode
 > neutral Shift-empty box
 > selected-body translation
 > click selection
 > camera gesture
 ```
 
-Body translation is disabled while transform mode is armed. Region and transform cannot be active together. Modifiers have no transform meaning in 007C.
+Body translation is disabled while transform mode is armed. Modifiers have no transform meaning.
 
-## 14. Preview and commit
+## 13. Preview and commit
 
 ```text
-original selected features
-→ pure authored-control transform
+original selection
+→ pure control transform
 → revision +1 candidates
-→ Registry.canonicalize every candidate
+→ canonicalize every candidate
 → Registry.generate every candidate
-→ complete success: replace whole transient preview
-→ any failure: preserve last-valid complete preview + rejection
+→ complete preview or complete rejection
+→ one BatchEditCommand on valid effective pointerup
 ```
 
-Partial preview/commit is prohibited.
+Partial preview/commit is prohibited. Failure preserves last-valid complete preview. Undo/redo use exact captured values and never recompute.
 
-Valid effective pointerup:
+No command for no-op, rejection or cancel.
 
-```text
-one BatchEditCommand
-execute.replace = changed transformed features
-undo.replace = exact originals
-orderedIds unchanged
-beforeSelection = afterSelection
-```
+## 14. Rejections and lifecycle
 
-Undo/redo restore exact captured revisions and values. Redo never recomputes the transform.
-
-No command when `abs(angle)<=1e-9 rad`, `abs(k-1)<=1e-9`, or authored controls are effectively unchanged.
-
-## 15. Rejections
+Stable codes:
 
 ```text
 SELECTION_TRANSFORM_SELECTION_EMPTY
@@ -242,53 +202,27 @@ SELECTION_TRANSFORM_CANDIDATE_GENERATION_FAILED
 SELECTION_TRANSFORM_TRANSACTION_INVALID
 ```
 
-A rejection never mutates Store/History. Include affected feature ids where applicable.
-
-## 16. Lifecycle
-
 Cancel without mutation on Escape, pointercancel, unexpected lost capture, style load, resize, active-drag camera movement, Store change, external selection revision, document lifecycle operation or destroy.
 
-While only armed, camera render may reproject the overlay. Intentional pointer release must not let `lostpointercapture` erase a newly created rejected state.
+## 15. Required runtime validation
 
-## 17. Required runtime tests
-
-Pure:
-
-- order-independent frame/pivot;
-- clockwise cardinal angles and distance preservation;
-- angle unwrap;
+- order-independent frame and pivot;
+- clockwise cardinal fixtures and angle unwrap;
 - scale `0.01/1/100`, range rejection and no reflection;
-- no-op thresholds;
-- WGS84/frame failure policies;
-- property preservation.
-
-Registry/command:
-
-- all 19 Definitions rotate;
-- valid scale candidates across all Definitions;
-- absolute parameters unchanged;
-- one invalid member rejects all;
-- exact revision, document order, selection, undo and redo.
-
-MapLibre/Chromium:
-
-- explicit/mutually exclusive modes;
-- DOM/SVG frame and handles;
-- dragPan/pointer lifecycle restoration;
-- rejection retry;
-- multi-select rotate/scale and undo/redo;
+- local-frame failure policies;
+- all 19 Definitions Registry smoke;
+- unchanged parameters/style/metadata;
+- all-member failure atomicity;
+- exact revision/order/selection/undo/redo;
+- explicit DOM handles and lifecycle;
+- multi-selection rotate/scale Chromium flows;
 - region-select → transform → delete → undo;
-- all historical 264/32 regressions.
+- transform benchmark for `1/100/1,000` selected features;
+- all historical 264 Node / 32 Chromium regressions.
 
-## 18. Performance boundary
+## 16. Validation gate
 
-Runtime must measure at least `1 / 100 / 1,000` selected features and record generation, total preview preparation and memory. The design PR publishes no latency SLA.
-
-Existing region benchmark remains observational and does not justify a persistent spatial index.
-
-## 19. Validation gate
-
-Every PR exact head:
+Every exact head:
 
 ```text
 Node 20.19
@@ -296,14 +230,12 @@ Node 22
 264 Node tests
 Playground build
 handover contract
-region-selection benchmark job/artifact
+region benchmark job/artifact
 32 Chromium E2E
 zero unresolved review threads
 ```
 
-Never claim a newer head passed from an older run.
-
-## 20. Clean-room references
+## 17. Clean-room references
 
 ```text
 Terra Draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
@@ -313,12 +245,8 @@ MapLibre GL JS@v6.0.0 — BSD-3-Clause
 code reuse: none
 ```
 
-## 21. Merge discipline and continuation
+## 18. Merge discipline
 
-- design/runtime/finalization use separate branches;
-- Draft until exact-head green;
-- zero threads, Ready, squash with expected SHA, verify main;
-- after design merge, perform documentation-only post-merge synchronization;
-- create runtime only from final synchronized main.
+Design, runtime and finalization use separate branches. Keep Draft until exact-head green; resolve threads; Ready; squash with expected SHA; verify main; start new work only from latest synchronized main; never merge locally.
 
-007C design branch prohibits runtime, reflection, non-uniform scale, groups/locks/visibility/z-order, snapping, touch transforms, new symbols and PlotJSON shortcuts.
+Runtime still excludes reflection, non-uniform scale, groups/locks/visibility/z-order, snapping, touch transforms, new symbols and PlotJSON shortcuts.
