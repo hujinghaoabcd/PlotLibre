@@ -4,7 +4,7 @@ import {
 } from "@plotlibre/interaction";
 import { MapLibrePlotRenderer } from "./renderer.js";
 import type {
-  MapCanvasMouseEventLike,
+  MapCanvasPointerEventLike,
   MapLibreMapLike,
 } from "./types.js";
 
@@ -20,11 +20,14 @@ export class MapLibreSelectionModifierCapture {
   readonly #renderer: MapLibrePlotRenderer;
   readonly #boxZoomWasEnabled: boolean;
 
-  readonly #onMouseDown = (event: MapCanvasMouseEventLike): void => {
+  readonly #onPointerDown = (event: MapCanvasPointerEventLike): void => {
     const intent = readModifierIntent(event);
     if (!intent) return;
 
-    const plotId = this.#queryPlotId(event.offsetX, event.offsetY);
+    const point = this.#readCanvasPoint(event);
+    const plotId = point
+      ? this.#queryPlotId(point.x, point.y)
+      : undefined;
     this.#selection.applyIntent(plotId, intent);
     event.preventDefault?.();
     event.stopPropagation?.();
@@ -43,19 +46,42 @@ export class MapLibreSelectionModifierCapture {
     this.#boxZoomWasEnabled = this.#map.boxZoom?.isEnabled?.() ?? false;
     if (this.#boxZoomWasEnabled) this.#map.boxZoom?.disable();
     this.#map.getCanvas().addEventListener(
-      "mousedown",
-      this.#onMouseDown,
+      "pointerdown",
+      this.#onPointerDown,
       { capture: true },
     );
   }
 
   public destroy(): void {
     this.#map.getCanvas().removeEventListener(
-      "mousedown",
-      this.#onMouseDown,
+      "pointerdown",
+      this.#onPointerDown,
       { capture: true },
     );
     if (this.#boxZoomWasEnabled) this.#map.boxZoom?.enable();
+  }
+
+  #readCanvasPoint(
+    event: MapCanvasPointerEventLike,
+  ): { readonly x: number; readonly y: number } | undefined {
+    const bounds = this.#map.getCanvas().getBoundingClientRect?.();
+    if (
+      bounds &&
+      typeof event.clientX === "number" &&
+      typeof event.clientY === "number"
+    ) {
+      return {
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      };
+    }
+    if (
+      typeof event.offsetX === "number" &&
+      typeof event.offsetY === "number"
+    ) {
+      return { x: event.offsetX, y: event.offsetY };
+    }
+    return undefined;
   }
 
   #queryPlotId(x: number, y: number): string | undefined {
@@ -81,7 +107,7 @@ export class MapLibreSelectionModifierCapture {
 }
 
 function readModifierIntent(
-  event: MapCanvasMouseEventLike,
+  event: MapCanvasPointerEventLike,
 ): SelectionIntent | undefined {
   if (event.altKey === true) return "subtract";
   if (event.ctrlKey === true || event.metaKey === true) return "toggle";
