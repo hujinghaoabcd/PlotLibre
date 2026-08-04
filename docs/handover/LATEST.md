@@ -21,7 +21,7 @@ current branch:     agent/007c-runtime-post-merge-finalization
 next branch:        agent/008-plotjson-migrations-design
 ```
 
-## Actual merge evidence
+## Validation
 
 ```text
 PR:                    #49
@@ -48,7 +48,7 @@ selection-transform-benchmark-30943895213
 artifact id: 8906253893
 ```
 
-## Merged capability
+## Completed in this milestone
 
 - ordered complete-selection clockwise rotation;
 - positive uniform scale `[0.01,100]`;
@@ -64,7 +64,8 @@ artifact id: 8906253893
 - four CSS-pixel start radius and 24 CSS-pixel minimum visual frame;
 - Playground controls and real Chromium flows;
 - all-19-Definition transform validation;
-- reproducible `1/100/1,000` transform benchmark.
+- reproducible `1/100/1,000` transform benchmark;
+- actual squash SHA and merged authority synchronized across current-state documentation.
 
 Authority:
 
@@ -77,15 +78,18 @@ docs/handover/2026-08-05-milestone-007c-rotation-scale-runtime.md
 docs/handover/2026-08-05-milestone-007c-runtime-post-merge-finalization.md
 ```
 
-## Next milestone
+## Next tasks
 
-007D groups/locks/visibility/z-order remains blocked by document persistence and compatibility semantics. The next stage is a documentation/design-only PlotJSON migration milestone:
+1. complete exact-head CI for the documentation-only finalization PR;
+2. verify zero unresolved review threads;
+3. mark the finalization PR Ready without changing its head;
+4. squash merge with the expected finalization head SHA;
+5. verify the new `main` SHA;
+6. create `agent/008-plotjson-migrations-design` from that synchronized `main`;
+7. inventory the current PlotJSON parser, types, fixtures and version semantics;
+8. freeze schema and migration behavior in a documentation/design-only PR.
 
-```text
-agent/008-plotjson-migrations-design
-```
-
-It must freeze:
+007D groups/locks/visibility/z-order remains blocked by document persistence and compatibility semantics. The 008 design must freeze:
 
 1. current schema inventory;
 2. schema-version and Definition-version responsibilities;
