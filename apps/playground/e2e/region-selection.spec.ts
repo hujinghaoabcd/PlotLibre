@@ -163,13 +163,13 @@ test("invalid lasso retries directly and Shift adds in Store order", async ({
   await page.getByTestId("lasso-select-button").click();
   await expect(page.getByTestId("status-text")).toContainText("套索已就绪");
 
-  const width = bounds.maxX - bounds.minX;
-  const height = bounds.maxY - bounds.minY;
+  const invalidX = bounds.minX + 10;
+  const invalidY = bounds.minY + 10;
   await dragLasso(page, [
-    [bounds.minX, bounds.minY],
-    [bounds.maxX, bounds.maxY],
-    [bounds.minX, bounds.minY + height * 0.6],
-    [bounds.minX + width * 0.6, bounds.minY],
+    [invalidX, invalidY],
+    [invalidX + 6, invalidY],
+    [invalidX, invalidY + 4],
+    [invalidX, invalidY],
   ]);
 
   await expect
@@ -187,7 +187,7 @@ test("invalid lasso retries directly and Shift adds in Store order", async ({
     )
     .toEqual({
       status: "rejected",
-      code: "SELECTION_REGION_LASSO_SELF_INTERSECTS",
+      code: "SELECTION_REGION_TOO_SMALL",
       selectedIds: ["region-c"],
     });
   await expect(page.getByTestId("status-text")).toContainText("区域选择被拒绝");
