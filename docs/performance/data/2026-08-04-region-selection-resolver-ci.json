@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 2,
+  "environment": {
+    "timestamp": "2026-08-04T17:17:28.077Z",
+    "sourceGitSha": "2fca8812e206f799c3580380f4e1cd3ed3a73aa8",
+    "workflowGitSha": "5a0678fdf6e8e8497e977ffc522292652bc0d4e7",
+    "runnerName": "GitHub Actions 1000020227",
+    "runnerOs": "Linux",
+    "node": "v22.23.1",
+    "platform": "linux",
+    "release": "6.17.0-1020-azure",
+    "arch": "x64",
+    "cpuModel": "AMD EPYC 7763 64-Core Processor",
+    "logicalCpuCount": 4,
+    "totalMemoryBytes": 16766423040,
+    "profile": "arrow.straight / all-candidates / deterministic-linear-projector",
+    "projection": "x=(lng-118.7)*100000; y=(32.2-lat)*100000; CSS-pixel-like deterministic adapter",
+    "regionPolicy": "one rectangle containing every generated candidate",
+    "renderedDuplicatesPerFeature": 2,
+    "garbageCollectionAvailable": true
+  },
+  "cases": [
+    {
+      "size": 100,
+      "warmups": 5,
+      "repetitions": 30,
+      "profileRepetitions": 7,
+      "featureType": "arrow.straight",
+      "authoredControlPointsPerFeature": 2,
+      "queriedFeatureCount": 200,
+      "uniqueRenderedPlotIdCount": 100,
+      "candidateCount": 100,
+      "generatedCandidateCount": 100,
+      "projectedGeometryCount": 200,
+      "selectedCount": 100,
+      "timingsMs": {
+        "total": {
+          "minimum": 1.5484280000000012,
+          "median": 2.399095000000017,
+          "p95": 5.30782099999999,
+          "maximum": 5.600206999999983,
+          "mean": 2.7567728666666635
+        }
+      },
+      "throughputCandidatesPerSecond": {
+        "minimum": 17856.482805010655,
+        "median": 37002.473985410834,
+        "p95": 58483.97831414101,
+        "maximum": 64581.62730201206,
+        "mean": 40677.55624772464
+      },
+      "diagnosticProfileMs": {
+        "profiledTotal": {
+          "minimum": 1.6199019999999962,
+          "median": 2.286484999999999,
+          "p95": 4.288669999999996,
+          "maximum": 4.288669999999996,
+          "mean": 2.5840245714285692
+        },
+        "queryAdapter": {
+          "minimum": 0.00027000000000043656,
+          "median": 0.0003300000000194814,
+          "p95": 0.0012930000000039854,
+          "maximum": 0.0012930000000039854,
+          "mean": 0.0004605714285738876
+        },
+        "registryGenerate": {
+          "minimum": 0.4395669999999541,
+          "median": 0.5345420000001866,
+          "p95": 0.9903060000001744,
+          "maximum": 0.9903060000001744,
+          "mean": 0.6619832857143015
+        },
+        "projectCalls": {
+          "minimum": 0.07744500000046628,
+          "median": 0.11060300000022494,
+          "p95": 0.4567670000002124,
+          "maximum": 0.4567670000002124,
+          "mean": 0.15771471428579634
+        },
+        "nonIsolatedRemainder": {
+          "minimum": 1.102519999999572,
+          "median": 1.5941030000002172,
+          "p95": 2.8479619999996544,
+          "maximum": 2.8479619999996544,
+          "mean": 1.7638659999998976
+        }
+      },
+      "memory": {
+        "rssBeforeFixtureBytes": 62783488,
+        "rssAfterWarmupBytes": 66252800,
+        "peakRssBytes": 72388608,
+        "fixtureAndWarmupDeltaBytes": 3469312,
+        "peakAdditionalDuringSamplesBytes": 6135808
+      }
+    },
+    {
+      "size": 1000,
+      "warmups": 3,
+      "repetitions": 24,
+      "profileRepetitions": 7,
+      "featureType": "arrow.straight",
+      "authoredControlPointsPerFeature": 2,
+      "queriedFeatureCount": 2000,
+      "uniqueRenderedPlotIdCount": 1000,
+      "candidateCount": 1000,
+      "generatedCandidateCount": 1000,
+      "projectedGeometryCount": 2000,
+      "selectedCount": 1000,
+      "timingsMs": {
+        "total": {
+          "minimum": 10.000345000000038,
+          "median": 10.960735999999997,
+          "p95": 18.246125000000006,
+          "maximum": 20.291229999999985,
+          "mean": 11.902729541666668
+        }
+      },
+      "throughputCandidatesPerSecond": {
+        "minimum": 49282.374700794426,
+        "median": 89291.52620737538,
+        "p95": 99954.60062039807,
+        "maximum": 99996.55011902051,
+        "mean": 86838.24929529156
+      },
+      "diagnosticProfileMs": {
+        "profiledTotal": {
+          "minimum": 12.24218600000006,
+          "median": 13.422307000000046,
+          "p95": 20.395584999999983,
+          "maximum": 20.395584999999983,
+          "mean": 14.18965171428574
+        },
+        "queryAdapter": {
+          "minimum": 0.0001310000000103173,
+          "median": 0.0007010000000491345,
+          "p95": 0.001542999999969652,
+          "maximum": 0.001542999999969652,
+          "mean": 0.0007214285714261288
+        },
+        "registryGenerate": {
+          "minimum": 1.5038710000001174,
+          "median": 2.2199640000022782,
+          "p95": 3.137909000000718,
+          "maximum": 3.137909000000718,
+          "mean": 2.1497987142865083
+        },
+        "projectCalls": {
+          "minimum": 0.7776929999954518,
+          "median": 0.8100349999971286,
+          "p95": 1.0407899999992196,
+          "maximum": 1.0407899999992196,
+          "mean": 0.855374142855648
+        },
+        "nonIsolatedRemainder": {
+          "minimum": 9.852743000002306,
+          "median": 10.444287000005033,
+          "p95": 16.216755000000035,
+          "maximum": 16.216755000000035,
+          "mean": 11.183757428572155
+        }
+      },
+      "memory": {
+        "rssBeforeFixtureBytes": 71065600,
+        "rssAfterWarmupBytes": 81313792,
+        "peakRssBytes": 106475520,
+        "fixtureAndWarmupDeltaBytes": 10248192,
+        "peakAdditionalDuringSamplesBytes": 25161728
+      }
+    },
+    {
+      "size": 10000,
+      "warmups": 2,
+      "repetitions": 20,
+      "profileRepetitions": 7,
+      "featureType": "arrow.straight",
+      "authoredControlPointsPerFeature": 2,
+      "queriedFeatureCount": 20000,
+      "uniqueRenderedPlotIdCount": 10000,
+      "candidateCount": 10000,
+      "generatedCandidateCount": 10000,
+      "projectedGeometryCount": 20000,
+      "selectedCount": 10000,
+      "timingsMs": {
+        "total": {
+          "minimum": 104.73638200000005,
+          "median": 109.30750999999987,
+          "p95": 119.18183900000008,
+          "maximum": 126.58238099999971,
+          "mean": 111.271453
+        }
+      },
+      "throughputCandidatesPerSecond": {
+        "minimum": 78999.936017952,
+        "median": 90516.63464474776,
+        "p95": 93667.38244158089,
+        "maximum": 95477.80636531817,
+        "mean": 90028.53198569088
+      },
+      "diagnosticProfileMs": {
+        "profiledTotal": {
+          "minimum": 119.84038299999975,
+          "median": 124.39332999999988,
+          "p95": 126.3004249999999,
+          "maximum": 126.3004249999999,
+          "mean": 123.69621957142856
+        },
+        "queryAdapter": {
+          "minimum": 0.00009000000000014552,
+          "median": 0.00009999999974752427,
+          "p95": 0.00011000000040439772,
+          "maximum": 0.00011000000040439772,
+          "mean": 0.0001000000000073799
+        },
+        "registryGenerate": {
+          "minimum": 18.820389999991676,
+          "median": 20.8695720000228,
+          "p95": 24.1315109999955,
+          "maximum": 24.1315109999955,
+          "mean": 20.7599288571466
+        },
+        "projectCalls": {
+          "minimum": 7.852174000057403,
+          "median": 8.082846000194877,
+          "p95": 10.299113999777546,
+          "maximum": 10.299113999777546,
+          "mean": 8.660126142831293
+        },
+        "nonIsolatedRemainder": {
+          "minimum": 91.1729179999802,
+          "median": 94.85928000010244,
+          "p95": 97.22282000011546,
+          "maximum": 97.22282000011546,
+          "mean": 94.27606457145066
+        }
+      },
+      "memory": {
+        "rssBeforeFixtureBytes": 109441024,
+        "rssAfterWarmupBytes": 113340416,
+        "peakRssBytes": 181702656,
+        "fixtureAndWarmupDeltaBytes": 3899392,
+        "peakAdditionalDuringSamplesBytes": 68362240
+      }
+    }
+  ],
+  "limitations": [
+    "This is a Node/CI resolver microbenchmark, not a browser frame-time or GPU benchmark.",
+    "The headline total timings use an uninstrumented resolver path. Diagnostic phase timings are collected in separate instrumented runs and must not be added to or subtracted from the headline totals.",
+    "queryRenderedFeatures is a deterministic adapter returning a prebuilt rendered-feature array; real MapLibre tile-index query latency is not measured.",
+    "The fixture is 100% arrow.straight and every feature is a broad-phase candidate and an exact hit; it represents a deliberate worst-candidate-count profile, not a mixed production document.",
+    "RSS observations include Node.js allocator and garbage-collector behavior and are not a retained-heap measurement.",
+    "Timing is observational and no pass/fail latency threshold is enforced."
+  ]
+}
