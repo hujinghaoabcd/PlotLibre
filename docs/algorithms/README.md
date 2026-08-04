@@ -37,7 +37,7 @@ tests and deterministic fixtures
 | `arrow-route-multihead.md` | bidirectional/double-head route | 已实现 |
 | `closed-action-area.md` | closed curve/gathering place | 已实现 |
 | `circular-arc-foundation.md` | circular arc/segment/sector shared frame | 已实现并合并 |
-| `batch-edit-transaction.md` | selection、Store transaction、batch commands、translation/transform | Milestone 007 design freeze candidate |
+| `batch-edit-transaction.md` | selection、Store transaction、batch commands、translation/transform | 007A 部分已实现于 PR #38；007B–D 仍为后续设计 |
 
 基础通用几何另见：
 
@@ -46,23 +46,23 @@ tests and deterministic fixtures
 ../ALGORITHM_POLICY.md
 ```
 
-## Milestone 006J merge evidence
+## 当前基线
 
 ```text
-workspace:          0.0.20
+workspace:          0.0.21
 public symbols:     19
-Node tests:         184 passed
-Chromium tests:     28 passed
-implementation PR: #34
-finalization PR:   #35
-final main SHA:    4ce59d189b65c8257bf49beabc308a4020249cd0
+Node tests:         219 passed on runtime head
+Chromium tests:     30 passed on runtime head
+MapLibre Sources:   4
+MapLibre Layers:    10
+007A PR:            #38
+runtime head:       07449e7fda66069b148fa08c865b209d7dc365a3
+runtime CI:         #398 / 30904843935
 ```
 
-Circular geometry remains governed by `circular-arc-foundation.md` and its local-only、strict topology、authored-control and clean-room contracts。
+最终文档 head 仍需新的完整 current-head CI。
 
-## Milestone 007 transaction design
-
-`batch-edit-transaction.md` freezes the first professional editing foundation：
+## 007A transaction implementation
 
 ### Selection representation
 
@@ -70,68 +70,85 @@ Circular geometry remains governed by `circular-arc-foundation.md` and its local
 ordered selectedIds
 Set membership index
 primaryId = final selected id
-selection revision
+monotonic interaction revision
 ```
 
-Selection is transient and excluded from PlotJSON。Replace/add/subtract/toggle/reconcile operations emit one immutable event per effective change。
+Selection is transient and excluded from PlotJSON。Replace/add/subtract/toggle/reconcile/restore 每次有效变化只发一个 immutable event；no-op 不发 event。
 
 ### Store transaction
 
 ```text
-validate all add/replace/remove operations
-→ build staged ordered feature Map
-→ any error: no mutation
+validate add/replace/remove id sets
+→ clone current ordered feature Map
+→ stage every operation
+→ validate optional exact orderedIds
+→ any error: no mutation and no event
 → commit once
 → emit one batch event
 ```
 
-No listener may observe a partial transaction。
+No listener observes partial state。
 
 ### Listener failure isolation
 
-Current single-command flow can mutate Store before a listener throws, leaving state changed without a history entry。007 design changes the contract：
-
+- validation errors throw before mutation；
 - post-commit listener errors are collected；
 - all listeners still run；
 - errors are reported through `onListenerError`；
 - they do not synchronously escape after commit；
-- validation errors still throw before mutation；
-- command history records the committed edit consistently。
+- CommandHistory records the committed edit consistently。
 
 ### Ordered undo
 
-Batch delete undo must restore original document order。The transaction design therefore needs an explicit ordered-id sequence or equivalent complete ordered state。Appending restored features is invalid because it changes rendering/z-order semantics。
+Batch delete undo restores original document order through exact ordered ids。Appending restored features is invalid because it changes rendering/z-order semantics。
 
 ### BatchEditCommand
 
-Command captures exact before/after feature snapshots and selection snapshots：
+Command captures exact before/after feature values, document order and selection snapshots：
 
 ```text
 execute/redo:
-  Store after transaction
-  restore after selection
+  exact Store after transaction
+  exact after selection
 
 undo:
-  Store inverse transaction
-  restore before selection
+  exact Store before transaction
+  exact before selection
 ```
 
-Redo reuses exact after revisions and does not increment again。
+Redo reuses exact stored revisions and does not increment again。Selection reconciliation is suspended during Store mutation and followed by one explicit final restore。
 
 ### Translation
 
-007A supports local-metre whole-object translation only：
+007A supports local-metre whole-selection translation：
 
-- all selected authored controls share one projection and meter delta；
+- all selected authored controls share one coordinate analysis, projection and metre delta；
+- projection origin is order-independent；
 - parameters/style/metadata remain unchanged；
+- Store remains unchanged during transient preview；
 - every candidate is canonicalized/generated before commit；
 - one invalid member rejects the complete batch；
-- preview is transient；
-- one gesture commits one command；
-- zero movement commits nothing；
-- Escape cancels。
+- Escape cancels；
+- zero/sub-threshold movement commits nothing；
+- one pointer gesture commits one command；
+- active handle drag has priority；
+- dragPan is disabled only during active translation。
 
-### Later algorithms
+### MapLibre selection overlay
+
+```text
+plotlibre-selection source
+plotlibre-selection-line layer
+plotlibre-selection-point layer
+```
+
+Polygon becomes boundary highlight, LineString remains line and Point remains point。Only Primary exposes semantic handles/guides。Style reload regenerates all transient resources from canonical state。
+
+### Shift and box zoom
+
+MapLibre box zoom conflicts with Shift additive selection。PlotLibre records and disables box zoom during its lifecycle, handles Shift through the MapLibre `mousedown` path, and restores the previous state on destroy。
+
+## Later algorithms
 
 - 007B：screen-space box/lasso intersection selection；
 - 007C：local rotation and positive uniform scale around authored-control bounds center；
@@ -147,19 +164,21 @@ mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
 
 Studied only for observable mode separation、selection lifecycle、keyboard configuration、whole-feature/direct editing and test organization。Code reuse：`none`。
 
-## Required 007A fixture families
+## Implemented 007A fixture families
 
-- selection ordering and primary fallback；
-- batch transaction preconditions and no-partial-mutation；
+- selection ordering, modifier intents and Primary fallback；
+- immutable snapshots, no-op and Store reconciliation；
+- transaction preconditions and no-partial-mutation；
 - listener exception isolation；
 - exact document-order restoration；
-- mixed Definition translation；
-- invalid one-member rollback；
-- revision execute/undo/redo；
-- selection overlay and primary handles；
+- batch delete execute/undo/redo；
+- local translation common metre delta；
+- invalid one-member atomic rejection；
+- exact revision replay；
+- selection overlay and Primary handles；
 - style reload recovery；
-- one gesture / one history entry；
-- 100/1,000/10,000 feature performance measurements；
-- all existing 184 Node / 28 Chromium regressions。
+- Shift/box-zoom lifecycle；
+- real MapLibre body drag、Escape and Delete flows；
+- all historical 219 Node / 30 Chromium regressions。
 
-No professional-editing runtime belongs on the documentation-only design branch。
+Performance measurements at 100/1,000/10,000 features remain a separate measured benchmark task and must not be claimed from functional tests alone。
