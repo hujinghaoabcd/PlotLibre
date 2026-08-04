@@ -20,39 +20,35 @@
 - 允许部分 batch mutation；
 - 关闭 Registry generation preflight；
 - 把 canonical editor state 隐藏在任意 metadata 中；
-- 在 documentation-only PR 中写 runtime；
+- 在 design/finalization PR 中写 runtime；
 - 一个 PR 并行扩散多个复杂编辑子系统；
 - 使用旧 head 的 CI 声明新 head 已通过。
 
 ## 当前合并基线
 
 ```text
-main SHA:          04dca0b120b1440afb49a300eeee92faf6644a7d
+main SHA:          d08c56b6687ea64e0c599fd04fd77115d320d8f2
 workspace:         0.0.21
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
 Node tests:        219
 Chromium tests:    30
 MapLibre Sources:  4
 MapLibre Layers:   10
-completed:         Milestone 007A through PR #38
-current slice:     007A post-merge documentation finalization
-current branch:    agent/007a-post-merge-finalization
-next milestone:    007B box/lasso selection design
+completed:         Milestone 007A runtime + finalization
+current slice:     007B box/lasso selection design
+current branch:    agent/007b-box-lasso-design
+runtime on branch: prohibited
 ```
 
-PR #38 final evidence：
+007A evidence：
 
 ```text
-validated head:   2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
-CI:               #409 / 30906467230
-Node 20.19:       success
-Node 22:          success
-Node tests:       219 passed
-Chromium tests:   30 passed
-Playground build: success
-handover check:  success
-threads:          0 unresolved
-squash SHA:       04dca0b120b1440afb49a300eeee92faf6644a7d
+runtime PR:       #38
+runtime head:     2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
+runtime CI:       #409 / 30906467230
+runtime squash:   04dca0b120b1440afb49a300eeee92faf6644a7d
+finalization PR:  #39
+current main:     d08c56b6687ea64e0c599fd04fd77115d320d8f2
 ```
 
 ## 已完成里程碑
@@ -67,169 +63,234 @@ squash SHA:       04dca0b120b1440afb49a300eeee92faf6644a7d
 | 006H | bidirectional + double-head route | 已合并 |
 | 006I | closed curve + gathering place | 已合并 |
 | 006J | circular design、implementation、semantic guides | 已合并 |
-| 007 Design | professional editing semantics and transaction algorithms | 已合并 |
-| 007A | ordered selection、atomic Store、batch delete、local translation | PR #38 已合并 |
+| 007 Design | professional editing overall semantics | 已合并 |
+| 007A | ordered selection、atomic Store、batch delete、local translation | PR #38/#39 已合并 |
 
 ## Milestone 007 总体拆分
 
 ```text
 007A — ordered multi-selection + atomic Store + batch delete + local translation — merged
-007B — box/lasso selection — next
+007B — box/lasso selection — current design
 007C — rotation + positive uniform scale — deferred
 007D — groups/locks/visibility/z-order after PlotJSON migration design — deferred
 ```
 
-## 007A 已合并能力
+## 007A 已合并基础
 
-### SelectionController
+- ordered transient SelectionController and Primary；
+- replace/add/subtract/toggle/clear/restore/reconcile；
+- one immutable event per effective operation；
+- atomic `PlotStore.applyTransaction()`；
+- listener-error isolation；
+- exact-order `BatchEditCommand`；
+- four Sources and ten Layers；
+- Primary-only handles/guides；
+- batch delete and local-metre whole-selection translation；
+- 219 Node and 30 actual Chromium tests。
 
-- ordered unique `selectedIds`；
-- final id Primary；
-- replace/add/subtract/toggle/clear/makePrimary/restore/reconcile；
-- immutable monotonic snapshots；
-- one effective operation = one event；
+## Milestone 007B 设计冻结
+
+Authoritative documents：
+
+```text
+docs/design/box-lasso-selection.md
+docs/algorithms/screen-region-selection.md
+```
+
+### 7B.1 Input ownership
+
+The current immediate Shift-add on MapLibre `mousedown` conflicts with thresholded Shift box selection。
+
+Runtime must replace it with one unified region adapter：
+
+```text
+pointer down → armed
+movement <4 px → pending click/no-op
+movement >=4 px → active box
+pointer up → exactly one click or region operation
+```
+
+Neutral convenience：
+
+```text
+Shift + empty primary drag → additive box
+```
+
+Explicit one-shot box/lasso modes support replace/add/toggle/subtract。Lasso is explicit only。Touch is deferred。
+
+### 7B.2 Screen state
+
+Region capture uses engine-independent CSS-pixel types：
+
+```text
+ScreenPoint
+ScreenBounds
+SelectionRegionSnapshot
+SelectionRegionRejection
+```
+
+Region state is transient and excluded from Store、History、PlotJSON and feature revisions。
+
+### 7B.3 Box
+
+```text
+activation threshold: 4 CSS px
+selection mutation:   pointer up only
+empty replace:        clear
+empty add/sub/toggle: no-op
+```
+
+Degenerate/sub-threshold box is no-op。
+
+### 7B.4 Lasso
+
+```text
+sample spacing:       2 CSS px
+minimum distinct pts: 3
+minimum area:         16 CSS px²
+RDP tolerance:        1.5 CSS px
+```
+
+Validation：
+
+```text
+raw simple-ring validation
+→ RDP simplify
+→ simplified simple-ring validation
+```
+
+Repeated non-consecutive vertices、non-adjacent crossing、touch and collinear overlap reject。Invalid completion changes nothing and keeps one retry armed。
+
+### 7B.5 One-event multi-id selection
+
+Add `SelectionController.applyMany(ids,intent,reason)`。
+
+- inputs validated before mutation；
+- candidate ids supplied in Store order；
+- replace/add/subtract/toggle produce one final ordered state；
+- one effective region completion = one SelectionChange；
 - no-op = no event；
-- Store remove/clear reconciliation；
-- selection excluded from PlotJSON and feature revision；
-- backward-compatible `select()` / `selectedId` aliases。
+- region selection never enters CommandHistory。
 
-### Atomic PlotStore transaction
+### 7B.6 Candidate resolution
 
 ```text
-validate operation id sets
-→ clone ordered Store state
-→ stage add/replace/remove
-→ validate exact orderedIds
-→ any error: no mutation
-→ commit once
-→ one batch event
+region bounding box
+→ queryRenderedFeatures on committed fill/line/point layers
+→ plotId dedup
+→ Store-order normalization
+→ Registry.generate once per unique candidate
+→ map.project semantic fills/lines/points
+→ exact screen intersection
 ```
 
-Post-commit listener errors are collected and reported through `onListenerError`; they do not prevent History from recording an already committed command。
+MapLibre query is broad phase only。Selection、draft、handles、guides、labels and CSS styling footprint are excluded。
 
-### BatchEditCommand
+Exact narrow phase：
 
-Stores exact before/after features, document order and selection snapshots。Execute/undo/redo replay exact revisions。Automatic reconciliation is suspended during Store mutation and followed by one explicit selection restoration。
+- Point center；
+- Line segments；
+- Polygon crossing/containment with hole support；
+- Multi and compound any-component semantics；
+- boundary inclusive；
+- failure of query/generation/projection rejects whole completion；
+- partial selection prohibited。
 
-### MapLibre selection
+### 7B.7 Overlay and lifecycle
+
+Region guide uses DOM/SVG overlay, not GeoJSON Source/Layer。The 4/10 baseline remains unchanged。
+
+Cancel on：
 
 ```text
-plain click       replace / make-primary
-Shift             add
-Ctrl/Cmd          toggle
-Alt               subtract
-empty plain click clear
+Escape
+pointercancel/lost capture
+style/resize/camera start
+Store change
+external selection change
+draw/import/clear/undo/redo
+destroy
 ```
 
-MapLibre box zoom is preserved、disabled during PlotLibre lifecycle and restored on destroy。
+Restore dragPan and boxZoom lifecycle exactly once and suppress synthetic post-drag click。
 
-Sources：
+### 7B.8 Stable rejection codes
 
 ```text
-plotlibre-committed
-plotlibre-selection
-plotlibre-draft
-plotlibre-handles
+SELECTION_REGION_TOO_SMALL
+SELECTION_REGION_LASSO_TOO_FEW_POINTS
+SELECTION_REGION_LASSO_SELF_INTERSECTS
+SELECTION_REGION_QUERY_FAILED
+SELECTION_REGION_CANDIDATE_GENERATION_FAILED
+SELECTION_REGION_PROJECTION_FAILED
 ```
 
-Layers：
+### 7B.9 Performance boundary
+
+First implementation uses MapLibre rendered index as broad phase。No second persistent spatial index before measured evidence。
+
+Fixtures：
 
 ```text
-plotlibre-fill
-plotlibre-line
-plotlibre-point
-plotlibre-selection-line
-plotlibre-selection-point
-plotlibre-draft-fill
-plotlibre-draft-line
-plotlibre-draft-point
-plotlibre-handle-guide
-plotlibre-handle
+100 / 1,000 / 10,000 features
 ```
 
-Only Primary exposes authored handles and Definition guides。
+Record hardware、browser、viewport/camera、feature mix、generated vertices、candidate count、query/narrow/total times、median and p95。No hard latency claim before results。
 
-### Batch delete
+## 007B implementation order after design merge
 
-- `plot.removeSelected()`；
-- Delete/Backspace and Playground action share one command path；
-- one atomic remove transaction；
-- undo restores exact values、document order、selection and Primary；
-- redo restores exact after-state。
+1. pure ScreenPoint/box/lasso utilities；
+2. `SelectionController.applyMany()`；
+3. exact projected geometry predicates；
+4. MapLibre candidate resolver and Store ordering；
+5. replace immediate Shift capture with unified region adapter；
+6. DOM/SVG overlay and pointer lifecycle；
+7. explicit one-shot public box/lasso API；
+8. Playground controls/status；
+9. actual Chromium flows；
+10. benchmark report；
+11. documentation、handover、current-head CI and merge。
 
-### Local whole-selection translation
+Planned runtime branch：
 
 ```text
-selected authored controls
-→ one shared local coordinate frame
-→ one order-independent projection origin
-→ one common metre delta
-→ transform every authored control
-→ candidate revision = original + 1
-→ Registry preflight all candidates
-→ all valid: transient preview and one command
-→ any invalid: no Store or History mutation
+agent/007b-box-lasso-selection
 ```
 
-Parameters/style/metadata remain unchanged。Escape cancels。Handle drag has priority。dragPan is restored after the gesture。
+## 007B required tests
 
-## 当前 documentation-only finalization
+### Node
 
-`agent/007a-post-merge-finalization` 只能：
+- box every quadrant、threshold and degenerate behavior；
+- lasso sampling、area、RDP and simple topology；
+- repeated vertex、bow-tie、touch and overlap rejection；
+- Point/Line/MultiLine predicates；
+- Polygon containment/crossing/hole exclusion；
+- MultiPolygon/compound any-component hit；
+- applyMany ordering、Primary and no-op；
+- query duplicate/order normalization；
+- fail-closed query/generation/projection。
 
-- record actual squash SHA；
-- replace pre-merge candidate wording；
-- update latest handover and continuation order；
-- add immutable post-merge handover；
-- pass unchanged 219 Node / 30 Chromium baseline。
+### Adapter/Chromium
 
-禁止 runtime、API、geometry、interaction or test behavior changes。
-
-## Milestone 007B：Box and lasso design
-
-Only after finalization merges：
-
-### Box selection decisions to freeze
-
-- gesture and modifier ownership；
-- screen-space rectangle representation；
-- default intersection policy；
-- candidate layer set；
-- compound feature de-duplication by `plotId`；
-- deterministic result ordering by Store/document order；
-- relationship with Shift click and MapLibre camera gestures；
-- behavior for active draw、handle drag and translation；
-- empty result and Primary selection policy。
-
-### Lasso decisions to freeze
-
-- screen-space authored lasso path；
-- closure threshold and completion gesture；
-- simple-ring requirement；
-- self-intersection fail closed；
-- intersection policy；
-- simplification tolerance boundary；
-- transient overlay source/layer ownership；
-- cancellation and keyboard behavior。
-
-### Performance boundary
-
-- no large-document claim without measured fixtures；
-- candidate feature de-duplication before expensive geometry tests；
-- define spatial-index ownership and invalidation；
-- record hardware、browser、feature mix and viewport for benchmarks。
-
-007B must not include rotation/scale、groups/locks、snapping or new symbols。
+- Shift click remains additive without mousedown mutation；
+- Shift-empty drag additive box；
+- explicit replace/toggle/subtract box；
+- lasso excludes bbox false positives；
+- invalid lasso changes nothing；
+- DOM overlay/pointer/camera cleanup；
+- no History mutation；
+- region selection followed by translation/delete/undo；
+- all historical 219/30 regressions。
 
 ## Milestone 007C：Rotation and scale
 
 - local-metre only initially；
 - pivot = selection authored-control bounds center；
-- positive clockwise user angle with documented Cartesian conversion；
+- positive clockwise user angle；
 - positive uniform scale `[0.01, 100]`；
 - no reflection/non-uniform scale；
-- atomic all-member Registry preflight；
-- parameters unchanged unless a future pure/versioned Definition transform hook opts in。
+- atomic all-member Registry preflight。
 
 ## Milestone 007D：Canonical editor object state
 
@@ -241,18 +302,21 @@ Groups、locks、visibility、z-order require formal PlotJSON schema and migrati
 Terra Draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
 MapLibre-Geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
 Mapbox GL Draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
+MapLibre GL JS@v6.0.0 — BSD-3-Clause
 ```
 
 Code reuse：`none`。
 
-## Milestone 008–013
+## 当前设计 PR 收尾顺序
 
-- snapping and constraints；
-- more symbols and annotations；
-- PlotJSON schema/migrations and project management；
-- optional MIL-STD/APP-6 backend；
-- React/Vue/CRDT/collaboration；
-- stable 1.0、license、release automation、performance and compatibility matrices。
+1. synchronize AGENTS、design/algorithm indices、reference matrix、interaction model and handover；
+2. add immutable 007B design handover；
+3. open Draft documentation-only PR；
+4. pass exact-head Node 20.19/22、219 Node、30 Chromium、build and handover；
+5. confirm zero unresolved threads；
+6. mark Ready and Squash and merge；
+7. finalize actual design squash state；
+8. create runtime branch from latest final `main`。
 
 ## 跨阶段工程任务
 
