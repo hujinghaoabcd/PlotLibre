@@ -5,5 +5,7 @@ export * from "./screen-region-selection.js";
 export * from "./screen-selection-region-session.js";
 export * from "./selection-controller.js";
 export * from "./selection-local-transform.js";
+export * from "./selection-transform-command.js";
+export * from "./selection-transform-session.js";
 export * from "./two-point-draw-session.js";
 export * from "./types.js";
