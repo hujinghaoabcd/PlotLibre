@@ -17,26 +17,23 @@
 ## 当前基线
 
 ```text
-main SHA:          add70f52eb252b1167f7abfb4ecf4b93370bfbdf
+main SHA:          d8b2d889dee81064069f96e555dd75b1c851ccf3
 workspace:         0.0.22
 PlotJSON schema:   1.0.0
 production migrations: none
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
-historical Node:   299
-008A expected Node: 324
+Node tests:        324
 Chromium tests:    34
 MapLibre Sources:  4
 MapLibre Layers:   10
 benchmark jobs:    region selection + selection transform
-completed:         007A + 007B + 007B-P + 007C + 008 Design
-current slice:     008A version / JSON safety / limits / errors
-current branch:    agent/008a-plotjson-version-json-safety-runtime
-current PR:        #53
+completed:         007A + 007B + 007B-P + 007C + 008 Design + 008A
+current slice:     008A post-merge authority synchronization
+current branch:    agent/008a-plotjson-post-merge-finalization
 next branch:       agent/008b-plotjson-migration-registry-runtime
 ```
 
-PR #51 design squash：`6012868d4c74e64374bfbeb3c032ee47a4a9fb2c`。  
-PR #52 design-finalization squash/main：`add70f52eb252b1167f7abfb4ecf4b93370bfbdf`。
+PR #53 exact head `cb3db0fa6dc38c9b852524c15e4066b52b0c7b38` passed CI run `30951490118` and squash-merged as `d8b2d889dee81064069f96e555dd75b1c851ccf3`.
 
 ## Milestones
 
@@ -48,17 +45,17 @@ PR #52 design-finalization squash/main：`add70f52eb252b1167f7abfb4ecf4b93370bfb
 | 007B-P | resolver benchmark 与索引决策 | PR #45/#46，已完成 |
 | 007C | shared-pivot rotation + positive uniform scale | PR #47–#50，已完成 |
 | 008 Design | PlotJSON versioning、migration、compatibility、atomic import | PR #51/#52，已完成 |
-| 008A | version / JSON safety / limits / errors | PR #53，收尾中 |
-| 008A Finalization | merge-state authority synchronization | PR #53 合并后 |
-| 008B | migration registry / planner / report | 008A 同步后 |
-| 008C | current reader compatibility / invariants | 008B 后 |
+| 008A | version / JSON safety / limits / errors | PR #53，已合并 |
+| 008A Finalization | merge-state authority synchronization | 当前 Markdown-only 分支 |
+| 008B | migration registry / planner / report records | 下一阶段 |
+| 008C | report-bearing reader / current compatibility / invariants | 008B 后 |
 | 008D | Registry-aware preparation / atomic import | 008C 后 |
-| 008E | docs / CI / immutable handover / post-merge sync | runtime 收尾 |
+| 008E | runtime docs / compatibility fixtures / finalization | runtime 收尾 |
 | 007D | groups / locks / visibility / z-order + production schema migration | 008 完成后解除阻塞 |
 
-## 008 authority
+## Authority
 
-Design:
+PlotJSON design:
 
 ```text
 docs/PLOTJSON_SPEC.md
@@ -77,86 +74,12 @@ packages/core/src/plotjson-error.ts
 packages/core/src/plotjson-safety.ts
 docs/design/plotjson-version-json-safety-runtime.md
 docs/handover/2026-08-05-milestone-008a-plotjson-foundations.md
+docs/handover/2026-08-05-milestone-008a-post-merge-finalization.md
 ```
 
-## Repository findings driving 008
+## 008A merged runtime
 
-### Current parser
-
-`parsePlotDocument()` still:
-
-- accepts only exact `PlotLibreDocument` / `1.0.0`;
-- combines syntax parsing、structure checks and default normalization;
-- drops unknown root/feature fields;
-- defaults missing `definitionVersion` to `1.0.0`;
-- defaults missing/non-record parameters、style、feature metadata to `{}`;
-- defaults missing/non-integer revision to `0`;
-- has no migration chain、report、limits or dedicated errors;
-- does not detect document-wide duplicate feature ids;
-- does not enforce the registered Definition version.
-
-008A deliberately does not integrate its new primitives into this parser. That compatibility-sensitive work remains 008C.
-
-### Current Registry
-
-Registry canonicalizes、validates and generates by `plotType`, but does not require:
-
-```text
-feature.definitionVersion === definition.version
-```
-
-### Current import
-
-`PlotLibre.importDocument()` performs Registry preflight before mutation, then executes:
-
-```text
-store.clear()
-→ repeated store.add()
-```
-
-A duplicate id can fail after partial replacement. 008D must implement one complete staged document replacement and one Store event.
-
-## Binding version model
-
-### Document `schemaVersion`
-
-Owns document structure、order、references and future persisted editor state.
-
-### Feature `definitionVersion`
-
-Owns control roles、parameters and one symbol Definition's authored semantics.
-
-### Required future order
-
-```text
-raw input
-→ input byte guard and JSON safety
-→ document schema migration
-→ current schema decode
-→ Definition migration for every feature
-→ final Definition-version equality
-→ all-member Registry preflight
-→ one atomic Store replacement
-```
-
-## Current `1.0.0` compatibility
-
-Historical normalization remains binding:
-
-```text
-missing definitionVersion → 1.0.0
-missing/non-record parameters → {}
-missing/non-record style → {}
-missing/non-record feature metadata → {}
-missing/non-integer revision → 0
-unknown schema fields → dropped
-```
-
-008A exports primitives only. It does not silently tighten same-version interpretation. 008C must preserve and report these normalizations.
-
-## 008A delivered runtime
-
-### Version primitives
+### Public primitives
 
 ```ts
 PLOTJSON_DOCUMENT_TYPE
@@ -164,24 +87,25 @@ CURRENT_PLOTJSON_SCHEMA_VERSION
 parsePlotJsonVersion(...)
 comparePlotJsonVersions(...)
 isCanonicalPlotJsonVersion(...)
+PlotJsonError
+DEFAULT_PLOTJSON_LIMITS
+resolvePlotJsonLimits(...)
+assertPlotJsonInputSize(...)
+clonePlotJsonValue(...)
+scanPlotJsonValue(...)
 ```
 
-Contract:
+### Version contract
 
 - canonical numeric `MAJOR.MINOR.PATCH`;
 - non-negative safe-integer components;
-- no leading zeros except `0`;
-- no prefix、prerelease、build、decimal or exponent form;
+- no prefix、leading zero、prerelease、build、decimal or exponent form;
 - numeric tuple comparison;
-- frozen parsed results;
-- forged parsed records reject;
-- invalid messages do not echo untrusted payloads.
+- frozen parsed records;
+- forged records reject;
+- malformed-version messages do not echo untrusted payloads.
 
-### Structured errors
-
-`PlotJsonError` extends `PlotLibreError` and exports the complete Milestone 008 code union. It can expose scalar path、feature、plotType、version、limit and cause context without retaining complete documents or metadata.
-
-### Iterative JSON safety
+### JSON-safety contract
 
 Accepted:
 
@@ -196,25 +120,24 @@ Rejected:
 ```text
 undefined / NaN / Infinity / BigInt / Symbol / function
 Date / Map / Set / RegExp / typed arrays / class instances
-custom prototypes / accessors / hidden properties / symbol keys
+custom prototypes / accessors / hidden or symbol properties
 sparse arrays / custom array properties / cycles
 ```
 
 Implementation rules:
 
-- explicit traversal stack, not recursion;
+- iterative traversal, not recursion;
 - descriptor inspection without getter invocation;
 - lexicographic object-key order;
 - repeated non-cyclic references cloned independently;
-- own `__proto__` and `constructor` remain safe data properties;
-- caller input is not mutated;
-- clone shares no nested containers with input;
-- result envelope、limits and statistics are frozen.
+- safe data handling for `__proto__` and `constructor` keys;
+- no caller-input mutation or shared nested output containers;
+- immutable result envelope、limits and statistics.
 
-### Resource limits
+### Resource ceilings
 
 ```text
-inputBytes:               16 MiB
+inputBytes:               16 MiB UTF-8
 maximum depth:            128
 value nodes:              1,000,000
 object keys:              250,000
@@ -224,69 +147,111 @@ controls per feature:     10,000
 total controls:           1,000,000
 ```
 
-These are finite security ceilings, not document-size recommendations or latency SLAs. Overrides must be finite positive safe integers. UTF-8 input bytes are measured separately; string length applies to values and keys.
+These are finite security ceilings, not recommended document sizes or latency SLAs. Overrides must be finite positive safe integers.
 
-### Statistics
+### Validation evidence
 
 ```text
-totalNodes
-objectKeys
-maximumDepth
-maximumStringLength
-features
-maximumControlPointsPerFeature
-totalControlPoints
+PR:                    #53
+validated head:        cb3db0fa6dc38c9b852524c15e4066b52b0c7b38
+CI run:                30951490118
+Node 20.19 / 22:       success
+Node tests:            324 passed
+Playground typecheck:  success
+Playground build:      success
+handover check:        success
+region artifact:       8909283653
+transform artifact:    8909282981
+Chromium tests:        34 passed
+review threads:        0
+merge method:          squash
+squash SHA:            d8b2d889dee81064069f96e555dd75b1c851ccf3
 ```
 
-Feature/control observations recognize only `$.features` and `$.features[i].controlPoints`; they are not schema validation.
+## Existing gaps retained intentionally
 
-## 008A validation
+### Current parser
 
-New test files:
+`parsePlotDocument()` still:
+
+- accepts only exact `PlotLibreDocument` / `1.0.0`;
+- combines JSON parsing、structure checks and historical normalization;
+- drops unknown root/feature fields;
+- defaults missing `definitionVersion` to `1.0.0`;
+- defaults missing/non-record parameters、style、feature metadata to `{}`;
+- defaults missing/non-integer revision to `0`;
+- has no migration report or dedicated reader limits;
+- does not detect document-wide duplicate feature ids;
+- does not enforce the registered Definition version.
+
+008A primitives are not integrated into this parser. That compatibility-sensitive work remains 008C.
+
+### Current Registry
+
+Registry does not require:
 
 ```text
-tests/plotjson-version-foundation.test.mjs
-tests/plotjson-safety.test.mjs
-tests/plotjson-safety-hardening.test.mjs
+feature.definitionVersion === definition.version
 ```
 
-Coverage:
+### Current import
 
-- valid/invalid/unsafe version triples;
-- lexical-order traps and forged records;
-- bounded malformed-version messages;
-- all accepted/prohibited value families;
-- getter non-invocation;
-- null/custom prototypes and prototype-pollution keys;
-- sparse/custom arrays;
-- direct/indirect cycles and repeated references;
-- insertion-order-independent paths;
-- 2,000-level iterative traversal;
-- UTF-8 bytes;
-- all limit categories;
-- immutable statistics and limits;
-- all historical regressions.
-
-Expected final exact-head gate:
+`PlotLibre.importDocument()` still performs:
 
 ```text
-Node 20.19 and 22
-324 Node tests
-Playground typecheck/build
-handover contract
-region benchmark
-selection-transform benchmark
-34 Chromium tests
-0 unresolved review threads
+full Registry preflight
+→ store.clear()
+→ repeated store.add()
 ```
 
-## 008A explicit exclusions
+A duplicate id can fail after partial replacement. 008D must replace this with one complete staged document transaction and one Store event.
+
+## 008B — migration registry、planner、report records
+
+Create after this finalization merges:
 
 ```text
-migration registration or execution
-migration report implementation
+agent/008b-plotjson-migration-registry-runtime
+```
+
+### Scope
+
+1. immutable document migration step type;
+2. immutable Definition migration reference `{ plotType, version }`;
+3. immutable Definition migration step with explicit source/target references;
+4. separate document and Definition registration APIs;
+5. one outgoing edge per source node and scope;
+6. strict target-version increase;
+7. duplicate、self、decreasing、cycle and branch rejection;
+8. deterministic linear chain planning independent of registration order;
+9. explicit plotType rename edges;
+10. immutable planned/applied step and report record types;
+11. public core exports、pure Node tests、runtime docs and immutable handover.
+
+### Graph model
+
+```text
+document node   = schema version
+Definition node = (plotType, definitionVersion)
+```
+
+Rules:
+
+- one source node has at most one outgoing edge;
+- versions strictly increase across an edge;
+- Definition rename can change plotType only through an explicit edge;
+- no cycles or branch ambiguity;
+- no arbitrary shortest-path search;
+- registration order cannot alter a valid plan;
+- missing chain becomes a structured PlotJSON error.
+
+### Exclusions
+
+```text
+production migration execution
 parsePlotDocument replacement
-Definition migration
+historical 1.0 normalization integration
+production symbol migrations
 Registry-version enforcement
 Store document replacement
 MapLibre import changes
@@ -294,47 +259,16 @@ schema bump
 007D fields
 ```
 
-## 008B — migration registry、planner、report types
-
-Create only after 008A squash merge and post-merge synchronization:
-
-```text
-agent/008b-plotjson-migration-registry-runtime
-```
-
-Scope:
-
-1. document and Definition migration step types;
-2. registry registration APIs;
-3. one outgoing edge per source version/scope;
-4. strict version increase;
-5. duplicate/self/decreasing/cycle/branch rejection;
-6. deterministic linear chain planning independent of registration order;
-7. immutable migration report record types;
-8. pure test migrations proving determinism and input immutability;
-9. public core exports and immutable handover.
-
-Excluded from 008B:
-
-```text
-parsePlotDocument replacement
-current 1.0 normalization integration
-production symbol migrations
-Registry-version enforcement
-Store/MapLibre changes
-schema bump
-```
-
 ## 008C — reader compatibility and invariants
 
 - report-bearing `readPlotDocument()`;
 - `parsePlotDocument()` compatibility wrapper;
-- 1.0 historical normalization records;
-- JSON/current-schema invariants;
-- duplicate feature-id detection;
-- Definition migration/equality;
+- input-byte and JSON-safety integration;
+- historical `1.0.0` normalization records;
+- document-wide duplicate-id detection;
+- Definition migration and final version equality;
 - current/legacy/future/invalid fixture tree;
-- repeat-read idempotence.
+- deterministic/idempotent repeated reads.
 
 ## 008D — Registry-aware preparation and atomic import
 
@@ -370,6 +304,23 @@ deterministic group/feature effective state
 production old-to-new schema migration
 golden compatibility fixtures
 ```
+
+## Validation gate
+
+Every runtime exact head:
+
+```text
+Node 20.19 and 22
+324 current Node tests plus milestone tests
+Playground typecheck/build
+handover contract
+both observational benchmarks
+34 Chromium tests plus milestone tests
+0 unresolved review threads
+immutable runtime handover
+```
+
+Post-merge finalization additionally proves Markdown-only scope.
 
 ## Cross-stage tasks
 
