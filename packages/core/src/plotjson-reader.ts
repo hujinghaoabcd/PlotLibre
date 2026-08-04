@@ -1,15 +1,15 @@
+import {
+  decodeCurrentPlotJsonDocument,
+  decodeCurrentPlotJsonFeature,
+  type MutablePlotJsonReportFacts,
+} from "./plotjson-current-decoder.js";
 import { PlotJsonError } from "./plotjson-error.js";
 import { PlotJsonMigrationRegistry } from "./plotjson-migration-registry.js";
 import {
   createPlotJsonMigrationReport,
   type PlotJsonAppliedDefinitionStep,
-  type PlotJsonAppliedDocumentStep,
   type PlotJsonFeatureMigrationRecord,
   type PlotJsonMigrationReport,
-  type PlotJsonNormalizationCode,
-  type PlotJsonNormalizationRecord,
-  type PlotJsonWarning,
-  type PlotJsonWarningCode,
 } from "./plotjson-migration-report.js";
 import type {
   PlotJsonDefinitionReference,
@@ -28,22 +28,19 @@ import {
   PLOTJSON_DOCUMENT_TYPE,
   parsePlotJsonVersion,
 } from "./plotjson-version.js";
-import {
-  createPlotFeature,
-  type JsonValue,
-  type PlotDocument,
-  type PlotFeature,
-  type PlotStyle,
-  type Position,
+import type {
+  JsonValue,
+  PlotDocument,
+  PlotFeature,
 } from "./types.js";
 
 export interface ReadPlotDocumentOptions {
   /** Trusted application-installed migration history. */
   readonly migrations?: PlotJsonMigrationRegistry;
   /**
-   * Explicit final Definition target keyed by the source plotType found after
-   * document-schema decoding. Omitting this map preserves parser-only 1.0.0
-   * compatibility and performs no Definition migration or equality check.
+   * Explicit final Definition target keyed by source plotType. Omitting this
+   * map preserves parser-only 1.0.0 compatibility and performs no Definition
+   * migration or equality check.
    */
   readonly definitionTargets?: Readonly<
     Record<string, PlotJsonDefinitionReference>
@@ -56,40 +53,6 @@ export interface ReadPlotDocumentResult {
   readonly report: PlotJsonMigrationReport;
 }
 
-interface MutableReportFacts {
-  readonly documentSteps: PlotJsonAppliedDocumentStep[];
-  readonly featureSteps: PlotJsonFeatureMigrationRecord[];
-  readonly normalizations: PlotJsonNormalizationRecord[];
-  readonly warnings: PlotJsonWarning[];
-}
-
-interface DecodedDocument {
-  readonly id: string;
-  readonly name: string;
-  readonly features: readonly PlotFeature[];
-  readonly metadata: Readonly<Record<string, JsonValue>>;
-}
-
-const ROOT_FIELDS = Object.freeze(new Set([
-  "type",
-  "schemaVersion",
-  "id",
-  "name",
-  "features",
-  "metadata",
-]));
-
-const FEATURE_FIELDS = Object.freeze(new Set([
-  "id",
-  "plotType",
-  "definitionVersion",
-  "controlPoints",
-  "parameters",
-  "style",
-  "metadata",
-  "revision",
-]));
-
 /**
  * Safely reads, migrates and normalizes PlotJSON without mutating Store,
  * Registry, History, interactions or MapLibre.
@@ -100,16 +63,15 @@ export function readPlotDocument(
 ): ReadPlotDocumentResult {
   const limits = resolvePlotJsonLimits(options.limits);
   const migrations = options.migrations ?? new PlotJsonMigrationRegistry();
-  const facts: MutableReportFacts = {
+  const facts: MutablePlotJsonReportFacts = {
     documentSteps: [],
     featureSteps: [],
     normalizations: [],
     warnings: [],
   };
 
-  const parsed = parseInput(input, limits);
   let current = cloneJsonObject(
-    parsed,
+    parseInput(input, limits),
     "$",
     limits,
     "PLOTJSON_ROOT_INVALID",
@@ -120,7 +82,6 @@ export function readPlotDocument(
     sourceSchemaVersion,
     CURRENT_PLOTJSON_SCHEMA_VERSION,
   );
-
   for (const step of documentPlan) {
     current = executeDocumentStep(current, step, limits);
     facts.documentSteps.push(Object.freeze({
@@ -131,8 +92,8 @@ export function readPlotDocument(
   }
 
   assertCurrentDocumentEnvelope(current);
-  const decoded = decodeCurrentDocument(current, facts);
-  const migratedFeatures = decoded.features.map((feature, index) =>
+  const decoded = decodeCurrentPlotJsonDocument(current, facts);
+  const features = decoded.features.map((feature, index) =>
     migrateDefinition(
       feature,
       index,
@@ -142,16 +103,14 @@ export function readPlotDocument(
       facts,
     ),
   );
-
   const document = deepFreeze({
     type: PLOTJSON_DOCUMENT_TYPE,
     schemaVersion: CURRENT_PLOTJSON_SCHEMA_VERSION,
     id: decoded.id,
     name: decoded.name,
-    features: migratedFeatures,
+    features,
     metadata: decoded.metadata,
   } satisfies PlotDocument);
-
   const report = createPlotJsonMigrationReport({
     sourceSchemaVersion,
     targetSchemaVersion: CURRENT_PLOTJSON_SCHEMA_VERSION,
@@ -160,7 +119,6 @@ export function readPlotDocument(
     normalizations: facts.normalizations,
     warnings: facts.warnings,
   });
-
   return Object.freeze({ document, report });
 }
 
@@ -238,7 +196,6 @@ function executeDocumentStep(
       new TypeError("Migration returned its input object."),
     );
   }
-
   const cloned = cloneMigrationObject(
     output,
     "$",
@@ -259,288 +216,19 @@ function executeDocumentStep(
   return cloned;
 }
 
-function decodeCurrentDocument(
-  root: PlotJsonObject,
-  facts: MutableReportFacts,
-): DecodedDocument {
-  recordUnknownFields(root, ROOT_FIELDS, "$", facts);
-
-  if (typeof root.id !== "string" || typeof root.name !== "string") {
-    throw currentSchemaError(
-      "$",
-      "PlotJSON id and name must be strings.",
-    );
-  }
-  if (!Array.isArray(root.features)) {
-    throw currentSchemaError(
-      "$.features",
-      "PlotJSON features must be an array.",
-    );
-  }
-  if (!isJsonObject(root.metadata)) {
-    throw currentSchemaError(
-      "$.metadata",
-      "PlotJSON metadata must be an object.",
-    );
-  }
-
-  const seenIds = new Set<string>();
-  const features = root.features.map((value, index) => {
-    const feature = decodeFeature(value, index, facts);
-    if (seenIds.has(feature.id)) {
-      throw new PlotJsonError(
-        "PLOTJSON_FEATURE_ID_DUPLICATE",
-        "PlotJSON feature ids must be unique.",
-        {
-          path: `$.features[${index}].id`,
-          featureId: feature.id,
-          plotType: feature.plotType,
-        },
-      );
-    }
-    seenIds.add(feature.id);
-    return feature;
-  });
-
-  return {
-    id: root.id,
-    name: root.name,
-    features,
-    metadata: root.metadata,
-  };
-}
-
-function decodeFeature(
-  value: JsonValue,
-  index: number,
-  facts: MutableReportFacts,
-): PlotFeature {
-  const path = `$.features[${index}]`;
-  if (!isJsonObject(value)) {
-    throw currentSchemaError(path, "PlotJSON feature must be an object.");
-  }
-  const featureId = typeof value.id === "string" ? value.id : undefined;
-  const plotType = typeof value.plotType === "string"
-    ? value.plotType
-    : undefined;
-  recordUnknownFields(
-    value,
-    FEATURE_FIELDS,
-    path,
-    facts,
-    featureId,
-    plotType,
-  );
-
-  if (featureId === undefined || plotType === undefined) {
-    throw currentSchemaError(
-      path,
-      "Feature id and plotType must be strings.",
-      featureId,
-      plotType,
-    );
-  }
-  if (!Array.isArray(value.controlPoints)) {
-    throw currentSchemaError(
-      `${path}.controlPoints`,
-      "Feature controlPoints must be an array.",
-      featureId,
-      plotType,
-    );
-  }
-
-  const controlPoints = value.controlPoints.map((point, pointIndex) =>
-    decodePosition(point, index, pointIndex, featureId, plotType),
-  );
-  const definitionVersion = decodeDefinitionVersion(
-    value.definitionVersion,
-    path,
-    featureId,
-    plotType,
-    facts,
-  );
-  const parameters = decodeOptionalRecord(
-    value.parameters,
-    `${path}.parameters`,
-    "PLOTJSON_PARAMETERS_DEFAULTED",
-    featureId,
-    plotType,
-    facts,
-  );
-  const style = decodeOptionalRecord(
-    value.style,
-    `${path}.style`,
-    "PLOTJSON_STYLE_DEFAULTED",
-    featureId,
-    plotType,
-    facts,
-  ) as PlotStyle;
-  const metadata = decodeOptionalRecord(
-    value.metadata,
-    `${path}.metadata`,
-    "PLOTJSON_FEATURE_METADATA_DEFAULTED",
-    featureId,
-    plotType,
-    facts,
-  );
-  const revision = decodeRevision(
-    value.revision,
-    `${path}.revision`,
-    featureId,
-    plotType,
-    facts,
-  );
-
-  return createPlotFeature({
-    id: featureId,
-    plotType,
-    definitionVersion,
-    controlPoints,
-    parameters,
-    style,
-    metadata,
-    revision,
-  });
-}
-
-function decodePosition(
-  value: JsonValue,
-  featureIndex: number,
-  pointIndex: number,
-  featureId: string,
-  plotType: string,
-): Position {
-  const path = `$.features[${featureIndex}].controlPoints[${pointIndex}]`;
-  if (
-    !Array.isArray(value) ||
-    value.length !== 2 ||
-    typeof value[0] !== "number" ||
-    typeof value[1] !== "number"
-  ) {
-    throw currentSchemaError(
-      path,
-      "Control point must be [longitude, latitude].",
-      featureId,
-      plotType,
-    );
-  }
-  if (value[1] < -90 || value[1] > 90) {
-    throw currentSchemaError(
-      path,
-      "Control-point latitude must be within [-90, 90].",
-      featureId,
-      plotType,
-    );
-  }
-  return Object.freeze([value[0], value[1]] as const);
-}
-
-function decodeDefinitionVersion(
-  value: JsonValue | undefined,
-  featurePath: string,
-  featureId: string,
-  plotType: string,
-  facts: MutableReportFacts,
-): string {
-  const path = `${featurePath}.definitionVersion`;
-  if (typeof value !== "string") {
-    addNormalization(
-      facts,
-      "PLOTJSON_DEFINITION_VERSION_DEFAULTED",
-      path,
-      featureId,
-      plotType,
-    );
-    if (value !== undefined) {
-      addWarning(
-        facts,
-        "PLOTJSON_INVALID_RECORD_DEFAULTED",
-        path,
-        featureId,
-        plotType,
-      );
-    }
-    return "1.0.0";
-  }
-  try {
-    return parsePlotJsonVersion(value).value;
-  } catch (cause) {
-    throw new PlotJsonError(
-      "PLOTJSON_DEFINITION_VERSION_INVALID",
-      "Feature definitionVersion must be a canonical numeric triple.",
-      { path, featureId, plotType, cause },
-    );
-  }
-}
-
-function decodeOptionalRecord(
-  value: JsonValue | undefined,
-  path: string,
-  code: PlotJsonNormalizationCode,
-  featureId: string,
-  plotType: string,
-  facts: MutableReportFacts,
-): Readonly<Record<string, JsonValue>> {
-  if (isJsonObject(value)) return value;
-  addNormalization(facts, code, path, featureId, plotType);
-  if (value !== undefined) {
-    addWarning(
-      facts,
-      "PLOTJSON_INVALID_RECORD_DEFAULTED",
-      path,
-      featureId,
-      plotType,
-    );
-  }
-  return Object.freeze({});
-}
-
-function decodeRevision(
-  value: JsonValue | undefined,
-  path: string,
-  featureId: string,
-  plotType: string,
-  facts: MutableReportFacts,
-): number {
-  if (
-    typeof value === "number" &&
-    Number.isSafeInteger(value) &&
-    value >= 0
-  ) {
-    return value;
-  }
-  addNormalization(
-    facts,
-    "PLOTJSON_REVISION_DEFAULTED",
-    path,
-    featureId,
-    plotType,
-  );
-  if (value !== undefined) {
-    addWarning(
-      facts,
-      "PLOTJSON_INVALID_REVISION_DEFAULTED",
-      path,
-      featureId,
-      plotType,
-    );
-  }
-  return 0;
-}
-
 function migrateDefinition(
   sourceFeature: PlotFeature,
   index: number,
   migrations: PlotJsonMigrationRegistry,
   targets: ReadPlotDocumentOptions["definitionTargets"],
   limits: Readonly<PlotJsonLimits>,
-  facts: MutableReportFacts,
+  facts: MutablePlotJsonReportFacts,
 ): PlotFeature {
+  if (!targets) return sourceFeature;
   const source = Object.freeze({
     plotType: sourceFeature.plotType,
     definitionVersion: sourceFeature.definitionVersion,
   });
-  if (!targets) return sourceFeature;
   if (!Object.prototype.hasOwnProperty.call(targets, source.plotType)) {
     throw new PlotJsonError(
       "PLOTJSON_DEFINITION_NOT_FOUND",
@@ -569,7 +257,6 @@ function migrateDefinition(
     target.definitionVersion,
   );
   const applied: PlotJsonAppliedDefinitionStep[] = [];
-
   for (const step of plan) {
     current = executeDefinitionStep(
       current,
@@ -586,7 +273,7 @@ function migrateDefinition(
     }));
   }
 
-  const migrated = decodeFeature(current, index, facts);
+  const migrated = decodeCurrentPlotJsonFeature(current, index, facts);
   if (
     migrated.id !== sourceFeature.id ||
     migrated.plotType !== target.plotType ||
@@ -604,13 +291,13 @@ function migrateDefinition(
       },
     );
   }
-
-  facts.featureSteps.push(Object.freeze({
+  const record: PlotJsonFeatureMigrationRecord = Object.freeze({
     featureId: sourceFeature.id,
     source,
     target,
     steps: Object.freeze(applied),
-  }));
+  });
+  facts.featureSteps.push(record);
   return migrated;
 }
 
@@ -647,7 +334,6 @@ function executeDefinitionStep(
       new TypeError("Migration returned its input object."),
     );
   }
-
   const cloned = cloneMigrationObject(
     output,
     path,
@@ -673,6 +359,19 @@ function executeDefinitionStep(
   return cloned;
 }
 
+function featureToJsonObject(feature: PlotFeature): unknown {
+  return {
+    id: feature.id,
+    plotType: feature.plotType,
+    definitionVersion: feature.definitionVersion,
+    controlPoints: feature.controlPoints,
+    parameters: feature.parameters,
+    style: feature.style,
+    metadata: feature.metadata,
+    revision: feature.revision,
+  };
+}
+
 function cloneMigrationObject(
   input: unknown,
   path: string,
@@ -692,18 +391,14 @@ function cloneMigrationObject(
     }
     return cloned;
   } catch (cause) {
-    throw new PlotJsonError(
-      code,
-      "PlotJSON migration output is invalid.",
-      {
-        path,
-        sourceVersion,
-        targetVersion,
-        ...(featureId === undefined ? {} : { featureId }),
-        ...(plotType === undefined ? {} : { plotType }),
-        cause,
-      },
-    );
+    throw new PlotJsonError(code, "PlotJSON migration output is invalid.", {
+      path,
+      sourceVersion,
+      targetVersion,
+      ...(featureId === undefined ? {} : { featureId }),
+      ...(plotType === undefined ? {} : { plotType }),
+      cause,
+    });
   }
 }
 
@@ -767,104 +462,8 @@ function definitionMigrationOutputError(
   );
 }
 
-function featureToJsonObject(feature: PlotFeature): PlotJsonObject {
-  return {
-    id: feature.id,
-    plotType: feature.plotType,
-    definitionVersion: feature.definitionVersion,
-    controlPoints: feature.controlPoints,
-    parameters: feature.parameters,
-    style: feature.style,
-    metadata: feature.metadata,
-    revision: feature.revision,
-  };
-}
-
-function recordUnknownFields(
-  object: PlotJsonObject,
-  allowed: ReadonlySet<string>,
-  basePath: string,
-  facts: MutableReportFacts,
-  featureId?: string,
-  plotType?: string,
-): void {
-  for (const key of Object.keys(object).sort(compareStrings)) {
-    if (allowed.has(key)) continue;
-    const path = appendKey(basePath, key);
-    addNormalization(
-      facts,
-      "PLOTJSON_UNKNOWN_FIELD_DROPPED",
-      path,
-      featureId,
-      plotType,
-    );
-    addWarning(
-      facts,
-      "PLOTJSON_UNKNOWN_FIELD_DROPPED",
-      path,
-      featureId,
-      plotType,
-    );
-  }
-}
-
-function addNormalization(
-  facts: MutableReportFacts,
-  code: PlotJsonNormalizationCode,
-  path: string,
-  featureId?: string,
-  plotType?: string,
-): void {
-  facts.normalizations.push(Object.freeze({
-    code,
-    path,
-    ...(featureId === undefined ? {} : { featureId }),
-    ...(plotType === undefined ? {} : { plotType }),
-  }));
-}
-
-function addWarning(
-  facts: MutableReportFacts,
-  code: PlotJsonWarningCode,
-  path: string,
-  featureId?: string,
-  plotType?: string,
-): void {
-  facts.warnings.push(Object.freeze({
-    code,
-    path,
-    ...(featureId === undefined ? {} : { featureId }),
-    ...(plotType === undefined ? {} : { plotType }),
-  }));
-}
-
-function currentSchemaError(
-  path: string,
-  message: string,
-  featureId?: string,
-  plotType?: string,
-): PlotJsonError {
-  return new PlotJsonError("PLOTJSON_CURRENT_SCHEMA_INVALID", message, {
-    path,
-    ...(featureId === undefined ? {} : { featureId }),
-    ...(plotType === undefined ? {} : { plotType }),
-  });
-}
-
-function isJsonObject(
-  value: JsonValue | undefined,
-): value is PlotJsonObject {
+function isJsonObject(value: JsonValue): value is PlotJsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function appendKey(path: string, key: string): string {
-  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key)
-    ? `${path}.${key}`
-    : `${path}[${JSON.stringify(key)}]`;
-}
-
-function compareStrings(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function deepFreeze<T>(value: T): T {
