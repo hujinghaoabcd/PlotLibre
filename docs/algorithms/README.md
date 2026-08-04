@@ -22,20 +22,21 @@ tests and golden fixtures
 
 ## 当前算法记录
 
-| 文档 | 公共符号或共享基础 |
-|---|---|
-| `arrow-fine.md` | `arrow.fine` |
-| `arrow-fine-tailed.md` | `arrow.fine.tailed` |
-| `arrow-assault-direction.md` | `arrow.assault-direction` |
-| `arrow-curved.md` | `arrow.curved` |
-| `arrow-attack.md` | `arrow.attack` 与共享 AttackArrow frame |
-| `arrow-attack-tailed.md` | `arrow.attack.tailed` |
-| `arrow-double.md` | `arrow.double` |
-| `arrow-pincer.md` | `arrow.pincer` |
-| `arrow-squad-combat.md` | `arrow.squad-combat` |
-| `arrow-route-corridor.md` | `arrow.route`、`arrow.corridor` 与 PathRibbon frame |
-| `arrow-route-multihead.md` | `arrow.route.bidirectional`、`arrow.route.double-head` |
-| `closed-action-area.md` | `area.closed-curve`、`area.gathering-place` 与 cyclic closed interpolation |
+| 文档 | 公共符号或共享基础 | 状态 |
+|---|---|---|
+| `arrow-fine.md` | `arrow.fine` | 已实现 |
+| `arrow-fine-tailed.md` | `arrow.fine.tailed` | 已实现 |
+| `arrow-assault-direction.md` | `arrow.assault-direction` | 已实现 |
+| `arrow-curved.md` | `arrow.curved` | 已实现 |
+| `arrow-attack.md` | `arrow.attack` 与共享 AttackArrow frame | 已实现 |
+| `arrow-attack-tailed.md` | `arrow.attack.tailed` | 已实现 |
+| `arrow-double.md` | `arrow.double` | 已实现 |
+| `arrow-pincer.md` | `arrow.pincer` | 已实现 |
+| `arrow-squad-combat.md` | `arrow.squad-combat` | 已实现 |
+| `arrow-route-corridor.md` | `arrow.route`、`arrow.corridor` 与 PathRibbon frame | 已实现 |
+| `arrow-route-multihead.md` | `arrow.route.bidirectional`、`arrow.route.double-head` | 已实现 |
+| `closed-action-area.md` | `area.closed-curve`、`area.gathering-place` 与 cyclic closed interpolation | 已实现 |
+| `circular-arc-foundation.md` | `line.circular-arc`、`area.sector`、`area.circular-segment` 与共享三点圆弧 frame | 006J 设计冻结候选 |
 
 基础通用几何另见：
 
@@ -46,7 +47,7 @@ tests and golden fixtures
 
 ## Milestone 006I 算法边界
 
-`closed-action-area.md` 已冻结：
+`closed-action-area.md` 已实现并通过 PR #31 合并：
 
 - 周期 Hermite/Catmull-Rom 数学表达；
 - local-metre projection；
@@ -62,3 +63,28 @@ tests and golden fixtures
 - Node、PlotJSON、interaction 和 browser 测试要求。
 
 不得把最终 Polygon ring 保存为 authored controls，也不得通过静默 ring repair 改变用户控制点语义。
+
+## Milestone 006J 算法冻结候选
+
+`circular-arc-foundation.md` 已记录：
+
+- fixed revisions：
+  - `sakitam-fdd/ol-plot@c919e60b4edeaeca53c08f9552f793b2ae9537f0`；
+  - `sakitam-fdd/maptalks.plot@37dab8d0dd31650540146e1e0f03f54982f01799`；
+- 两个参考仓库均为 MIT License；
+- code reuse 为 `none`；
+- 三点 circumcircle 的 determinant 公式；
+- exact `start / through / end` sweep selection；
+- minor/major、clockwise/counterclockwise 和 crossing 0°；
+- 分段采样并 exact 保留 through-point；
+- `line.circular-arc` LineString 边界；
+- `area.circular-segment` arc + chord Polygon；
+- `area.sector` centre/radius-start/end-bearing 与显式 sweepDirection；
+- local-only 1.0 coordinate policy；
+- near-collinear、excessive radius 和 unsupported extent fail closed；
+- no two-point fallback、no triangle degradation、no hidden geodesic switch；
+- deterministic fixtures 和 browser requirements。
+
+`area.lune` 未进入 006J public scope。参考实现的 `Lune/弓形` 实际是 circular segment；真正由两条圆弧围成的 lune 需要独立设计。
+
+在设计 PR 合并前，不创建 circular-arc geometry 或 Definition。实现必须以合并后的固定数学记录和测试 fixture 为约束。

@@ -1,13 +1,11 @@
-# PlotLibre Development Handover — Milestone 006I Merged / 006J Design Next
+# PlotLibre Development Handover — Milestone 006J Circular Arc Design Active
 
 日期：2026-08-04  
 仓库：`hujinghaoabcd/PlotLibre`  
-当前 `main`：`f873052d44a98f7029f0eda27ea70cda8b1af347`  
-已合并 PR：`#31 Add closed action area symbol group`  
-合并方式：squash  
-Post-merge 分支：`agent/006i-post-merge-finalization`  
+设计基线：`main@b3a1a18c5aaf0b26a4c7c5e42a6e307eaa331873`  
+活跃分支：`agent/006j-arc-sector-lune-design`  
 Workspace：`0.0.19`  
-状态：Milestone 006I 已合并到 `main`；当前仅同步合并后权威状态，下一实现阶段为 006J 语义设计
+状态：006I implementation 与 post-merge finalization 均已合并；006J 正在冻结 circular arc family 语义，尚无运行时代码
 
 ## Current state
 
@@ -20,117 +18,112 @@ public Arrow types: 14
 public Area types:  2
 Node tests:         163
 Chromium tests:     23
-main SHA:           f873052d44a98f7029f0eda27ea70cda8b1af347
-merged PR:          #31
-next milestone:     006J arc / sector / lune semantic design
+base main SHA:      b3a1a18c5aaf0b26a4c7c5e42a6e307eaa331873
+active branch:      agent/006j-arc-sector-lune-design
+active phase:       semantic and mathematical design only
 ```
 
-当前公共 Definitions：
+当前已实现公共 Definitions 仍为 16 个。006J 候选尚未进入 Registry、PlotJSON、Playground 或 public API。
+
+设计冻结候选：
 
 ```text
-arrow.straight
-arrow.fine
-arrow.fine.tailed
-arrow.assault-direction
-arrow.curved
-arrow.attack
-arrow.attack.tailed
-arrow.double
-arrow.pincer
-arrow.squad-combat
-arrow.route
-arrow.corridor
-arrow.route.bidirectional
-arrow.route.double-head
-area.closed-curve
-area.gathering-place
+line.circular-arc@1.0.0
+area.sector@1.0.0
+area.circular-segment@1.0.0
 ```
 
-Canonical state 仍为：
+延期：
 
 ```text
-plot definition + authored control points + parameters + style + metadata
+area.lune
 ```
-
-闭合重复点、周期曲线采样、winding normalization、gathering rear anchor 和 Polygon coordinates 均为派生数据。
 
 ## Completed in this milestone
 
-- 冻结并实现 `area.closed-curve@1.0.0`；
-- 冻结并实现 `area.gathering-place@1.0.0`；
-- 将 `area.route-loop` 延期，避免没有独立语义的公共别名；
-- 增加 pure periodic Hermite/Catmull–Rom closed-area geometry；
-- 使用 circular longitude mean + mean latitude 建立与遍历顺序无关的局部投影中心；
-- 保证每个 authored control 被曲线插值；
-- 自动闭合并规范化 counterclockwise simple ring；
-- duplicate、degenerate、invalid parameter 和 self-intersection fail closed；
-- gathering-place 仅允许两个 flank 的 permutation-only canonicalization；
-- derived rear anchor 不进入 Store、History、handles 或 PlotJSON；
-- 增加独立 `DEFAULT_AREA_STYLE`；
-- 保留 `arrowSymbols` 并新增 `areaSymbols`；
-- `builtInSymbols` 从 14 扩展到 16；
-- Node tests 从 154 增至 163；
-- Chromium tests 从 20 增至 23；
-- Playground 增加两类 selector、两类南京样例和独立交互提示；
-- 生产和无底图模式加载完整 16 类样例；
-- 基础 `?e2e=1` 保留原九类 selector compatibility surface；
-- extended E2E 增加 `areas=1`；
-- 修复 generic/specialized listener 顺序，保留 actionable rejection guidance；
-- root workspace 提升到 `0.0.19`；
-- 完成 README、AGENTS、路线图、Playground、interaction、design、algorithm 和 immutable handover；
-- PR #31 在 current-head CI 全绿、0 个未解决线程后标记 Ready；
-- PR #31 使用 expected head SHA squash 合并；
-- 实际 squash merge SHA 为 `f873052d44a98f7029f0eda27ea70cda8b1af347`。
+- 在两个固定 revision 参考库中交叉研究 Arc、Sector 和 Lune；
+- 核对两个参考仓库的 MIT License；
+- 声明 code reuse 为 `none`；
+- 确认参考 `Arc` 是固定三点 open LineString；
+- 确认参考 `Sector` 是 centre/radius-start/end-direction 三点 Polygon；
+- 确认参考 `Lune/弓形` 实际为一条圆弧加直线弦的 circular segment；
+- 拒绝使用误导性 `area.lune` 作为 circular-segment alias；
+- 将候选 `area.arc` 修正为 output/category 一致的 `line.circular-arc`；
+- 冻结 `line.circular-arc` 的 exact `start / through / end` controls；
+- 冻结 `area.circular-segment` 的 exact arc controls 与 derived chord；
+- 冻结 `area.sector` 的 `center / exact radius-start / end-bearing handle` controls；
+- 冻结显式 `sweepDirection` 参数；
+- 冻结 fixed-three automatic completion；
+- 冻结 no two-point fallback、no collinear degradation、no hidden control movement；
+- 冻结 local-metre-only 1.0 coordinate policy；
+- 记录三点 circumcircle、directed sweep、exact-through sampling 和 sector bearing 数学；
+- 记录 minor/major、crossing 0°、sweep > 180° 与 reversal test matrix；
+- 新增 `docs/design/circular-arc-family.md`；
+- 新增 `docs/algorithms/circular-arc-foundation.md`；
+- 更新 design 与 algorithm indexes。
 
 ## Validation
 
-最终 PR head 验证：
+当前分支只包含 Markdown 设计和 provenance，不包含：
 
 ```text
-GitHub Actions run: 30883623452 (#294)
-validated head SHA: d39657ebbd0d450a8bb184a30dbc6d014821a913
-Node 20.19:         success
-Node 22:            success
-TypeScript:         success
-Node tests:         163 passed / 0 failed
-Playground typecheck: success
-Playground build:   success
-handover contract:  success
-Chromium tests:     23 passed / 0 failed
-unresolved threads: 0
+geometry
+Definitions
+Registry entries
+PlotJSON changes
+interaction changes
+Playground selectors or samples
+tests
 ```
 
-前一实现候选 run `#292` 也独立完成 163 Node / 23 Chromium 全绿。run #294 验证了包含 immutable handover 的最终 PR head，是实际 Ready 和 squash merge 门槛。
+设计 PR 的 merge gate 仍执行完整回归：
 
-本 post-merge finalization 只修改权威 Markdown 状态并增加合并记录，不改变 runtime、geometry、Definitions、interaction、Playground 或 tests。该 finalization 仍需在自己的 PR 中通过完整 CI 后进入 `main`。
+```text
+Node 20.19
+Node 22
+163 Node tests
+23 Chromium tests
+Playground build
+handover contract
+0 unresolved review threads
+```
+
+设计内容的人工冻结门槛：
+
+- public identifiers 与 output type 一致；
+- control roles 无歧义；
+- through-point 明确选择 minor/major sweep；
+- sector bearing handle 与 rendered endpoint 区分明确；
+- local/geodesic 边界明确；
+- legacy Lune 命名问题明确；
+- deterministic fixtures 在实现前列出；
+- clean-room revisions、licenses 和 no-code-reuse 声明完整。
 
 ## Next tasks
 
-1. 完成 `agent/006i-post-merge-finalization` 的文档一致性修复；
-2. 为该分支创建 Draft PR；
-3. 通过 Node 20.19、Node 22、163 Node、23 Chromium、build 和 handover contract；
-4. 全绿后 squash 合并 post-merge finalization；
-5. 从最终 `main` 创建 `agent/006j-arc-sector-lune-design`；
-6. 先研究并冻结 `area.arc`、`area.sector`、`area.lune` 的独立语义；
-7. 明确 center、radius、start/end bearing、arc direction 和 output type；
-8. 明确 local-metre / geodesic、antimeridian 和 high-latitude policy；
-9. 语义、控制点角色和拓扑未冻结前不写 006J geometry；
-10. 不返回 pincer hardening，不增加 route-head variants。
+1. 更新 AGENTS 与 DEVELOPMENT_PLAN 到活跃 006J design branch；
+2. 增加 immutable 006J design handover；
+3. 创建只含文档的 Draft design PR；
+4. 对该 PR 运行完整 163 Node / 23 Chromium 回归；
+5. 处理设计评审问题，不在 design PR 中写 geometry；
+6. 全绿且 0 线程后 squash merge design PR；
+7. 从设计合并后的 `main` 创建独立 implementation branch；
+8. 先实现 pure circular frame 和 deterministic Node fixtures；
+9. geometry 全绿后再接 Definition、Registry、PlotJSON、Playground 和 browser tests；
+10. 不添加 `area.lune` alias，不回到 pincer hardening 或 route-head variants。
 
 ## Risks and decisions
 
-- 当前 packages 仍为 `UNLICENSED`，正式 npm release 前必须决定许可证；
-- root workspace 为 `0.0.19`，公共 package versions 尚未统一；
-- PlotJSON 1.0 尚缺正式 JSON Schema 和 migration framework；
-- Store/History 尚无多对象事务、持久化或通用 rollback；
-- closed-area 1.0 使用局部米制投影，不承诺全球尺度、极区或模糊反经线输入；
-- `area.closed-curve` 的 canonical order 不因 winding normalization 被重写；
-- `area.gathering-place` 的 crown 固定为 index 1，只有 flank pair 可交换；
-- sampled ring、closing duplicate 和 rear anchor 绝不能进入 canonical controls；
-- production sample catalog 为 16，基础 E2E 的 9-selector surface 是明确 compatibility mode；
-- generic 与 specialized Playground listener 顺序是可见行为契约；
-- Vite 生产 bundle 为约 `1,067.41 kB`，后续需评估 code splitting；
-- connector 工作流无法删除已合并分支；
-- PR #31 合并触发的 Pages workflow 与 live page 人工核验是两个独立状态，不能仅凭源码宣称线上缓存已更新。
+- `line.circular-arc` 将引入第一个非 Arrow 的 open LineString category，Registry 与 Playground 必须验证 category/output assumptions；
+- sector 的 end-bearing handle 是 authored semantic control，但通常不位于 rendered arc endpoint，必须有清晰 semantic guide；
+- reference libraries 的 two-point fallback 和 singular degradation 不适用于 PlotLibre；
+- local-only 1.0 会拒绝 antimeridian、high-latitude、large-extent 和 geodesic small-circle cases；
+- near-collinear triples 可能产生巨大 circumradius，必须冻结 scale-aware determinant 与 radius policy；
+- true mathematical lune 需要两条圆弧的独立控制模型，不能与 circular segment 混同；
+- packages 仍为 `UNLICENSED`；
+- root workspace 与 public package versions 尚未统一；
+- PlotJSON 尚缺正式 JSON Schema 和 migration framework；
+- Vite bundle code-splitting 风险仍存在但不属于 design PR；
+- connector 无法删除已合并分支。
 
-Continuation：完成 006I post-merge finalization 后，只进入 006J 语义设计。不要在 finalization PR 中加入任何新 geometry 或 public Definition。
+Continuation：继续在 `agent/006j-arc-sector-lune-design` 完成文档冻结和设计 PR。不要在该分支创建 `packages/geometry/src/circular-arc.ts` 或任何新 Definition。
