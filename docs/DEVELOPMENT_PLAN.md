@@ -14,18 +14,18 @@
 
 钳形箭头边界加固继续冻结；路线头部变体暂不扩展。
 
-## 当前活跃基线
+## 当前基线
 
 ```text
-base main SHA:     a883cbf382b61309e7d64e788e46d9319b8c0ea1
-active branch:     agent/006i-closed-action-area-group
-active PR:         #31 Add closed action area symbol group
+main SHA:          f873052d44a98f7029f0eda27ea70cda8b1af347
+merged PR:         #31 Add closed action area symbol group
 workspace:         0.0.19
 public symbols:    16 (14 Arrow + 2 Area)
 Node tests:        163
 Chromium tests:    23
-current milestone: 006I closed action area group
-next milestone:    006J arc / sector / lune group
+completed:         006I closed action area group
+next milestone:    006J arc / sector / lune semantic design
+finalization:      agent/006i-post-merge-finalization
 ```
 
 公开 Definitions：
@@ -61,7 +61,7 @@ area.gathering-place
 | 006E | 分队战斗箭头 | 已完成并合并 |
 | 006F–006G | 路线箭头 + 走廊箭头共享 PathRibbon | 已完成并合并 |
 | 006H | 双向路线 + 双头路线共享多头路径基础 | 已完成并最终同步 |
-| 006I | 闭合曲线 + 集结地共享周期闭合曲线基础 | 实现完成，最终 CI/交接阶段 |
+| 006I | 闭合曲线 + 集结地共享周期闭合曲线基础 | 已通过 PR #31 合并 |
 
 ## Milestone 006I：闭合行动区域组
 
@@ -182,36 +182,16 @@ Polygon coordinates
 - extended E2E 使用 `?e2e=1&squad=1&paths=1&areas=1`；
 - generic status listener 先绑定，symbol-specific guidance 后绑定。
 
-### 006I 测试基线
-
-Node：
-
-- periodic interpolation；
-- exact authored control preservation；
-- closed/CCW/simple ring；
-- reversal footprint；
-- gathering flank canonicalization；
-- rear-depth isolation；
-- Registry render roles；
-- invalid input rejection；
-- PlotJSON round trip；
-- 全部历史回归。
-
-Chromium：
-
-- 16-symbol selector/sample catalog；
-- closed-curve actual draft and committed rendering；
-- gathering-place third-pointer draft and automatic completion；
-- 完整样例 committed layer coverage；
-- 旧 14 Arrow visibility、drawing、editing、rejection、style reload、undo 与 PlotJSON regressions。
-
-目标最终基线：
+### 006I 最终验证
 
 ```text
-Node 20.19:       success
-Node 22:          success
-Node tests:       163 passed
-Chromium tests:   23 passed
+PR:                #31
+squash merge SHA:  f873052d44a98f7029f0eda27ea70cda8b1af347
+final head run:    #294 / 30883623452
+Node 20.19:        success
+Node 22:           success
+Node tests:        163 passed
+Chromium tests:    23 passed
 Playground build: success
 handover check:   success
 review threads:   0 unresolved
@@ -219,13 +199,15 @@ review threads:   0 unresolved
 
 ## Milestone 006J：弧形与扇形区域组
 
-候选：
+候选研究对象：
 
 ```text
 area.arc
 area.sector
 area.lune
 ```
+
+006J 第一阶段是**语义设计**，不是立即实现。只有满足独立公共语义、可解释 authored controls、稳定拓扑和测试契约的候选才进入 runtime。
 
 实现前冻结：
 
@@ -240,9 +222,12 @@ area.lune
 9. sector center 是否进入 ring；
 10. lune 的两个圆弧如何选择合法交集区域；
 11. canonicalization 是否仅做角色 permutation；
-12. PlotJSON migration 和 deterministic fixtures。
+12. PlotJSON migration 和 deterministic fixtures；
+13. 哪些候选只是参数变体，不能成为独立 Definition；
+14. interaction completion 是 fixed-count 还是 explicit completion；
+15. actual-rendered browser matrix 和 degenerate-input cases。
 
-不得把三个名字实现成同一几何换默认样式。
+不得把三个名字实现成同一几何换默认样式。语义设计、clean-room reference matrix、license review 和测试计划未冻结前，不创建 geometry 或 public identifier。
 
 ## Milestone 007：专业编辑
 
