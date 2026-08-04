@@ -2,7 +2,17 @@ name: Region Selection Benchmark
 
 on:
   workflow_call:
+    inputs:
+      source_sha:
+        description: Source branch head represented by this benchmark run
+        required: false
+        type: string
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Optional source SHA label for a manual run
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -24,7 +34,7 @@ jobs:
 
       - name: Run resolver benchmark
         env:
-          PLOTLIBRE_BENCHMARK_SHA: ${{ github.sha }}
+          PLOTLIBRE_BENCHMARK_SHA: ${{ inputs.source_sha || github.sha }}
         run: npm run benchmark:region-selection
 
       - name: Publish benchmark summary
