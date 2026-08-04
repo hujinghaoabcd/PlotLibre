@@ -51,7 +51,9 @@ export class BatchEditCommand implements Command {
   }
 
   public execute(): void {
-    this.#store.applyTransaction(this.#executeTransaction);
+    this.#selection.runWithoutStoreReconciliation(() => {
+      this.#store.applyTransaction(this.#executeTransaction);
+    });
     this.#selection.restore(
       this.#afterSelection,
       this.#executionCount === 0 ? "history-execute" : "history-redo",
@@ -63,7 +65,9 @@ export class BatchEditCommand implements Command {
     if (this.#executionCount === 0) {
       throw new Error("BatchEditCommand cannot undo before execute.");
     }
-    this.#store.applyTransaction(this.#undoTransaction);
+    this.#selection.runWithoutStoreReconciliation(() => {
+      this.#store.applyTransaction(this.#undoTransaction);
+    });
     this.#selection.restore(this.#beforeSelection, "history-undo");
   }
 }
