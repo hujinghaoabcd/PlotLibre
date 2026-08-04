@@ -7,6 +7,7 @@ import {
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { installClosedActionAreaPlayground } from "./closed-action-area-playground.js";
 import { installDoubleArrowPlayground } from "./double-arrow-playground.js";
 import { installPathSymbolsPlayground } from "./path-symbols-playground.js";
 import { installPincerArrowPlayground } from "./pincer-arrow-playground.js";
@@ -29,6 +30,7 @@ const query = new URLSearchParams(window.location.search);
 const e2e = query.get("e2e") === "1";
 const squadCombatE2e = query.get("squad") === "1";
 const pathSymbolsE2e = query.get("paths") === "1";
+const closedActionAreaE2e = query.get("areas") === "1";
 const basemapDisabled = e2e || query.get("basemap") === "none";
 
 const bootstrapStyle = {
@@ -87,6 +89,10 @@ map.once("load", () => {
     historySize: 300,
   });
   const app = new PlaygroundApp(map, plot, { e2e });
+
+  // Bind the generic application lifecycle first. Symbol-group listeners are
+  // installed afterwards so their semantic guidance can refine generic status
+  // messages, including fixed-count completion rejection details.
   app.start();
   installDoubleArrowPlayground(app, plot, map, { e2e });
   installPincerArrowPlayground(app, plot, map, { e2e });
@@ -98,6 +104,17 @@ map.once("load", () => {
     e2e,
     enableInE2e: pathSymbolsE2e,
   });
+  installClosedActionAreaPlayground(app, plot, map, {
+    e2e,
+    enableInE2e: closedActionAreaE2e,
+  });
+
+  // `start()` loads the original base sample before the installers wrap
+  // `loadSample`. Reload once in production so the first visible document uses
+  // the complete current sixteen-symbol catalog. E2E starts empty by design.
+  if (!e2e) {
+    app.loadSample();
+  }
 
   window.__plotlibrePlayground = { map, plot, app };
 });

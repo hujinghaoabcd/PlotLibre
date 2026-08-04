@@ -2,25 +2,33 @@
 
 ## 总体策略
 
-采用“相关符号组完整纵向切片”：具有同一数学基础的 2–3 个符号可以在同一 PR 中完成共享几何、独立语义、Definition、PlotJSON、交互、Playground、浏览器测试、算法记录和交接。禁止为了批量开发而复制整套生成器，也禁止仅通过不同默认参数伪造新符号。
+采用“相关符号组完整纵向切片”：具有同一数学基础的 2–3 个符号可以在同一里程碑中完成共享几何、独立语义、Definition、PlotJSON、交互、Playground、浏览器测试、算法记录和交接。
 
-单个复杂耦合符号仍可独立成组。只有存在未解决的语义争议时才单独创建设计 PR。
+禁止：
 
-当前用户目标是继续扩大真正具有独立语义的符号库。钳形箭头边界加固继续冻结；路线头部变体暂不继续扩展。完成一个相关符号组后直接进入下一组，公共稳定性问题集中在阶段性回归中处理。
+- 为增加数量复制整套生成器；
+- 仅通过不同默认参数伪造新公共符号；
+- 将 rendered GeoJSON 反写为 canonical controls；
+- 为提高成功率关闭 simple-ring 或完整生成 preflight；
+- 在多个复杂符号族之间并行扩散范围。
 
-## 当前基线
+钳形箭头边界加固继续冻结；路线头部变体暂不扩展。
+
+## 当前活跃基线
 
 ```text
-main SHA:           e799b3263bc36410c4195225faad5d2fc36f494f
-workspace:          0.0.18
-public Arrow types: 14
-Node tests:         154
-Chromium tests:     20
-handover branch:    agent/006i-handover-baseline
-next milestone:     006I closed action area group
+base main SHA:     a883cbf382b61309e7d64e788e46d9319b8c0ea1
+active branch:     agent/006i-closed-action-area-group
+active PR:         #31 Add closed action area symbol group
+workspace:         0.0.19
+public symbols:    16 (14 Arrow + 2 Area)
+Node tests:        163
+Chromium tests:    23
+current milestone: 006I closed action area group
+next milestone:    006J arc / sector / lune group
 ```
 
-公开箭头：
+公开 Definitions：
 
 ```text
 arrow.straight
@@ -37,6 +45,8 @@ arrow.route
 arrow.corridor
 arrow.route.bidirectional
 arrow.route.double-head
+area.closed-curve
+area.gathering-place
 ```
 
 ## 已完成里程碑
@@ -49,157 +59,167 @@ arrow.route.double-head
 | 005H | 双箭头 | 已完成 |
 | 006A–006D | 钳形箭头、自然点击顺序、失败原因提示 | 已完成 |
 | 006E | 分队战斗箭头 | 已完成并合并 |
-| 006F–006G | 路线箭头 + 走廊箭头共享 PathRibbon 基础 | 已完成并合并 |
-| 006H | 双向路线 + 双头路线共享多头路径基础 | 已完成并合并 |
-| 006I | 闭合行动区域相关符号组 | 下一阶段 |
+| 006F–006G | 路线箭头 + 走廊箭头共享 PathRibbon | 已完成并合并 |
+| 006H | 双向路线 + 双头路线共享多头路径基础 | 已完成并最终同步 |
+| 006I | 闭合曲线 + 集结地共享周期闭合曲线基础 | 实现完成，最终 CI/交接阶段 |
 
 ## Milestone 006I：闭合行动区域组
 
-### 目标
-
-项目第一次从 Arrow family 进入 Area family。该阶段不能只增加一个看起来闭合的 Polygon，而要建立可复用、可测试、可迁移的闭合区域语义基础。
-
-候选公共标识符：
+### 最终公共范围
 
 ```text
-area.closed-curve
-area.gathering-place
+area.closed-curve@1.0.0
+area.gathering-place@1.0.0
+```
+
+延期：
+
+```text
 area.route-loop
 ```
 
-其中：
+`area.route-loop` 只有在具有独立路线、方向、入口/出口或行动语义时才可进入公共 API。换样式或参数的 closed curve 不是新 Definition。
 
-- `area.closed-curve`：面向用户定义边界控制点的平滑闭合区域；
-- `area.gathering-place`：具有独立传统标绘语义、非普通闭合曲线默认样式的集结地区域；
-- `area.route-loop`：只有在能够定义独立的方向、路线或流向语义时才进入公共 API；若只是闭合曲线换参数，则不实现。
+### `area.closed-curve`
 
-### 第一阶段：语义冻结
-
-实现 geometry 前必须确定：
-
-1. 公共 identifier 与 Definition version；
-2. authored controls 位于边界、中心路径还是具有特殊角色；
-3. `minPoints`、`maxPoints` 和完成方式；
-4. 是否允许两点或三点退化形态；
-5. 自动闭合是否只存在于派生 ring；
-6. 控制点顺序是否有方向含义；
-7. 反转 authored controls 是否保持几何不变；
-8. 输出一个 Polygon、MultiPolygon 或同时包含 LineString；
-9. 是否允许孔洞；006I 默认不允许孔洞；
-10. 自交、重复点、尖锐折返和极短边策略；
-11. 参数、单位、范围和隔离性；
-12. PlotJSON 中哪些内容必须持久化、哪些必须派生。
-
-### 共享闭合区域基础
-
-计划提取纯 `ClosedAreaFrame` 或等价共享组件，负责：
-
-- WGS84 authored controls 的局部米制投影；
-- 连续重复点清洗；
-- 闭合控制路径分析；
-- Catmull–Rom、Bezier 或独立闭合插值策略；
-- 参数化采样；
-- ring closure；
-- finite、area、winding 和 simple-ring validation；
-- 精确 authored control preservation policy；
-- WGS84 反投影。
-
-禁止：
-
-- 在 `symbols` 中复制完整闭合曲线生成器；
-- 直接把最终 ring 存成 `controlPoints`；
-- 为了让复杂输入渲染而关闭自交检查；
-- 在 `interaction` 或 Playground 中硬编码 area identifier；
-- 将自由手绘 GeoJSON 当作 canonical parametric state。
-
-### 交互契约
-
-初始目标为 schema-driven `MultiPointDrawSession`：
+Canonical controls 是 3–64 个有序边界途经点：
 
 ```text
-click authored controls
-→ pointer candidate produces derived closed-area draft
-→ double-click or Enter completes
-→ automatic closure remains derived
+0..n-1 authored boundary waypoints
 ```
 
-要求：
+契约：
 
-- 完成结果只包含 authored controls，不附加重复首点；
-- Backspace/Delete 逐点撤销未提交控制；
-- Escape 取消；
-- invalid closure 保留最后合法 draft 或 semantic guide；
-- self-intersection 和退化 ring 不进入 Store/History；
-- 每个 authored control 完成后均显示 semantic handle；
-- 一次 handle drag 只产生一个 `ReplacePlotCommand`。
+- 周期 Hermite/Catmull–Rom 曲线插值每个 authored control；
+- 最后一个 span 自动回到首点；
+- authored controls 不重复首点；
+- 双击末点或 Enter 完成；
+- reversal 保持 footprint，canonical authored order 不被静默重写；
+- sampled vertices、closing duplicate 和 Polygon ring 全部派生。
+
+### `area.gathering-place`
+
+固定三个 authored controls：
+
+```text
+0 flank A
+1 front crown
+2 flank B
+```
+
+契约：
+
+- 两个 flank 是无序语义对，只允许 indices 0/2 的确定性 permutation；
+- crown 必须保持 exact index 1；
+- rear closure anchor 从 flank midpoint 和 crown direction 派生；
+- 第三次点击自动完成；
+- derived rear anchor 不进入 Store、History、handles 或 PlotJSON；
+- 与三点 closed curve 保持独立语义和默认样式。
+
+### 共享纯几何基础
+
+`packages/geometry/src/closed-area.ts` 负责：
+
+- WGS84 authored controls 的局部米制投影；
+- 顺序无关的 circular-longitude/mean-latitude projection origin；
+- periodic Hermite/Catmull–Rom sampling；
+- authored control interpolation；
+- gathering-place rear-anchor derivation；
+- explicit ring closure；
+- counterclockwise winding normalization；
+- finite、area 和 simple-ring validation；
+- WGS84 反投影。
+
+共享基础不包含 arrow head、neck、notch、shaft width 或 route ribbon 语义。
+
+### 失败策略
+
+以下情况在 Store mutation 前 fail closed：
+
+- 控制点数量错误；
+- 非有限 WGS84 坐标；
+- pairwise duplicate controls；
+- 无法确定稳定局部投影中心的全球尺度输入；
+- 参数越界；
+- derived rear anchor collapse；
+- zero/near-zero area；
+- sampled ring self-intersection。
+
+不允许静默删除 controls、polygonize 自交或回退到 raw authored polygon。
 
 ### PlotJSON 契约
+
+只持久化：
 
 ```text
 plotType
 Definition version
-ordered authored controls
+ordered canonical authored controls
 explicit parameters
 style
 metadata
 revision
 ```
 
-以下内容不得序列化为 controls：
+不得持久化：
 
 ```text
-closing duplicate point
+closing duplicate
 sampled curve points
-smoothed boundary vertices
-winding-normalization vertices
-ring repair points
+derived rear anchor
+winding-normalized copies
 Polygon coordinates
 ```
 
-### 测试要求
+### Playground 与交互
 
-006I 在现有 154 Node / 20 Chromium 基线上增加：
+- `area.closed-curve`：至少三个点；pointer candidate 形成完整 draft；双击/Enter 完成；
+- `area.gathering-place`：第三个 pointer candidate 形成完整 draft；第三次点击自动完成；
+- 两者均使用 schema-driven `MultiPointDrawSession`；
+- committed handles 仅对应 authored controls；
+- production selector 与样例总数为 16；
+- 基础兼容 E2E 保留原九类 selector；
+- extended E2E 使用 `?e2e=1&squad=1&paths=1&areas=1`；
+- generic status listener 先绑定，symbol-specific guidance 后绑定。
 
-- deterministic golden fixture；
-- exact authored control contract；
-- automatic closure without extra control；
-- duplicate-control policy；
-- control-order and reversal behavior；
-- interior-control influence；
-- parameter isolation；
-- finite/closed/CCW/simple ring；
-- self-intersection rejection；
-- antimeridian and high-latitude policy；
-- Registry registration；
+### 006I 测试基线
+
+Node：
+
+- periodic interpolation；
+- exact authored control preservation；
+- closed/CCW/simple ring；
+- reversal footprint；
+- gathering flank canonicalization；
+- rear-depth isolation；
+- Registry render roles；
+- invalid input rejection；
 - PlotJSON round trip；
-- schema-driven completion；
-- invalid completion before Store mutation；
-- committed and draft Source coverage；
-- actual `queryRenderedFeatures()` coverage；
-- handle edit, revision, history and undo；
-- style reload restoration；
-- current fourteen Arrow regressions remain green。
+- 全部历史回归。
 
-### 006I 完成条件
+Chromium：
 
-1. 语义设计经反例检查；
-2. 只保留真正独立的公共 identifiers；
-3. shared closed-area geometry 为纯函数；
-4. 每个 Definition 独立 validate/generate；
-5. PlotJSON 只保存 authored controls；
-6. Playground 分类、说明和样例完成；
-7. Node 20.19 success；
-8. Node 22 success；
-9. 全部 Node tests success；
-10. 全部 Chromium tests success；
-11. handover contract success；
-12. unresolved review threads = 0；
-13. merge SHA 与 `main` 一致；
-14. `LATEST.md` 更新为真实 merged state。
+- 16-symbol selector/sample catalog；
+- closed-curve actual draft and committed rendering；
+- gathering-place third-pointer draft and automatic completion；
+- 完整样例 committed layer coverage；
+- 旧 14 Arrow visibility、drawing、editing、rejection、style reload、undo 与 PlotJSON regressions。
+
+目标最终基线：
+
+```text
+Node 20.19:       success
+Node 22:          success
+Node tests:       163 passed
+Chromium tests:   23 passed
+Playground build: success
+handover check:   success
+review threads:   0 unresolved
+```
 
 ## Milestone 006J：弧形与扇形区域组
 
-开发共享圆弧、半径和方位角基础的区域符号，候选包括：
+候选：
 
 ```text
 area.arc
@@ -207,33 +227,41 @@ area.sector
 area.lune
 ```
 
-实现前必须明确中心、起始方位、终止方位、半径和弧方向的 authored/derived 边界。
+实现前冻结：
+
+1. 哪些是 Polygon、LineString 或复合输出；
+2. authored centre、radius、start/end bearing 的角色；
+3. clockwise/counterclockwise arc direction；
+4. 大于 180° 和跨 0° 方位行为；
+5. 两点/三点输入是否等价；
+6. radius 单位与 geodesic/local-metre 边界；
+7. antimeridian/high-latitude 策略；
+8. arc sampling 与 exact endpoint contract；
+9. sector center 是否进入 ring；
+10. lune 的两个圆弧如何选择合法交集区域；
+11. canonicalization 是否仅做角色 permutation；
+12. PlotJSON migration 和 deterministic fixtures。
+
+不得把三个名字实现成同一几何换默认样式。
 
 ## Milestone 007：专业编辑
 
-- 多选；
-- 框选；
-- 套索；
-- 对象平移；
-- 旋转；
-- 缩放；
-- 分组；
-- 锁定；
+- 多选、框选、套索；
+- 对象平移、旋转、缩放；
+- 分组与锁定；
 - 触摸；
-- 多对象事务。
+- 多对象事务和 rollback。
 
 ## Milestone 008：吸附和约束
 
-- RBush 或等价空间索引；
+- 空间索引；
 - 顶点、线段、中点和交点吸附；
-- 网格吸附；
-- 角度和方位约束；
-- 平行和垂直约束；
-- guides 和可解释吸附原因。
+- 网格、角度、方位、平行和垂直约束；
+- guides 与可解释吸附原因。
 
 ## Milestone 009：更多区域、旗帜和注记
 
-- 更多 closed curve 和 control measures；
+- control measures 与更多 area families；
 - triangle、rectangle、curve、swallowtail flags；
 - callout、leader label、text、image 和 SVG annotation。
 
@@ -242,30 +270,22 @@ area.lune
 - 正式 PlotJSON JSON Schema；
 - document/definition migrations；
 - unresolved definition preservation；
-- GeoJSON import/export；
-- SVG/PNG export；
+- GeoJSON、SVG、PNG import/export；
 - 图层、分组和 z-order；
-- 自动保存和文档恢复；
-- 文件大小与输入复杂度限制。
+- 自动保存与恢复；
+- 文件大小和输入复杂度限制。
 
 ## Milestone 011：MIL-STD/APP-6
 
 - 可选符号后端；
-- SIDC；
-- modifiers；
+- SIDC、modifiers；
 - 单点和多点标准符号；
 - 标准版本与授权边界。
 
 ## Milestone 012：框架与协作
 
-- React；
-- Vue；
-- Vanilla integration guide；
-- CRDT；
-- 持久化；
-- 审计；
-- 权限；
-- 协作 presence。
+- React、Vue、Vanilla integration guides；
+- CRDT、持久化、审计、权限和 presence。
 
 ## Milestone 013：1.0
 
@@ -275,25 +295,20 @@ area.lune
 - 50+ 原生参数化符号；
 - 完整专业编辑；
 - 浏览器兼容矩阵；
-- 文档站；
-- 性能基准；
+- 文档站与性能基准；
 - 明确许可证；
-- 统一 package version 和发布流程；
-- npm release automation；
-- migration policy；
-- 长期支持声明。
+- 统一 package version 和 release automation；
+- migration 与长期支持政策。
 
 ## 跨阶段工程任务
-
-以下任务不能无限推迟，但不阻塞 006I 语义设计：
 
 1. 决定开源许可证并建立 notices；
 2. 统一 workspace 与 package version 策略；
 3. 引入 Changesets 或等价 release workflow；
-4. 建立正式 JSON Schema；
+4. 建立正式 PlotJSON JSON Schema；
 5. 增加 transaction/rollback 设计；
-6. 为文档状态增加自动一致性检查；
-7. 建立 docs/design 和 docs/algorithms 完整索引；
-8. 把长期架构愿景与当前实现状态分离；
-9. 建立性能基准和大对象数量测试；
-10. 在正式 0.1.0 前完成 npm package boundary review。
+6. 自动检查 README、LATEST、Playground 和 Registry 数量一致性；
+7. 建立性能基准与大对象数量测试；
+8. 在正式 0.1.0 前完成 npm package boundary review；
+9. 评估 Playground 单 bundle 超过 1 MB 的 code splitting；
+10. 持续区分 source/build ready、workflow deployed 与 live manually verified。

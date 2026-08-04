@@ -6,31 +6,25 @@
 https://hujinghaoabcd.github.io/PlotLibre/
 ```
 
-`apps/playground` 同时承担：
+`apps/playground` 同时承担真实 MapLibre 浏览器应用、人工验收入口、Playwright 测试目标、GitHub Pages 站点和公共 API 使用示例。
 
-- 真实 MapLibre 浏览器应用；
-- 人工验收入口；
-- Playwright 测试目标；
-- GitHub Pages 站点；
-- 公共 API 使用示例。
-
-Playground 只能通过公开 PlotLibre packages 工作，不得直接调用内部 geometry 或修改 MapLibre Source 来绕过 Store、Registry 和 CommandHistory。
+Playground 只能通过公开 PlotLibre packages 工作，不得直接调用内部 geometry 或修改 MapLibre Source 绕过 Store、Registry 和 CommandHistory。
 
 ## 2. 当前技术基线
 
 ```text
-PlotLibre workspace:  0.0.18
+PlotLibre workspace:  0.0.19
 MapLibre GL JS:       6.0.0
 Vite:                 8.1.5
 Playwright:           1.61.1
 Node.js:              20.19+
 Pages base:           /PlotLibre/
-Node tests:           154
-Chromium tests:       20
-public Arrow types:   14
+Node tests:           163
+Chromium tests:       23
+public symbols:       16 (14 Arrow + 2 Area)
 ```
 
-公共 packages 当前仍为 `0.0.2`，Playground package 为 `0.0.3`。根 workspace `0.0.18` 是当前开发里程碑基线，不应被误解为已经完成统一 npm release。
+公共 packages 仍为开发期独立版本，Playground package 仍为 `0.0.3`。根 workspace `0.0.19` 是里程碑基线，不代表统一 npm release。
 
 ## 3. 当前公共符号
 
@@ -49,6 +43,8 @@ arrow.route                 路线箭头
 arrow.corridor              走廊
 arrow.route.bidirectional   双向路线箭头
 arrow.route.double-head     双头路线箭头
+area.closed-curve           闭合曲线区域
+area.gathering-place        集结地
 ```
 
 ## 4. 绘制模式
@@ -62,170 +58,73 @@ arrow.fine.tailed
 arrow.assault-direction
 ```
 
-语义控制：
+第二次点击自动完成。两个 authored controls 分别是 tail/origin 和 exact tip/objective。
+
+### 4.2 可变路径箭头
 
 ```text
-0 = tail / origin
-1 = exact tip / objective
-```
-
-操作：
-
-1. 点击起点；
-2. 移动指针显示 draft；
-3. 第二次点击完成；
-4. Enter 可用当前 pointer preview 完成；
-5. Backspace/Delete 返回 ready；
-6. Escape 取消；
-7. 完成后显示两个 semantic handles；
-8. 一次合法拖动产生一个可撤销命令。
-
-### 4.2 曲线箭头
-
-`arrow.curved` 使用 3–64 个 authored controls：
-
-```text
-0      tail centre
-1..n-2 path controls
-n-1    exact tip
-```
-
-第三个有效候选点开始显示完整 draft。双击或 Enter 完成。派生 Catmull–Rom 样本、offset 边界和 arrow-head vertices 不进入 Store、handles 或 PlotJSON。
-
-### 4.3 攻击箭头家族
-
-```text
+arrow.curved
 arrow.attack
 arrow.attack.tailed
+arrow.squad-combat
+arrow.route
+arrow.corridor
+arrow.route.bidirectional
+arrow.route.double-head
 ```
 
-控制语义：
+双击末点或按 Enter 完成。Backspace/Delete 逐点回退，Escape 取消。Definition 决定控制点角色、两点最小形态、exact tip、tail edge 或 centre path 语义。
+
+### 4.3 固定复合箭头
 
 ```text
-0 + 1   exact tail edges
-2..n-2  attack-spine controls
-n-1     exact objective/tip
+arrow.double  4 controls
+arrow.pincer  5 controls
+```
+
+达到最大 authored control 数量后自动尝试完成。无效候选保留 active session，并通过 `drawRejection` 暴露稳定 issue codes。派生的镜像目标、branch、bridge 或 curve samples 不持久化。
+
+### 4.4 闭合曲线区域
+
+`area.closed-curve@1.0.0` 使用 3–64 个有序边界途经点：
+
+```text
+0..n-1 authored boundary waypoints
 ```
 
 操作：
 
-1. 点击 tail edge A；
-2. 点击 tail edge B；
-3. 点击或移动到 spine/objective candidates；
-4. 双击 objective 或按 Enter 完成；
-5. Backspace/Delete 逐点回退；
-6. Escape 取消；
-7. 完成后所有 authored tail/spine controls 均为 handles。
+1. 点击至少三个边界控制点；
+2. 从第三个完整 candidate 开始显示 derived closed Polygon draft；
+3. 双击末点或按 Enter 完成；
+4. 自动闭合不增加 authored control；
+5. Backspace/Delete 逐点撤销；
+6. 完成后每个 authored waypoint 显示 semantic handle。
 
-燕尾攻击箭头只改变派生尾部闭合策略。notch roots 和 notch tip 不是 controls。
+周期曲线、重复首点、winding normalization 和 final Polygon coordinates 均为派生数据。
 
-### 4.4 双箭头
+### 4.5 集结地
 
-`arrow.double` 固定四个 authored controls：
-
-```text
-0 tail edge A
-1 tail edge B
-2 objective A
-3 objective B
-```
-
-第三次点击后，Definition 可以生成一个临时镜像 objective 用于完整 draft。该点只是 transient draft control：
+`area.gathering-place@1.0.0` 固定三个 controls：
 
 ```text
-不能完成
-不能进入 Store
-不能成为 handle
-不能写入 PlotJSON
+0 flank A
+1 front crown
+2 flank B
 ```
 
-第四个真实控制点点击后通过 fixed-maximum path 自动完成。
+操作：
 
-### 4.5 钳形箭头
+1. 点击一侧翼点；
+2. 点击前向冠点；
+3. 移动指针时第三个 candidate 形成完整 draft；
+4. 点击另一侧翼点后自动完成。
 
-`arrow.pincer@1.1.0` 固定五个 canonical controls：
+后部闭合锚点由两翼中点和 crown direction 派生，不能成为 handle 或 PlotJSON control。两个 flank 可以 canonical permutation，crown 必须保持 exact index 1。
 
-```text
-0 outer tail A
-1 outer tail B
-2 objective A
-3 objective B
-4 shared inner junction
-```
+## 5. Completion 与地图生命周期
 
-用户可以按左右任意顺序点击两个 objectives。当原始目标配对会造成 crossed arms、而交换 controls 2/3 能生成合法钳形时，Definition 只做 permutation-only canonicalization。
-
-第五个点不合法时：
-
-- 会话保持 active；
-- candidate 不进入 Store、History 或 PlotJSON；
-- `drawRejection` 暴露稳定 validation issues；
-- Playground 将 issue code 翻译为中文调整建议；
-- 移动指针或删除点后清除旧 rejection。
-
-### 4.6 分队战斗箭头
-
-`arrow.squad-combat` 保存 centre action path：
-
-```text
-0      tail centre
-1..n-2 optional path controls
-n-1    exact objective/tip
-```
-
-两个 tail edges 和 tail width 在局部米制空间中对称派生。它与 `arrow.attack` 的区别是后者的两个 tail edges 为 authored controls。
-
-两点可以生成直线形式；更多点生成曲线路径；双击或 Enter 完成。
-
-### 4.7 路线和走廊
-
-`arrow.route`：
-
-```text
-0      route origin
-1..n-2 optional path controls
-n-1    exact objective/tip
-```
-
-派生 constant-width shaft、neck plane 和 exact-tip head。
-
-`arrow.corridor`：
-
-```text
-0      endpoint A
-1..n-2 optional path controls
-n-1    endpoint B
-```
-
-输出 flat-cap undirected ribbon。它不是隐藏或退化 head 的 route arrow。
-
-两者均支持两点直线和多点曲线路径，双击或 Enter 完成。
-
-### 4.8 路线多头组
-
-`arrow.route.bidirectional`：
-
-```text
-0      exact start tip
-1..n-2 optional path controls
-n-1    exact end tip
-```
-
-两个 authored endpoints 均为精确箭尖，输出一个 closed simple Polygon。
-
-`arrow.route.double-head`：
-
-```text
-0      route origin
-1..n-2 optional path controls
-n-1    exact primary objective/tip
-```
-
-primary body 保持普通 route 语义。secondary emphasis head 在 primary neck 后方派生并作为第二个 Polygon component 渲染。secondary head 不进入 Store、History、handles 或 PlotJSON。
-
-## 5. Completion 与地图交互生命周期
-
-### 固定最大点数
+固定最大点数：
 
 ```text
 maximum-point candidate
@@ -235,7 +134,7 @@ maximum-point candidate
 → invalid: active session + visible rejection
 ```
 
-### 可变多点
+可变多点：
 
 ```text
 double-click / Enter
@@ -246,73 +145,52 @@ double-click / Enter
 → Store
 ```
 
-绘制多点符号期间，MapLibre double-click zoom 被暂时关闭。完成需要：
-
-```text
-dblclick completion
-→ preventDefault + stopPropagation
-→ create/select semantic feature
-→ current browser event ends
-→ restore previous zoom state
-```
-
-不能在同一原生 `dblclick` 调用栈中过早恢复，否则地图可能额外缩放一次。Cancel 和 destroy 立即恢复原状态。
+绘制多点符号期间临时关闭 MapLibre double-click zoom。恢复必须发生在当前原生 `dblclick` 调用栈结束后，避免完成时额外缩放。Cancel 与 destroy 可立即恢复。
 
 ## 6. Draft、Guide 与 Rejection
 
-PlotLibre 区分三种临时可视状态：
+PlotLibre 区分：
 
-### 完整合法 draft
+- **完整合法 draft**：Definition 已生成 RenderBundle，但尚未进入 Store；
+- **last-valid draft**：当前 pointer candidate 无效时保留最近合法图形；
+- **semantic guide**：尚不能生成 Polygon 时显示 authored path/control guide；
+- **completion rejection**：明确完成尝试失败后的结构化问题。
 
-Definition 可以生成完整 RenderBundle，但尚未进入 Store。
+所有临时状态均不得进入 Store、History、handles 或 PlotJSON。
 
-### Last-valid draft
-
-当前 pointer candidate 暂时无效，仍保留最近一次合法完整 draft，避免图形闪烁消失。
-
-### Semantic guide
-
-在还不能生成完整 Polygon 时，显示 authored path/control guide。Guide：
-
-- 只用于可见性和调整；
-- 不能完成对象；
-- 不进入 Store、History、handles 或 PlotJSON。
-
-Completion rejection 描述一次明确完成尝试。它不是每一次 pointer movement 的连续错误检查。
+Playground 的通用事件监听器必须先注册，symbol-specific 监听器后注册。这样钳形等复杂符号的 actionable rejection guidance 不会被通用“继续点击”文案覆盖。
 
 ## 7. 示例数据
 
-完整功能模式加载 14 类南京示例：
+生产模式和 `?basemap=none` 模式加载 16 类南京示例：
 
 ```text
-1 × arrow.straight
-1 × arrow.fine
-1 × arrow.fine.tailed
-1 × arrow.assault-direction
-1 × arrow.curved
-1 × arrow.attack
-1 × arrow.attack.tailed
-1 × arrow.double
-1 × arrow.pincer
-1 × arrow.squad-combat
-1 × arrow.route
-1 × arrow.corridor
-1 × arrow.route.bidirectional
-1 × arrow.route.double-head
+14 × Arrow Definitions
+2 × Area Definitions
 ```
 
-示例必须只通过公开 create/import API 进入 Store，不得直接注入 rendered GeoJSON。
+示例只通过公开 `create()` 和 Registry preflight 进入 Store。首次启动流程为：
 
-## 8. 启动与底图
+```text
+PlaygroundApp.start()
+→ register generic listeners and base sample
+→ install symbol-group wrappers/listeners
+→ reload complete wrapped sample catalog
+→ 16 semantic features
+```
+
+基础兼容 E2E `?e2e=1` 保持空 Store 和原九类 selector，以验证早期公共交互表面没有意外破坏。完整目录 E2E 使用显式 feature flags。
+
+## 8. 启动、底图与 E2E 模式
 
 在线资源不能阻塞标绘：
 
 ```text
 local background style
 → MapLibre load
+→ optional raster basemap
 → PlotLibre renderer
 → PlaygroundApp
-→ optional raster basemap
 ```
 
 禁用在线底图：
@@ -321,19 +199,19 @@ local background style
 ?basemap=none
 ```
 
-基础 E2E：
+基础兼容 E2E：
 
 ```text
 ?e2e=1
 ```
 
-完整 path/squad 功能测试：
+完整 16 类功能 E2E：
 
 ```text
-?e2e=1&squad=1&paths=1
+?e2e=1&squad=1&paths=1&areas=1
 ```
 
-E2E 运行真实 PlotLibre、MapLibre 和 Worker，但不依赖远程瓦片。
+`basemap=none` 只能改变底图，不得改变符号目录、示例或 semantic behavior。
 
 ## 9. MapLibre 6 Worker
 
@@ -350,9 +228,9 @@ maplibre-gl-shared.mjs
 setWorkerUrl(`${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`);
 ```
 
-Worker entry 和 shared module 必须保持同一 MapLibre 版本。详见 `MAPLIBRE_WORKER_PACKAGING.md`。
+Worker entry 和 shared module 必须来自同一 MapLibre 版本。详见 `MAPLIBRE_WORKER_PACKAGING.md`。
 
-## 10. 本地运行
+## 10. 本地运行与验证
 
 ```bash
 npm install
@@ -365,7 +243,7 @@ npm run playground:dev
 http://127.0.0.1:5173/PlotLibre/
 ```
 
-验证：
+完整验证：
 
 ```bash
 npm run typecheck
@@ -379,63 +257,59 @@ npm run playground:e2e
 
 ## 11. 当前 Chromium 覆盖
 
-当前 20 个 Chromium tests 覆盖：
+23 个 Chromium tests 覆盖：
 
 - `/PlotLibre/` base path；
 - Worker entry/shared module；
 - 无远程底图启动；
-- selector 和 sample 行为；
+- 基础 9-selector compatibility surface；
+- 生产 16-sample catalog；
 - committed/draft/handles Sources；
 - fill/line/handle Layers；
 - actual `queryRenderedFeatures()`；
 - 两点符号绘制；
 - curved/attack/squad/path multi-point 绘制；
 - double-arrow transient preview 与 fixed-four completion；
-- pincer natural objective order；
-- pincer actionable rejection；
-- route/corridor；
-- bidirectional/double-head route；
-- 14 类型 draft/committed visibility matrix；
+- pincer natural order、actionable rejection 与恢复；
+- route/corridor/multi-head route；
+- closed-curve draft、double-click completion 和 rendered Polygon；
+- gathering-place third-pointer draft、fixed-three completion 和 rendered Polygon；
+- 14 Arrow visibility matrix；
+- 16 类 sample committed layer presence；
 - handle edit、revision、history 和 undo；
-- style reload；
-- delete 与 PlotJSON；
+- style reload、delete、PlotJSON；
 - camera stability 和 zoom restoration。
 
-当前权威实现基线：
+当前目标权威基线：
 
 ```text
-Node tests:      154 passed
-Chromium tests:  20 passed
-public symbols:  14 Arrow types
+Node tests:      163 passed
+Chromium tests:  23 passed
+public symbols:  16
 ```
 
 ## 12. `querySourceFeatures()` 注意事项
 
-MapLibre 可以按瓦片返回同一 GeoJSON Feature 的多个副本。
-
-语义 handle 数量必须按：
+MapLibre 可以按瓦片返回同一 GeoJSON Feature 的多个副本。语义 handle 数量必须按：
 
 ```text
 plotId + handleIndex
 ```
 
-去重，而不是使用原始 Feature 数量。Store 中 `controlPoints.length` 是 authored semantic control 数量的权威值。
+去重。Store 中 `controlPoints.length` 才是 authored semantic control 数量的权威值。
 
 ## 13. Geometry validation policy
 
-所有 topology-sensitive Definitions 必须在 Store mutation 前完成 full generation preflight。
+所有 topology-sensitive Definitions 在 Store mutation 前完成 full generation preflight：
 
-通用要求：
-
-- semantic controls 满足 Definition 数量和角色；
+- controls 满足 Definition 数量和角色；
 - 参数有限且处于范围；
 - 输出 geometry 有限；
-- Polygon ring 闭合；
-- 方向规范化；
+- Polygon ring 闭合并规范化方向；
 - simple-ring validation；
-- exact authored tips/tails/junctions 按 Definition contract 保留；
+- exact authored controls 按 Definition contract 保留；
 - invalid handle preview 不进入 Store/History；
-- derived samples、heads、notches、bridges、offsets 和 final vertices 不作为 handles。
+- derived samples、heads、notches、bridges、offsets、closure anchors 和 final vertices 不作为 handles。
 
 ## 14. Pages 部署
 
@@ -461,13 +335,15 @@ npm run playground:build
 apps/playground/dist
 ```
 
-文档不得仅根据源码或 workflow 配置就声称线上缓存已经人工核验。需要明确区分：
+必须区分：
 
 ```text
 source/build ready
 workflow deployed
 live page manually verified
 ```
+
+不能仅根据源码或 workflow 配置宣称线上缓存已人工核验。
 
 ## 15. 强制约束
 
@@ -478,19 +354,20 @@ live page manually verified
 - dev、preview、E2E 和 Pages 统一 `/PlotLibre/`；
 - 每个新公共符号同阶段加入 selector、样例和 browser coverage；
 - browser tests 必须验证 actual rendered feature；
-- completion instructions 必须与 Definition schema 一致；
-- topology-sensitive symbols 必须验证 invalid preview 不进入 Store/History；
-- derived controls 与 generated vertices 不得暴露为 canonical handles；
+- completion instructions 与 Definition schema 一致；
+- topology-sensitive symbols 验证 invalid preview 不进入 Store/History；
+- derived controls 与 generated vertices 不暴露为 canonical handles；
 - Playground 错误提示使用 Registry issue codes，不复制 geometry validation；
-- 新 Area family 必须有清晰分类和独立说明，不能简单混入 Arrow 名称列表。
+- Area family 使用独立命名、样式与说明；
+- generic/specialized listener ordering 必须有回归测试保护。
 
 ## 16. 下一步
 
-Milestone 006H 已合并。当前进入 006I：
+006I 在 PR #31 完成最终 CI、交接与 squash merge 后，进入 006J：
 
-1. 同步剩余历史状态文档；
-2. 冻结闭合行动区域公共 identifiers；
-3. 设计 `area.closed-curve` 与 `area.gathering-place` canonical controls；
-4. 仅在证明独立方向语义后保留 `area.route-loop`；
-5. 建立 pure closed-area geometry frame；
-6. 完成 Definition、Registry、PlotJSON、Playground 和浏览器纵向切片。
+1. 研究 arc/sector/lune 的公共行为和许可证；
+2. 冻结 center、radius、bearings 和 arc direction roles；
+3. 明确 Polygon/LineString/compound output；
+4. 决定 local-metre 与 geodesic 策略；
+5. 建立共享 circular-arc frame；
+6. 同阶段完成 Definition、Registry、PlotJSON、Playground 和浏览器纵向切片。

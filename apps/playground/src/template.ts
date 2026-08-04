@@ -10,7 +10,7 @@ export const playgroundTemplate = `
       </a>
       <div class="header-links">
         <a href="https://github.com/hujinghaoabcd/PlotLibre" target="_blank" rel="noreferrer">GitHub</a>
-        <span class="version-badge">v0.0.18 demo</span>
+        <span class="version-badge">v0.0.19 demo</span>
       </div>
     </header>
 
@@ -66,7 +66,7 @@ export const playgroundTemplate = `
           <div class="section-heading">
             <div>
               <span class="eyebrow">Style</span>
-              <h2>选中箭头样式</h2>
+              <h2>选中标绘样式</h2>
             </div>
             <span id="selection-state" class="state-pill">未选择</span>
           </div>
@@ -107,7 +107,9 @@ export const playgroundTemplate = `
             <li>走廊箭头：控制点定义无方向中心路径，派生双向平头走廊。</li>
             <li>双向路线箭头：首末点均为精确箭尖，中间控制点定义共同路线。</li>
             <li>双头路线箭头：末点为精确目标，后方同向强调头自动派生。</li>
-            <li>可变多点箭头双击最后一点或按 Enter 完成；Backspace/Delete 逐点回退。</li>
+            <li>闭合曲线区域：沿边界点击至少三个途经点，双击末点或按 Enter 自动闭合。</li>
+            <li>集结地：依次点击一侧翼点、前向冠点和另一侧翼点；第三点自动完成。</li>
+            <li>可变多点标绘双击最后一点或按 Enter 完成；Backspace/Delete 逐点回退。</li>
             <li>完成后可拖动任一圆形语义控制点重新编辑。</li>
           </ol>
         </section>
