@@ -245,7 +245,13 @@ export class MapLibreSelectionRegionInteraction {
   };
 
   readonly #onPointerCancel = (event: MapCanvasPointerEventLike): void => {
-    if (!this.#session || !this.#matchesPointer(event.pointerId)) return;
+    if (
+      !this.#session ||
+      this.#pointerId === undefined ||
+      !this.#matchesPointer(event.pointerId)
+    ) {
+      return;
+    }
     this.#consumePointerEvent(event);
     this.cancel();
   };
