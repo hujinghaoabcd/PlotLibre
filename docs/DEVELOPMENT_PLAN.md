@@ -2,279 +2,304 @@
 
 ## 总体策略
 
-采用“相关能力完整纵向切片”：符号族先冻结语义和数学，再完成共享纯几何、独立 Definition、Registry、PlotJSON、交互、Playground、浏览器测试、算法记录和交接；编辑能力同样先冻结状态模型、事务边界和失败策略，再进入 runtime。
+符号族与专业编辑都采用“设计冻结 → 独立实现 → current-head CI → immutable handover → squash merge”的完整纵向切片。
 
 禁止：
 
-- 为增加数量复制完整生成器；
-- 仅通过不同默认参数伪造新公共符号；
-- 把 rendered GeoJSON 反写为 authored controls；
-- 为提高成功率关闭 topology 或 generation preflight；
-- 在多个复杂符号族之间并行扩散；
-- 在设计冻结前先写运行时代码。
+- 编辑 rendered GeoJSON vertices 代替 authored controls；
+- 允许部分 batch mutation；
+- 为提高成功率关闭 Registry generation preflight；
+- 把 canonical editor state 隐藏在任意 metadata 中；
+- 在 documentation-only design PR 中提前写 runtime；
+- 并行扩散多个复杂编辑子系统。
 
-## 当前合并基线
+## 当前基线
 
 ```text
-main SHA:          297d0a644eaa3427f8fd59b82b7bc3582221d49e
-merged PR:         #34 Add circular arc family
+main SHA:          4ce59d189b65c8257bf49beabc308a4020249cd0
 workspace:         0.0.20
 public symbols:    19 (14 Arrow + 1 Line + 4 Area)
 Node tests:        184
 Chromium tests:    28
-completed:         006J circular arc family implementation
-current slice:     006J post-merge documentation finalization
-next milestone:    007 professional editing semantic design
-finalization:      agent/006j-post-merge-finalization
-```
-
-当前公共 Definitions：
-
-```text
-arrow.straight
-arrow.fine
-arrow.fine.tailed
-arrow.assault-direction
-arrow.curved
-arrow.attack
-arrow.attack.tailed
-arrow.double
-arrow.pincer
-arrow.squad-combat
-arrow.route
-arrow.corridor
-arrow.route.bidirectional
-arrow.route.double-head
-line.circular-arc
-area.closed-curve
-area.gathering-place
-area.circular-segment
-area.sector
+completed:         006J implementation + finalization
+active milestone:  007 professional editing semantic design
+active branch:     agent/007-professional-editing-design
+runtime changes:   prohibited on design branch
 ```
 
 ## 已完成里程碑
 
 | 里程碑 | 主要成果 | 状态 |
 |---|---|---|
-| 001–004 | Workspace、Core、History、PlotJSON、MapLibre、Geometry foundations | 已完成 |
-| 005A–005H | 两点、曲线、攻击、燕尾、双箭头 | 已完成 |
-| 006A–006D | 钳形箭头、自然点击顺序、结构化失败反馈 | 已完成 |
-| 006E | 分队战斗箭头 | 已完成并合并 |
-| 006F–006G | 路线箭头 + 走廊共享 PathRibbon | 已完成并合并 |
-| 006H | 双向路线 + 双头路线 | 已完成并合并 |
-| 006I | 闭合曲线 + 集结地 | PR #31、#32 已合并 |
-| 006J Design | 圆弧、扇形、圆弓形语义与数学冻结 | PR #33 已合并 |
-| 006J Implementation | 三个 circular Definitions、semantic guides、19 类 Playground | PR #34 已合并 |
+| 001–004 | Workspace、Core、History、PlotJSON、MapLibre、geometry foundations | 已完成 |
+| 005A–005H | 基础与复合 Arrow families | 已完成 |
+| 006A–006D | pincer、canonical roles、structured rejection | 已完成 |
+| 006E | squad combat | 已合并 |
+| 006F–006G | route + corridor PathRibbon | 已合并 |
+| 006H | bidirectional + double-head route | 已合并 |
+| 006I | closed curve + gathering place | PR #31、#32 已合并 |
+| 006J | circular design、implementation、semantic guides | PR #33、#34、#35 已合并 |
 
-## Milestone 006J：圆弧族最终状态
-
-### 公共范围
+## Milestone 007 总体拆分
 
 ```text
-line.circular-arc@1.0.0
-area.circular-segment@1.0.0
-area.sector@1.0.0
+007 Design — professional editing semantic/transaction freeze
+007A — multi-selection + atomic Store transaction + batch delete + local translation
+007B — box/lasso selection
+007C — rotation + positive uniform scale
+007D — groups/locks/visibility/z-order after PlotJSON migration design
 ```
 
-延期：
+Design PR 合并后只创建 007A implementation branch；007B–D 不进入同一 runtime PR。
 
-```text
-area.lune
+## 007 Design：已冻结候选
+
+### SelectionSnapshot
+
+```ts
+interface SelectionSnapshot {
+  readonly selectedIds: readonly string[];
+  readonly primaryId?: string;
+  readonly revision: number;
+}
 ```
 
-参考库的 `Lune/弓形` 实际是一条圆弧加直线弦，因此 PlotLibre 使用准确名称 `area.circular-segment`。真正由两条圆弧围成的 lune 需要未来独立语义设计。
+规则：
 
-### Shared circular frame
+- selection transient，不进入 PlotJSON；
+- ids unique 且为现存 Store ids；
+- acquisition order 稳定；
+- primary 是最后一个 selected id；
+- replace/add/subtract/toggle/clear/reconcile 每次最多一个 event；
+- Store removal/clear 自动 reconcile；
+- only primary feature 显示 authored handles and Definition guides；
+- secondary selection 只显示 lightweight overlay；
+- backward-compatible `selectedId` 映射到 primary。
 
-`packages/geometry/src/circular-arc.ts` 已实现：
-
-- local-metre coordinate-mode gate；
-- traversal-order-independent projection origin；
-- scale-aware three-point circumcenter；
-- exact radius and angle derivation；
-- through-point-directed minor/major sweep selection；
-- clockwise/counterclockwise deltas；
-- crossing-0° normalization；
-- `start → through` 与 `through → end` 双子弧采样；
-- exact authored control replacement；
-- circular-segment arc+chord ring；
-- directed sector ring；
-- finite、area、winding 和 simple-ring validation。
-
-### Definition-driven semantic guides
-
-Core public extension：
+### Modifier intent
 
 ```text
-PlotDefinition.deriveSemanticGuidePaths(feature)
+plain click       replace / make primary
+Shift             add
+Ctrl or Cmd       toggle
+Alt               subtract
+empty plain click clear
 ```
 
-MapLibre layer：
+MapLibre 只负责把浏览器 modifiers 转成 engine-independent intent。
+
+### Atomic PlotStore transaction
 
 ```text
-plotlibre-handle-guide
+validate transaction
+→ clone ordered Store state
+→ stage add/replace/remove
+→ any error: no mutation
+→ commit once
+→ one batch event
 ```
 
-Sector 返回 `center → end-bearing handle`。该虚线在 complete draft、selection 和 handle drag 状态显示，但不进入 committed RenderBundle、Store、History 或 PlotJSON。
+必须支持 exact ordered-id state，以便 batch delete undo 恢复原 document order。Append-on-undo 不允许。
 
-### Final validation and merge
+### Listener failures
+
+Store commit 后 listener error：
+
+- 不回滚已被其他 listeners 观察的状态；
+- 所有 listeners 仍执行；
+- errors 交给 `onListenerError`；
+- 不同步抛出阻止 history 入栈；
+- mutation validation error 仍在 commit 前抛出。
+
+### BatchEditCommand
+
+Command 保存：
 
 ```text
-implementation PR: #34
-validated head:    608567d4f8f662242b0356c54742a2ffcb087c66
-CI run:            #337 / 30893450723
-Node 20.19:        success
-Node 22:           success
-Node tests:        184 passed
-Chromium tests:    28 passed
-Playground build: success
-handover check:   success
-review threads:   0 unresolved
-squash merge SHA: 297d0a644eaa3427f8fd59b82b7bc3582221d49e
+before/after features
+before/after document order
+before/after selection
+label
 ```
 
-### Current catalog and renderer
+Execute/redo 使用 exact after-state；undo 使用 exact before-state。Redo 不再次增加 revisions。
+
+## Milestone 007A：首个 runtime slice
+
+### 7A.1 SelectionController
+
+Engine-independent API candidate：
 
 ```text
-arrowSymbols:   14
-lineSymbols:     1
-areaSymbols:     4
-builtInSymbols: 19
-MapLibre Sources: 3
-MapLibre Layers:  8
+replace
+add
+subtract
+toggle
+clear
+makePrimary
+restore
+snapshot
+subscribe
 ```
 
-Production Playground loads 19 selectors and 19南京 samples. Base `?e2e=1` retains the original nine-selector compatibility surface; full current E2E uses：
+Node tests 先于 MapLibre adapter。
+
+### 7A.2 Multi-selection overlay
+
+Candidate MapLibre resources：
 
 ```text
-?e2e=1&squad=1&paths=1&areas=1&circular=1
+plotlibre-selection source
+plotlibre-selection-line
+plotlibre-selection-point
+plotlibre-transform-guide
 ```
 
-## Milestone 007：专业编辑语义设计
+- overlays transient；
+- compound output dedup by `plotId`；
+- selection-only changes 不 regenerate entire document；
+- primary flag explicit；
+- primary authored handles remain in handles source。
 
-006J post-merge documentation 合并后，从最终 `main` 创建：
+### 7A.3 Batch delete
 
 ```text
-agent/007-professional-editing-design
+selected ids
+→ one atomic remove transaction
+→ afterSelection empty
+→ one history entry
 ```
 
-该阶段先做 documentation-only design，不立即实现 runtime。
+Undo restores exact features、order、selection and primary。
 
-### 7.1 Multi-selection model
-
-必须冻结：
-
-- `selectedIds` 是否有稳定有序语义；
-- primary/active selection 与集合 selection 的区别；
-- 单击、Ctrl/Cmd-click、Shift-click、空白点击的集合变更；
-- 删除、锁定、隐藏或 import 后 selection cleanup；
-- Store change 与 selection change 的事件顺序；
-- selection 是否属于 document canonical state（初步建议：不属于 PlotJSON）。
-
-### 7.2 Box and lasso selection
-
-必须冻结：
-
-- contain、intersect 或 configurable hit policy；
-- 使用 authored controls、derived geometry、hit-area 或组合判定；
-- Polygon holes、LineString、Point 和 compound output 的一致规则；
-- 屏幕空间与地理空间的边界；
-- additive、subtractive、toggle gestures；
-- drag threshold、camera gesture 冲突和 touch behavior；
-- 大对象数量时的索引和性能预算。
-
-### 7.3 Whole-object translation
-
-初步原则：
+### 7A.4 Local whole-object translation
 
 ```text
-translate authored controls only
-→ canonicalize
-→ validate/generate every affected feature
-→ all valid: one batch command
+selected authored controls
+→ analyze one local coordinate frame
+→ one common meter delta
+→ transform every authored control
+→ revision = original + 1
+→ Registry preflight all candidates
+→ all valid: one batch preview/command
 → any invalid: no mutation
 ```
 
-必须明确：
+Rules：
 
-- local-metre 与 geodesic translation；
-- antimeridian、高纬度和大范围输入；
-- Definition parameters 是否随平移变化（通常不变）；
-- group translation；
-- locked features；
-- transient preview 与 final commit；
-- one gesture = one undo step。
+- parameters/style/metadata unchanged；
+- antimeridian/high-latitude/large-extent selection rejects before drag；
+- control handle priority > whole-object drag > selection click > camera drag；
+- drag threshold 4 CSS px；
+- Escape cancels；
+- zero movement no-op；
+- one gesture = one history entry；
+- dragPan disabled only during transform。
 
-### 7.4 Rotation and scale
+### 7A.5 Structured rejection
 
-必须冻结：
+Initial codes：
 
-- pivot：selection center、bounding-box center、primary feature anchor 或 authored pivot；
-- local projection origin；
-- rotation direction and angle normalization；
-- uniform/non-uniform scale；
-- negative scale/reflection 是否禁止；
-- screen-sized parameters 与 ground-sized controls 的关系；
-- scale 对 radius/width 参数的影响；
-- local-only Definitions 在 transform 后的 coordinate-mode gate；
-- invalid multi-feature transform 的 atomic rollback。
+```text
+TRANSFORM_SELECTION_EMPTY
+TRANSFORM_FEATURE_MISSING
+TRANSFORM_FEATURE_LOCKED
+TRANSFORM_UNSUPPORTED_COORDINATE_MODE
+TRANSFORM_CANDIDATE_GENERATION_FAILED
+TRANSFORM_TRANSACTION_INVALID
+```
 
-### 7.5 Groups, locks and z-order
+Invalid preview keeps last-valid preview and never mutates Store/History。
 
-必须冻结：
+### 7A.6 Tests
 
-- group 是 document metadata、独立 entity 还是 feature relation；
-- stable group identifiers；
-- nested groups 是否允许；
-- lock 对 selection、style edit、handle edit 和 transform 的影响；
-- hidden/visible state；
-- z-order 是全局、layer 内还是 group 内；
-- PlotJSON schema 和 migration；
-- import unresolved group references 的策略。
+Node：
 
-### 7.6 Multi-object commands and transactions
+- selection operations/order/primary/no-op；
+- Store reconcile；
+- transaction preconditions；
+- no partial mutation；
+- one batch event；
+- listener failure isolation；
+- exact order restoration；
+- execute/undo/redo revisions and selection；
+- mixed Arrow/Line/Area translation；
+- common meter delta；
+- invalid member atomic rejection；
+- Escape/zero movement。
 
-必须新增或冻结：
+Chromium：
 
-- batch create/replace/delete command；
-- transaction preflight；
-- all-or-nothing Store mutation；
-- listener exception rollback policy；
-- history entry shape and memory limits；
-- undo/redo selection restoration；
-- command serialization/audit boundary；
-- future collaboration/CRDT compatibility。
+- Ctrl/Cmd toggle、Shift add、Alt subtract；
+- primary handles only；
+- actual multi-selection overlays；
+- whole-selection drag preview and commit；
+- one undo/redo；
+- batch delete/undo；
+- style reload；
+- all existing 19-symbol/28-test regressions。
 
-### 7.7 Interaction and accessibility
+## Milestone 007B：Box and lasso
 
-- pointer capture；
-- keyboard nudging and modifiers；
-- Escape cancellation；
-- touch transform gestures；
-- focus and ARIA feedback；
-- camera drag/box zoom conflicts；
-- visible transform handles and guides；
-- reduced-motion and high-contrast behavior。
+### Box
 
-### 7.8 Required design fixtures
+- Shift-drag empty map；
+- default intersection policy；
+- candidate ids from committed interactive layers；
+- dedup by `plotId`；
+- deterministic Store order；
+- selection changes once on pointer-up；
+- exact contain policy deferred。
 
-设计 PR 必须先列出：
+### Lasso
 
-- mixed Point/Line/Polygon multi-selection；
-- additive/subtractive/toggle selection；
-- contain/intersect box fixtures；
-- lasso self-intersection policy；
-- translation across multiple Definitions；
-- invalid member causing atomic rollback；
-- rotation/scale around deterministic pivot；
-- locked/grouped objects；
-- one gesture / one history entry；
-- undo/redo selection behavior；
-- style reload and selection overlays；
-- 100、1,000、10,000 features performance targets；
-- actual-rendered Chromium interaction matrix。
+- dedicated mode/action；
+- screen-space path；
+- remove adjacent duplicates and simplify with documented tolerance；
+- >=3 distinct points；
+- simple ring required；
+- self-intersection rejects completion；
+- transient only；
+- spatial index required before large-document claim。
 
-### 7.9 Design merge gate
+## Milestone 007C：Rotation and scale
+
+- local-metre only initially；
+- pivot = selection authored-control bounds center；
+- positive user angle clockwise；
+- positive uniform scale `[0.01, 100]`；
+- no reflection/non-uniform scale；
+- all selected controls share pivot；
+- parameters unchanged by default；
+- future Definition parameter-transform hook must be pure/versioned；
+- any invalid member rejects complete transform。
+
+## Milestone 007D：Canonical editor object state
+
+Groups、locks、visibility、z-order require formal PlotJSON schema/migration before runtime。
+
+Must freeze：
+
+- stable group ids and nesting；
+- lock effects on selection/style/handles/delete/transform；
+- visibility and hit testing；
+- global/group z-order；
+- import unresolved relations；
+- migration from PlotJSON 1.0。
+
+Arbitrary free-form metadata is prohibited for these fields。
+
+## Reference evidence
+
+```text
+Terra Draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
+MapLibre-Geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
+Mapbox GL Draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
+```
+
+Code reuse：`none`。详细行为矩阵见 `REFERENCE_LIBRARY_MATRIX.md`，事务算法见 `algorithms/batch-edit-transaction.md`。
+
+## 007 Design merge gate
 
 ```text
 no runtime changes
@@ -287,50 +312,36 @@ handover check:  success
 review threads:  0 unresolved
 ```
 
-设计 PR 合并后，才创建 Milestone 007 implementation branch。
+设计合并后创建：
+
+```text
+agent/007a-selection-batch-translation
+```
 
 ## Milestone 008：吸附与约束
 
 - spatial index；
 - vertex/segment/midpoint/intersection snapping；
 - grid、angle、bearing、parallel、perpendicular constraints；
-- guides and explainable snap reasons。
+- explainable snap reasons and guides。
 
-## Milestone 009：更多符号与注记
+## Milestone 009–013
 
-- more control measures and Area families；
-- rectangle、triangle、flags；
-- callout、leader label、text、image、SVG annotation；
-- true two-arc lune（若独立语义成立）。
-
-## Milestone 010：IO 与项目管理
-
-- formal PlotJSON JSON Schema；
-- document/Definition migrations；
-- unresolved Definition preservation；
-- GeoJSON、SVG、PNG import/export；
-- layers、groups、z-order；
-- autosave and recovery；
-- input complexity limits。
-
-## Milestones 011–013
-
-- MIL-STD/APP-6 optional backend；
-- React/Vue/Vanilla integrations；
-- CRDT/collaboration/persistence/audit；
-- stable 1.0 API；
-- 50+ native parametric symbols；
-- license、release automation、performance and compatibility matrices。
+- more symbols and annotations；
+- PlotJSON schema/migrations and project management；
+- optional MIL-STD/APP-6 backend；
+- React/Vue/CRDT/collaboration；
+- stable 1.0、license、release automation、performance and compatibility matrices。
 
 ## 跨阶段工程任务
 
-1. 决定开源许可证并建立 notices；
-2. 统一 workspace 与 package version strategy；
-3. 引入 Changesets 或等价 release workflow；
-4. 建立正式 PlotJSON JSON Schema；
-5. 实现 transaction/rollback；
-6. 自动检查 README、LATEST、Playground 和 Registry 数量一致性；
-7. 建立 performance benchmarks；
-8. 正式 0.1.0 前完成 npm package-boundary review；
-9. 处理 Playground bundle 超过 1 MB 的 code splitting；
-10. 持续区分 source/build ready、workflow deployed 与 live manually verified。
+1. 决定开源许可证；
+2. 统一 workspace/package versions；
+3. Changesets/release workflow；
+4. formal PlotJSON JSON Schema；
+5. batch transaction and error isolation；
+6. docs/Registry baseline consistency automation；
+7. performance benchmarks；
+8. npm package-boundary review；
+9. Playground code splitting；
+10. distinguish source/build/deploy/live verification。

@@ -24,54 +24,9 @@
 | `route-multihead-group.md` | bidirectional + derived secondary-head route | 已实现并合并 |
 | `closed-action-area-group.md` | closed curve + gathering place | 已实现并通过 PR #31 合并 |
 | `circular-arc-family.md` | circular arc + sector + circular segment | 设计 PR #33、实现 PR #34 均已合并 |
+| `professional-editing.md` | multi-selection、batch transaction、translation、box/lasso、rotation/scale、groups | Milestone 007 设计冻结候选，尚无 runtime |
 
 ## Milestone 006J 最终状态
-
-公共范围：
-
-```text
-line.circular-arc@1.0.0
-area.circular-segment@1.0.0
-area.sector@1.0.0
-```
-
-延期：
-
-```text
-area.lune
-```
-
-关键决策：
-
-- open arc 使用 output/category 一致的 `line.circular-arc`；
-- legacy `Lune/弓形` 的 arc+chord geometry 精确命名为 `area.circular-segment`；
-- true two-arc lune 需要未来独立设计；
-- circular arc/segment controls 为 exact `start / through / end`；
-- through-point 选择 minor/major directed sweep；
-- sector controls 为 `center / exact radius-start / end-bearing handle`；
-- sector 第三点只定义 bearing，距离不定义第二半径；
-- `sweepDirection` 显式区分 clockwise/counterclockwise；
-- 三者 fixed-three，第三个有效点击自动完成；
-- 1.0 local-metre only；
-- duplicate、collinear、unstable、excessive-radius、unsupported extent 和 invalid topology fail closed；
-- no two-point fallback、hidden control movement、singular degradation 或 silent geodesic switch；
-- `segmentsPerCircle` 只影响采样密度；
-- exact authored controls survive PlotJSON；
-- centers、radii、sweeps、samples、derived endpoints 和 closing coordinates 均为派生状态。
-
-### Sector semantic-guide extension
-
-006J 增加通用 Definition hook：
-
-```text
-deriveSemanticGuidePaths(feature)
-```
-
-Sector 声明 `center → end-bearing handle`。MapLibre 在 complete draft、selection 和 handle drag 中渲染虚线，但 guide 不进入 committed RenderBundle、Store、History 或 PlotJSON。
-
-该能力是通用语义机制，不是 MapLibre 层的 `area.sector` 特判。
-
-### Merge evidence
 
 ```text
 workspace:        0.0.20
@@ -79,35 +34,87 @@ symbols:          19 (14 Arrow + 1 Line + 4 Area)
 Node:             184 passed
 Chromium:         28 passed
 implementation:   PR #34
-squash merge SHA: 297d0a644eaa3427f8fd59b82b7bc3582221d49e
+finalization:     PR #35
+final main SHA:   4ce59d189b65c8257bf49beabc308a4020249cd0
 ```
 
-详细语义见 `circular-arc-family.md`，数学与 provenance 见 `../algorithms/circular-arc-foundation.md`。
-
-## Milestone 007 设计入口
-
-下一阶段是专业编辑语义设计，而不是继续增加符号。拟新增设计文档应覆盖：
+Circular family public范围：
 
 ```text
-multi-selection
-box/lasso selection
-whole-object translation
-rotation and scale
-groups, locks and z-order
-multi-object commands and atomic rollback
-keyboard, pointer and touch behavior
-performance and browser fixtures
+line.circular-arc@1.0.0
+area.circular-segment@1.0.0
+area.sector@1.0.0
 ```
 
-核心原则：
+`area.lune` 继续延期。详细语义见 `circular-arc-family.md`，数学与 provenance 见 `../algorithms/circular-arc-foundation.md`。
 
-- selection overlay 和 transform handles 是 transient UI state；
-- object transforms 修改 authored controls，不修改 rendered Polygon vertices；
-- multi-object mutation 必须先对全部 affected features 完成 Registry preflight；
-- 任一 feature 无效时整批不 mutation；
-- one gesture = one history entry；
-- group/lock/z-order 进入 canonical document 前必须明确 PlotJSON schema 和 migration；
-- design PR 合并前不得编写 Milestone 007 runtime。
+## Milestone 007 设计冻结候选
+
+`professional-editing.md` 将专业编辑拆为四个实施切片：
+
+```text
+007A selection + atomic batch commands + local translation
+007B box/lasso selection
+007C rotation + positive uniform scale
+007D canonical groups/locks/visibility/z-order after PlotJSON migration design
+```
+
+### Selection
+
+- transient engine-independent state；
+- ordered `selectedIds` + one `primaryId`；
+- primary 必须是 selection order 的最后一个 id；
+- selection 不进入 PlotJSON；
+- replace/add/subtract/toggle/clear/reconcile 每次最多一个 event；
+- Store remove/clear 自动 reconcile surviving ids；
+- secondary features 显示 lightweight overlay；
+- only primary feature 显示 authored handles 与 Definition guides。
+
+### Atomic transaction
+
+```text
+build every candidate
+→ Registry canonicalize/generate all
+→ any invalid: reject entire edit
+→ all valid: one PlotStore transaction
+→ one batch event
+→ one history entry
+```
+
+Store listeners 在 commit 后出错不能回滚已经被其他 listeners 观察的状态，也不能让 history 漏记 command。错误必须被收集并交给 error handler。
+
+### Translation
+
+007A 只支持 local-metre whole-object translation：
+
+- one shared projection and meter delta；
+- transform authored controls only；
+- parameters/style/metadata unchanged；
+- all selected features preview together；
+- any invalid member prevents all mutation；
+- one pointer gesture = one `BatchEditCommand`；
+- Escape cancellation and zero-movement no-op。
+
+### Later slices
+
+- 007B default box/lasso policy is intersection, candidate ids ordered by Store order；
+- 007C uses selection authored-control bounds center as deterministic pivot；
+- scale is positive uniform only；
+- group/lock/z-order cannot be hidden in free-form metadata and requires formal PlotJSON schema/migration。
+
+### Reference boundary
+
+Fixed behavior references：
+
+```text
+JamesLMilner/terra-draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
+geoman-io/maplibre-geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
+mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
+```
+
+Code reuse：`none`。只研究 selection lifecycle、direct/whole-feature editing、drag/rotate/scale mode separation、keyboard configuration 和 test organization。
+
+详细事务算法见 `../algorithms/batch-edit-transaction.md`。
 
 ## 状态说明
 
