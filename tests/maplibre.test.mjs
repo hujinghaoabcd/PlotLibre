@@ -380,7 +380,8 @@ test("style.load restores sources, layers, committed plots and handles", () => {
   map.fire("style.load");
 
   assert.equal(map.sources.size, 3);
-  assert.equal(map.layers.size, 7);
+  assert.equal(map.layers.size, 8);
+  assert.equal(map.getLayer("plotlibre-handle-guide")?.type, "line");
   assert.equal(map.getSource("plotlibre-committed").data.features.length, 2);
   assert.equal(map.getSource("plotlibre-handles").data.features.length, 2);
 });
