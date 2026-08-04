@@ -50,6 +50,8 @@ Rules:
 - Shaft/head joins must not retain offset vertices beyond the head neck plane.
 - Closed-area symbols must explicitly define authored boundary/path roles, automatic closure and output topology.
 - Closed-area symbols must not persist sampled curves, derived closure anchors or final rings as controls.
+- Circular symbols must define center, radius, bearing direction, sweep and output topology before implementation.
+- Arc/sector/lune work must declare local-metre versus geodesic behavior, including antimeridian and high-latitude limits.
 
 ## 4. Related-symbol groups
 
@@ -63,7 +65,9 @@ A development slice may contain two or three related symbols only when:
 
 Do not group unrelated symbols to increase symbol count. Do not create public variants only by changing defaults.
 
-Milestone 006I includes `area.closed-curve` and `area.gathering-place`. `area.route-loop` remains deferred until independent route, direction, entry/exit or operational semantics are documented.
+Milestone 006I added `area.closed-curve` and `area.gathering-place`. `area.route-loop` remains deferred until independent route, direction, entry/exit or operational semantics are documented.
+
+Milestone 006J may study `area.arc`, `area.sector` and `area.lune`, but none becomes public until independent control roles and output topology are frozen.
 
 ## 5. Clean-room and licensing
 
@@ -207,13 +211,15 @@ Closed-area tests additionally prove:
 - invalid closure and self-intersection remain outside Store and History;
 - actual draft and committed rendering are visible.
 
-Milestone 006I regression target:
+Current merged regression baseline:
 
 ```text
 163 Node tests
 23 Chromium tests
 16 public symbols: 14 Arrow + 2 Area
 ```
+
+006J design must define its future tests before geometry is written, including exact endpoint preservation, sweep-direction cases, crossing 0°, sweeps above 180°, degenerate radii and geodesic-boundary fixtures.
 
 ## 9. Playground and Pages
 
@@ -257,37 +263,46 @@ Never rewrite earlier immutable handovers. `LATEST.md` must describe the actual 
 
 Prefer one complete related-symbol group to many incomplete symbols. Do not develop unrelated complex symbols in parallel. Documentation-state repair may be isolated so implementation starts from an accurate baseline.
 
+A design milestone may contain research, semantic contracts, provenance and test planning without runtime code. Do not begin implementation merely because candidate names exist.
+
 ## 12. Current priority
 
-Merged baseline before this milestone:
+Merged baseline:
 
 ```text
-main SHA:           a883cbf382b61309e7d64e788e46d9319b8c0ea1
-workspace:          0.0.18
-public symbols:     14 Arrow
-Node baseline:      154
-Chromium baseline:  20
-Milestone 006H:     finalized
+main SHA:           f873052d44a98f7029f0eda27ea70cda8b1af347
+workspace:          0.0.19
+public symbols:     16 (14 Arrow + 2 Area)
+Node baseline:      163
+Chromium baseline:  23
+Milestone 006I:     merged through PR #31
 ```
 
-Active milestone:
+Current administrative slice:
 
 ```text
-Milestone: 006I closed action area group
-branch:    agent/006i-closed-action-area-group
-PR:        #31 Add closed action area symbol group
-workspace: 0.0.19
-symbols:   16 (14 Arrow + 2 Area)
+branch: agent/006i-post-merge-finalization
+scope:  documentation-only merged-state synchronization
 ```
 
-Binding completion order:
+Next development milestone:
 
-1. keep `area.closed-curve@1.0.0` and `area.gathering-place@1.0.0` semantic contracts stable;
-2. keep `area.route-loop` deferred;
-3. preserve pure cyclic closed-area geometry and strict topology rejection;
-4. preserve full Registry/PlotJSON preflight;
-5. verify 163 Node and 23 Chromium tests on the final head;
-6. update current and immutable handover documents;
-7. merge only with a fully green current-head CI and zero unresolved review threads;
-8. after 006I finalization, begin 006J arc/sector/lune semantic design;
-9. do not return to pincer hardening or add route-head variants in this milestone.
+```text
+Milestone: 006J arc / sector / lune semantic design
+planned branch: agent/006j-arc-sector-lune-design
+runtime implementation: prohibited until design freeze
+```
+
+Binding continuation order:
+
+1. finish and merge the 006I post-merge finalization without runtime changes;
+2. create 006J from the final `main`, not from an old implementation branch;
+3. research public behavior, terminology, licenses and fixed revisions;
+4. decide whether `area.arc` is LineString, Polygon or compound output;
+5. freeze center/radius/start/end bearing roles for each candidate;
+6. freeze clockwise/counterclockwise and sweep normalization rules;
+7. define exact endpoints, sweeps above 180° and crossing-0° behavior;
+8. define local-metre versus geodesic policy and unsupported extents;
+9. freeze deterministic fixtures and PlotJSON semantics;
+10. only then decide which of arc/sector/lune are valid independent public Definitions;
+11. do not return to pincer hardening or add route-head variants.
