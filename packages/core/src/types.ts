@@ -178,6 +178,14 @@ export interface PlotDefinition {
   deriveDraftControlPoints?(
     controlPoints: readonly Position[],
   ): readonly Position[] | undefined;
+  /**
+   * Optionally derives transient semantic control paths for draft and selected
+   * editing states. Paths are rendered as guides only and never enter Store,
+   * History, PlotJSON or the Definition's committed RenderBundle.
+   */
+  deriveSemanticGuidePaths?(
+    feature: PlotFeature,
+  ): readonly (readonly Position[])[];
   generate(context: GenerateContext): RenderBundle;
   validate?(context: GenerateContext): ValidationResult;
 }

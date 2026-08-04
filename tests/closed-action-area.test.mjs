@@ -134,7 +134,14 @@ test("gathering place rear depth changes only derived geometry", () => {
 
 test("closed action areas are independently registered and render all area roles", () => {
   const registry = new PlotRegistry().registerMany(builtInSymbols);
-  assert.equal(areaSymbols.length, 2);
+  assert.equal(
+    areaSymbols.some((definition) => definition.type === CLOSED_CURVE_TYPE),
+    true,
+  );
+  assert.equal(
+    areaSymbols.some((definition) => definition.type === GATHERING_PLACE_TYPE),
+    true,
+  );
   assert.equal(registry.has(CLOSED_CURVE_TYPE), true);
   assert.equal(registry.has(GATHERING_PLACE_TYPE), true);
 

@@ -2,14 +2,14 @@
 
 ## 1. Purpose
 
-PlotLibre separates semantic interaction state from the map engine. Drawing and editing rules are pure, engine-independent sessions testable without DOM, WebGL or MapLibre.
+PlotLibre separates semantic interaction from the map engine. Drawing sessions operate on WGS84 authored controls and are testable without DOM, WebGL or MapLibre.
 
 ```text
 TwoPointDrawSession
 MultiPointDrawSession
 ```
 
-Sessions return semantic snapshots. They do not write Store or render layers.
+Sessions return snapshots; they do not write Store, History or render layers.
 
 ## 2. Package boundary
 
@@ -23,14 +23,10 @@ Sessions return semantic snapshots. They do not write Store or render layers.
 MapLibre GL JS
 ```
 
-Rules:
-
 - interaction depends only on Core;
-- no MapLibre, DOM or browser globals in sessions;
-- sessions receive geographic Positions, not screen pixels;
-- MapLibre adapter owns event translation, hit testing, cursor and rendering;
-- only fully validated/generated semantic features enter Store and History;
-- session selection comes from `PlotDefinition.controlSchema`, never identifiers.
+- session choice comes from `PlotDefinition.controlSchema`;
+- MapLibre owns event translation, hit testing, cursor and Sources/Layers;
+- only fully canonicalized, validated and generated features enter Store and History.
 
 ## 3. DrawSession contract
 
@@ -46,18 +42,9 @@ interface DrawSession {
 }
 ```
 
-A non-terminal snapshot may contain:
-
-- temporary semantic `draft`;
-- structured `rejection` from the latest completion attempt;
-- both when an invalid fixed-count final point remains visible;
-- neither when a complete candidate does not yet exist.
-
-A completed snapshot contains authored semantic controls only. The adapter merges Definition defaults, canonicalizes controls, validates and performs Registry generation preflight.
+A non-terminal snapshot may contain a temporary complete draft, a structured rejection, both, or neither. Completed snapshots contain authored controls only.
 
 ## 4. Completion validation
-
-`validateCompletion` accepts:
 
 ```ts
 type DrawCompletionValidationResult = boolean | ValidationResult;
@@ -65,194 +52,24 @@ type DrawCompletionValidationResult = boolean | ValidationResult;
 
 Rules:
 
-1. `true` or valid result completes;
-2. `false` returns `DRAW_COMPLETION_REJECTED`;
-3. invalid result preserves stable issues in `snapshot.rejection`;
-4. a thrown validator becomes `DRAW_COMPLETION_VALIDATION_FAILED`;
-5. unexpected generation failure becomes `DRAW_CANDIDATE_GENERATION_FAILED`;
-6. rejection is non-terminal and never mutates Store, History or PlotJSON.
+1. valid result completes;
+2. invalid result preserves stable issues in `snapshot.rejection`;
+3. thrown validation becomes `DRAW_COMPLETION_VALIDATION_FAILED`;
+4. generation failure becomes `DRAW_CANDIDATE_GENERATION_FAILED`;
+5. rejection is non-terminal and never mutates Store, History or PlotJSON;
+6. a rejected fixed-count final candidate remains replaceable.
 
 ## 5. Shared guarantees
 
-1. `ready` and `drawing` are non-terminal;
-2. `completed` and `cancelled` are terminal;
-3. terminal sessions ignore later input;
-4. duplicate pointer positions do not create duplicate controls;
-5. Definition-derived draft controls are rendering-only;
-6. completion returns authored controls, never transient controls or Polygon vertices;
-7. sessions create no Store history;
-8. rejected fixed-count candidates remain visible and replaceable;
-9. pointer movement, point removal, cancellation and success clear stale rejection;
-10. automatic closure, mirror points, derived tails, closure anchors and secondary heads remain derived;
-11. invalid candidates retain last-valid draft or semantic guide where available.
+- terminal sessions ignore later input;
+- duplicate pointer positions do not create duplicate controls;
+- Definition-derived draft controls are rendering-only;
+- completion returns authored controls, never samples, rings, endpoints or guide paths;
+- pointer movement, point removal, cancellation, a new session and successful completion clear stale rejection;
+- invalid pointer geometry retains the last valid draft or an incomplete guide;
+- automatic closures, mirrored points, route heads, circular centers/radii and semantic guides remain derived.
 
-## 6. TwoPointDrawSession
-
-```text
-ready
-  └─ click(start) → drawing
-
-drawing
-  ├─ pointerMove(end) → drawing + draft
-  ├─ click(valid end) → completed
-  ├─ click(invalid end) → drawing + rejection
-  ├─ Enter → attempt with preview end
-  ├─ Backspace/Delete → ready
-  └─ Escape → cancelled
-```
-
-Current users:
-
-```text
-arrow.straight
-arrow.fine
-arrow.fine.tailed
-arrow.assault-direction
-```
-
-## 7. MultiPointDrawSession
-
-```text
-ready
-  └─ click(point 1) → drawing
-
-drawing
-  ├─ click(point n) → append authored point
-  ├─ pointerMove(cursor) → preview candidate
-  ├─ Definition draft → optional transient complete draft
-  ├─ Enter → explicit completion attempt
-  ├─ doubleClick(point) → explicit completion attempt
-  ├─ maximum valid → automatic completion
-  ├─ maximum invalid → drawing + rejection
-  ├─ Backspace/Delete → remove one authored point
-  └─ Escape → cancelled
-```
-
-Normal candidate:
-
-```text
-committed authored points + distinct pointer preview
-```
-
-Transient draft controls may satisfy a Definition minimum for rendering, but are never copied into session points and cannot be committed by Enter, double-click or maximum completion.
-
-Current users:
-
-```text
-arrow.curved
-arrow.attack
-arrow.attack.tailed
-arrow.double
-arrow.pincer
-arrow.squad-combat
-arrow.route
-arrow.corridor
-arrow.route.bidirectional
-arrow.route.double-head
-area.closed-curve
-area.gathering-place
-```
-
-## 8. Completion modes by semantic group
-
-### Variable path arrows
-
-```text
-arrow.curved
-arrow.attack
-arrow.attack.tailed
-arrow.squad-combat
-arrow.route
-arrow.corridor
-arrow.route.bidirectional
-arrow.route.double-head
-```
-
-Double-click or Enter completes. Browser click-before-dblclick behavior is de-duplicated so the terminal point is persisted once.
-
-### Fixed compound arrows
-
-```text
-arrow.double  maxPoints = 4
-arrow.pincer  maxPoints = 5
-```
-
-The maximum valid click automatically completes. Invalid maximum candidates remain active with structured rejection.
-
-### Closed curve area
-
-```text
-plotType: area.closed-curve
-minPoints: 3
-maxPoints: 64
-completion: double-click or Enter
-```
-
-Controls are ordered boundary waypoints. Pointer movement after two committed points can produce the first complete closed Polygon draft using the live third candidate. Completion persists only authored controls; ring closure and sampled vertices remain derived.
-
-Double-click de-duplicates the final browser click and never appends the repeated first ring coordinate.
-
-### Gathering place
-
-```text
-plotType: area.gathering-place
-minPoints: 3
-maxPoints: 3
-completion: automatic on third click
-```
-
-Controls are flank A, front crown and flank B. After two clicks the live pointer is the third authored candidate and can produce a full draft. The third valid click completes automatically. A derived rear closure anchor has no session point, handle or history identity.
-
-## 9. Canonical semantic models
-
-```text
-arrow.curved:
-  tail centre, path controls, exact tip
-
-arrow.attack / arrow.attack.tailed:
-  two exact tail edges, spine controls, exact objective
-
-arrow.double:
-  unordered tail pair + unordered objective pair
-
-arrow.pincer:
-  outer tails + canonical objective pair + exact inner junction
-
-arrow.squad-combat:
-  tail centre + optional path + exact objective
-
-arrow.route:
-  route origin + path + exact tip
-
-arrow.corridor:
-  endpoint A + path + endpoint B
-
-arrow.route.bidirectional:
-  exact start tip + path + exact end tip
-
-arrow.route.double-head:
-  route origin + path + exact primary tip
-
-area.closed-curve:
-  ordered boundary waypoints
-
-area.gathering-place:
-  flank A + front crown + flank B
-```
-
-Derived mirrored objectives, tail edges, route heads, secondary emphasis heads, sampled boundaries and rear closure anchors are not interaction controls.
-
-## 10. Enter, double-click and point removal
-
-- Enter completes the current actual authored candidate.
-- Enter never commits Definition-derived transient controls.
-- Double-click creates an immutable de-duplicated candidate.
-- Backspace/Delete removes one uncommitted authored point.
-- Drawing-state point removal is not CommandHistory.
-- Fixed-count Definitions complete through maximum-point logic.
-- Variable-count Definitions complete explicitly.
-
-## 11. Definition-driven session selection
+## 6. Session selection
 
 ```text
 minPoints = 2 and maxPoints = 2
@@ -262,90 +79,185 @@ otherwise
 → MultiPointDrawSession
 ```
 
-No branch may select by `plotType`. A variable schema may use `minPoints = 2` only with explicit `maxPoints > 2`.
+No session branch may select by `plotType`.
 
-## 12. MapLibre event adapter
+## 7. Current completion modes
+
+### Exact two-point
 
 ```text
-click      → DrawSession.click / selection
-mousemove  → DrawSession.pointerMove / handle preview
-dblclick   → DrawSession.doubleClick
-mousedown  → start semantic handle drag
-mouseup    → commit one ReplacePlotCommand
-style.load → restore sources, layers and visual state
-keydown    → session or selection action
+arrow.straight
+arrow.fine
+arrow.fine.tailed
+arrow.assault-direction
 ```
 
-During drawing:
+Second valid click completes.
 
-- events convert to WGS84 Positions;
-- double-click default is prevented;
-- double-click zoom is disabled and previous state remembered;
-- completion defers restoration until the native event finishes;
-- cancellation and destroy restore immediately;
-- invalid temporary geometry keeps last-valid draft or guide;
-- `drawRejection` exposes the latest completion rejection.
+### Variable multi-point
 
-## 13. Playground listener precedence
+```text
+arrow.curved
+arrow.attack
+arrow.attack.tailed
+arrow.squad-combat
+arrow.route
+arrow.corridor
+arrow.route.bidirectional
+arrow.route.double-head
+area.closed-curve
+```
 
-`PlaygroundApp.start()` binds generic lifecycle/status listeners first. Symbol-group installers bind semantic guidance afterwards.
+Double-click or Enter completes. Browser click-before-dblclick behavior is de-duplicated.
 
-This order is required because generic map refresh text such as “继续点击” must not overwrite:
+### Fixed four/five
 
-- pincer actionable fifth-point rejection;
-- fixed-count automatic completion instructions;
-- route/corridor semantic guidance;
-- closed-area automatic closure instructions.
+```text
+arrow.double  maxPoints = 4
+arrow.pincer  maxPoints = 5
+```
 
-Production then calls the fully wrapped `loadSample()` once to load all sixteen samples. E2E starts empty and enables optional symbol groups by query flags.
+Maximum valid click automatically completes. Invalid maximum candidates remain active with structured rejection.
 
-## 14. Source separation
+### Fixed three
 
-### `plotlibre-committed`
+```text
+area.gathering-place
+line.circular-arc
+area.circular-segment
+area.sector
+```
 
-Persistent derived output from Store features.
+```text
+first click  → one authored control
+second click → two authored controls
+third pointer candidate → first complete renderable draft
+third valid click → automatic completion
+```
 
-### `plotlibre-draft`
+Two-point geometry is never committed as a fallback.
 
-Active drawing or handle-drag preview; never exported.
+## 8. Circular interaction semantics
 
-### `plotlibre-handles`
+### Circular arc
 
-Authored controls of the selected committed object.
+```text
+0 start
+1 through
+2 end
+```
 
-### Semantic guides
+The through-point selects the exact minor/major directed sweep. Third click completes one open LineString.
 
-Transient visibility aids when full geometry is not yet renderable.
+### Circular segment
 
-`querySourceFeatures()` can return tile duplicates. Handle tests compare unique `plotId + handleIndex` identities.
+```text
+0 arc/chord start
+1 through on selected arc
+2 arc/chord end
+```
 
-## 15. Completion transaction
+Third click completes one arc-plus-chord Polygon.
+
+### Sector
+
+```text
+0 center
+1 exact radius/start point
+2 end-bearing handle
+```
+
+The third control is authored even though it usually does not lie on the rendered arc endpoint. Its distance from the center does not affect radius.
+
+## 9. Definition-driven semantic guide paths
+
+Core hook:
+
+```ts
+interface PlotDefinition {
+  deriveSemanticGuidePaths?(
+    feature: PlotFeature,
+  ): readonly (readonly Position[])[];
+}
+```
+
+This hook describes transient paths that explain authored semantic controls after a complete feature can already be generated.
+
+Sector returns:
+
+```text
+center → end-bearing handle
+```
+
+Guarantees:
+
+- pure WGS84 path output;
+- no Store or History identity;
+- no committed RenderBundle role;
+- no PlotJSON serialization;
+- no hit-test selection identity;
+- invalid/non-finite paths are ignored by renderer;
+- map-engine adapter chooses visual styling.
+
+## 10. MapLibre rendering of guides
+
+Sources:
+
+```text
+plotlibre-committed
+plotlibre-draft
+plotlibre-handles
+```
+
+Layer:
+
+```text
+plotlibre-handle-guide
+```
+
+Guide placement:
+
+- complete drawing draft: appended to `plotlibre-draft` and rendered through the draft line layer;
+- selected feature: appended to `plotlibre-handles` and rendered through `plotlibre-handle-guide`;
+- handle-drag preview: draft geometry and selected-state guide are refreshed from the preview feature;
+- committed source: never contains semantic guide features.
+
+Guide properties use:
+
+```text
+role = "line"
+handleKind = "semantic-guide"
+```
+
+The dashed layer is not queryable as a control handle because handle hit testing targets only `plotlibre-handle` circle features.
+
+## 11. Completion transaction
 
 ```text
 completion attempt
 → merge defaults
 → canonicalize authored controls
 → Registry validation
+→ full Registry generation
 → invalid: rejection, no mutation
-→ valid: full Registry generation
-→ completed PlotFeatureInput
+→ valid: PlotFeatureInput
 → CreatePlotCommand
-→ PlotStore
+→ Store
 → committed renderer
-→ selection + authored handles
+→ selection + authored handles + optional semantic guides
 ```
 
-For closed areas, generated ring closure, winding and topology are part of the preflight.
+Circular generation includes coordinate-mode, circumcircle, sweep and topology validation.
 
-## 16. Handle-drag transaction
+## 12. Handle-drag transaction
 
 ```text
 mousedown authored handle
 → capture original feature
 → disable dragPan
-→ pointerMove builds semantic preview
+→ pointerMove builds preview controls
 → Registry validation + generation
-→ valid draft + handles
+→ valid draft + semantic guides + authored handles
 → mouseup
 → one ReplacePlotCommand
 → clear draft
@@ -354,46 +266,95 @@ mousedown authored handle
 
 Invalid previews never mutate Store. Escape restores the original feature without a command.
 
-## 17. Selection, cursor and keyboard
+For Sector, dragging control `2` updates the radial guide and sweep while retaining the exact radius from control `1`.
+
+## 13. MapLibre event adapter
 
 ```text
-crosshair  active draw
-grab       selected object or handle hover
-grabbing   active handle drag
-empty      idle
+click      → DrawSession.click / selection
+dblclick   → DrawSession.doubleClick
+mousemove  → pointer draft / handle preview
+mousedown  → start authored-handle drag
+mouseup    → commit one replacement
+style.load → restore sources, eight layers and visual state
+keydown    → completion, removal, cancellation or selection action
 ```
 
-The canvas is keyboard-focusable. Clicking committed fill/line selects the semantic feature; clicking empty space clears selection.
+Multi-point drawing temporarily disables double-click zoom. Completion restores it after the native event finishes; cancellation and destroy restore immediately.
 
-## 18. Style lifecycle
+## 14. Style lifecycle
 
-`map.setStyle()` removes application Sources/Layers. PlotLibre restores committed features, active valid draft and selected authored handles. Renderer initialization is idempotent.
+`map.setStyle()` removes application Sources/Layers. PlotLibre restores:
 
-## 19. Current limitations
+- three Sources;
+- committed fill/line/point layers;
+- draft fill/line/point layers;
+- `plotlibre-handle-guide`;
+- `plotlibre-handle`;
+- committed features;
+- active valid draft;
+- selected authored handles and semantic guides.
+
+Renderer initialization is idempotent. Current layer count is 8.
+
+## 15. Playground listener precedence
+
+`PlaygroundApp.start()` binds generic lifecycle/status listeners first. Symbol-group installers bind specialized guidance afterwards so generic messages cannot overwrite actionable pincer, closed-area or circular instructions.
+
+Production calls the fully wrapped `loadSample()` once and loads 19 features. E2E starts empty and enables optional groups through query flags.
+
+## 16. Canonical semantic models
+
+```text
+arrow.curved:
+  tail center + path + exact tip
+
+arrow.attack / arrow.attack.tailed:
+  exact tail pair + spine + exact objective
+
+arrow.double:
+  tail pair + objective pair
+
+arrow.pincer:
+  outer tails + paired objectives + exact inner junction
+
+arrow.squad-combat:
+  tail center + path + exact objective
+
+arrow.route / corridor / multi-head routes:
+  authored center path with Definition-specific endpoint roles
+
+area.closed-curve:
+  ordered boundary waypoints
+
+area.gathering-place:
+  flank + crown + flank
+
+line.circular-arc:
+  exact start + through + end
+
+area.circular-segment:
+  exact arc/chord start + through + arc/chord end
+
+area.sector:
+  center + exact radius/start + end-bearing handle
+```
+
+All samples, widths, centers, radii, sweeps, closure points, endpoints and guides are derived.
+
+## 17. Current limitations
 
 - no snapping or angle constraints;
 - no touch-specific completion gesture;
-- no committed control insertion/removal UI despite schema capability metadata;
-- no box/lasso selection;
+- no committed point insertion/removal UI;
+- no box/lasso or multi-selection;
 - no multi-object transform transaction;
-- no parameter handles for width, bearings, tension or rear depth;
-- rejection describes completion attempts, not every temporary pointer position;
-- hit testing lacks a fully independent expanded hit-area path;
-- Store listener exceptions lack general transaction rollback;
-- transient draft API exposes one replacement control set rather than alternatives;
-- no hole editing or MultiPolygon Area Definition;
-- no geodesic closed-area mode for global extents.
+- no parameter handles for width, radius, sweep, tension or rear depth;
+- rejection describes explicit completion attempts rather than every pointer location;
+- no holes or MultiPolygon editing;
+- no geodesic circular/closed-area mode;
+- no general Store transaction rollback.
 
-## 20. Next interaction milestone
+## 18. Next interaction milestone
 
-After 006I merge, 006J arc/sector/lune design must determine:
-
-- fixed versus variable control count;
-- center/radius/bearing authored roles;
-- clockwise/counterclockwise direction;
-- whether third click auto-completes;
-- whether arc is LineString while sector/lune are Polygon;
-- exact endpoint and center handle behavior;
-- geodesic versus local-metre completion preflight.
-
-No identifier-specific session branch should be added unless the generic schema cannot express a proven semantic requirement.
+After PR #34 merges, Milestone 007 must first freeze a professional editing model for multi-selection, box/lasso selection, whole-object translation, rotation/scale pivots, groups/locks, multi-object commands and atomic rollback. It must preserve authored controls as the transform source and avoid manipulating generated Polygon vertices directly.

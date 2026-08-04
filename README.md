@@ -1,10 +1,10 @@
 # PlotLibre
 
-**PlotLibre** is a MapLibre-native, engine-independent framework for drawing, editing, rendering, and exchanging semantic parametric situation plots and tactical graphics.
+**PlotLibre** is a MapLibre-native, engine-independent framework for drawing, editing, rendering and exchanging semantic parametric situation plots and tactical graphics.
 
-> PlotLibre 是面向 MapLibre GL JS 的参数化态势标绘框架。原始数据是“符号类型 + 控制点 + 参数 + 样式 + 元数据”，地图中的 GeoJSON Polygon 只是可重新生成的派生结果。
+> PlotLibre 是面向 MapLibre GL JS 的参数化态势标绘框架。原始数据是“符号类型 + authored controls + 参数 + 样式 + 元数据”；地图中的 LineString、Polygon、采样点和语义引导线都是可重新生成的派生结果。
 
-## Live playground
+## Live Playground
 
 **https://hujinghaoabcd.github.io/PlotLibre/**
 
@@ -25,64 +25,110 @@ arrow.route
 arrow.corridor
 arrow.route.bidirectional
 arrow.route.double-head
+line.circular-arc
 area.closed-curve
 area.gathering-place
+area.circular-segment
+area.sector
 ```
 
-The Playground supports exact two-point, variable path, variable closed-boundary, fixed-three-point, fixed-four-point and fixed-five-point drawing; live preview; semantic-guide fallback; maximum-point or explicit completion; structured completion-rejection feedback; semantic control-point editing; undo/redo; style editing; sixteen-symbol samples; and PlotJSON import/export.
+The Playground supports exact two-point, variable path, variable closed-boundary and fixed three/four/five-control drawing; live preview; structured rejection feedback; Definition-driven semantic guides; semantic handle editing; undo/redo; style editing; nineteen-symbol samples; and PlotJSON import/export.
 
 ## Current baseline
 
 ```text
-workspace version: 0.0.19
+workspace version: 0.0.20
 MapLibre GL JS:    6.0.0
 Node.js:           20.19+
-Node tests:        163
-Chromium tests:    23
-public symbols:    16 (14 Arrow + 2 Area)
+Node tests:        184
+Chromium tests:    28
+public symbols:    19 (14 Arrow + 1 Line + 4 Area)
 ```
 
 Public package versions remain independent development placeholders; the root workspace version is not yet a coordinated npm release.
 
-Implemented foundations:
+## Architecture foundations
 
 - engine-independent `PlotDefinition`, Registry, Store and CommandHistory;
 - PlotJSON 1.0 semantic serialization;
-- `TwoPointDrawSession` and reusable `MultiPointDrawSession`;
-- schema-driven variable paths and fixed-count semantic controls;
-- optional Definition-driven transient draft controls;
-- optional Definition-level canonical control-role ordering that may only permute authored coordinates;
-- full renderability preflight before interactive completion, create, replace or import mutates Store;
-- `ValidationResult`-backed completion rejection details with backward-compatible boolean validators;
-- public `MapLibrePlotInteraction.drawRejection` state;
-- last-valid-draft retention and transient semantic guides for temporarily invalid candidates;
-- MapLibre committed, draft and semantic-handle Sources/Layers;
-- click, pointer preview, double-click, Enter, Escape and point-removal interaction;
-- fixed-maximum-point auto-completion for three-, four- and five-control symbols;
-- semantic handle editing with one-command history and undo;
-- local-metre projection and strict finite/closed/simple topology validation;
-- shared pure geometry frames for related symbol groups;
-- periodic closed Hermite/Catmull–Rom interpolation for Area Definitions;
+- schema-driven `TwoPointDrawSession` and `MultiPointDrawSession`;
+- variable-count and fixed-count completion without symbol-ID-specific state machines;
+- Definition-level canonicalization limited to deterministic authored-coordinate permutations;
+- full Registry generation preflight before interactive completion, create, replace or import mutates Store;
+- structured completion rejection and last-valid-draft retention;
+- transient Definition-driven draft controls and semantic guide paths;
+- MapLibre committed, draft, semantic-handle and handle-guide Sources/Layers;
+- semantic handle editing with one replace command and undo;
+- local-metre, geodesic, topology and coordinate-mode foundations;
 - deterministic geometry fixtures and actual-rendered-feature Chromium tests;
-- browser visibility coverage for every public symbol family.
+- browser coverage for every public symbol family.
+
+## Circular arc family
+
+Milestone 006J introduces a three-control circular foundation shared by one open line and two area Definitions.
+
+### Circular arc
+
+`line.circular-arc@1.0.0` stores:
+
+```text
+0 exact start
+1 exact through-point
+2 exact end
+```
+
+The three controls define a stable local-metre circumcircle. The through-point selects the exact minor or major directed sweep. Sampling is split into `start → through` and `through → end`, so all three authored controls remain exact. The output is one open LineString.
+
+### Circular segment
+
+`area.circular-segment@1.0.0` uses the same exact three-control arc and closes it with the straight chord between the authored endpoints. Minor and major circular segments are supported when the derived ring is finite, counterclockwise and simple.
+
+The identifier is deliberately not `area.lune`: the legacy plotting type often named `Lune/弓形` is one circular arc plus one chord, while a mathematical lune is bounded by two arcs and requires a separate future semantic model.
+
+### Sector
+
+`area.sector@1.0.0` stores:
+
+```text
+0 center
+1 exact radius and start-boundary point
+2 end-bearing handle
+```
+
+Control `2` defines direction only. Its distance from the center does not define a second radius. The rendered end-boundary point is derived at the radius established by control `1`.
+
+The public parameter:
+
+```text
+sweepDirection: "clockwise" | "counterclockwise"
+```
+
+supports crossing 0° and sweeps above 180°. A transient center-to-bearing radial guide is rendered during complete drafts, selection and handle dragging. The guide never enters the committed RenderBundle, Store, History or PlotJSON.
+
+### Circular failure policy
+
+Version 1.0 is explicitly local-metre only. Circular generation rejects before Store mutation:
+
+- invalid or non-finite WGS84 positions;
+- duplicate controls;
+- collinear or numerically unstable three-point circles;
+- excessive circumradius;
+- antimeridian, high-latitude or large-extent input;
+- ambiguous through-point sweep;
+- zero/full sector sweep;
+- invalid parameters or Polygon topology.
+
+There is no two-point committed fallback, hidden authored-control movement, triangle/polyline degradation or silent geodesic switch.
 
 ## Closed action area group
 
-Milestone 006I adds PlotLibre's first Area family while preserving the same semantic-source model used by the Arrow family.
-
 ### Closed curve
 
-`area.closed-curve@1.0.0` stores 3–64 ordered boundary waypoints:
-
-```text
-0..n-1 authored boundary controls
-```
-
-A periodic curve interpolates every authored control and closes the final derived ring automatically. The repeated closing coordinate, sampled curve vertices, winding normalization and Polygon coordinates are never persisted as controls. Double-click or Enter completes the variable-count drawing session.
+`area.closed-curve@1.0.0` stores 3–64 ordered boundary waypoints. A periodic Hermite/Catmull–Rom curve interpolates every authored control and closes the final derived ring automatically. The repeated closing coordinate, sampled vertices and normalized Polygon ring are never persisted.
 
 ### Gathering place
 
-`area.gathering-place@1.0.0` stores exactly three role-based controls:
+`area.gathering-place@1.0.0` stores exactly:
 
 ```text
 0 flank A
@@ -90,89 +136,27 @@ A periodic curve interpolates every authored control and closes the final derive
 2 flank B
 ```
 
-The flank pair is canonicalized only by deterministic permutation while the exact crown remains at index `1`. A rounded rear closure anchor is derived from the flank midpoint and crown direction. The third click completes automatically; the rear anchor never enters Store, handles, History or PlotJSON.
+The flank pair may be canonicalized only by deterministic permutation. A rounded rear closure anchor is derived and never enters Store, handles, History or PlotJSON.
 
-Both Definitions output one counterclockwise simple Polygon without holes and reject duplicate, degenerate or self-intersecting candidates before Store mutation.
+## Route and compound Arrow families
 
-`area.route-loop` is intentionally deferred. It will become public only if an independent route, direction, entry/exit or operational semantic contract can be demonstrated; a restyled closed curve is not a new Definition.
+PlotLibre currently includes:
 
-## Route multi-head group
+- exact two-point arrows;
+- curved and attack-path arrows;
+- independent flat and tailed attack closures;
+- four-control double arrow;
+- five-control pincer with structured invalid-junction feedback;
+- center-path squad combat arrow;
+- route and flat-cap corridor sharing a pure PathRibbon frame;
+- bidirectional exact-two-tip route;
+- route with a derived secondary emphasis head.
 
-`arrow.route.bidirectional` and `arrow.route.double-head` share the authored center-path model and route-head geometry while keeping different directional topology.
-
-### Bidirectional route
-
-```text
-0      exact start tip
-1..n-2 optional path controls
-n-1    exact end tip
-```
-
-Both authored endpoints are exact arrow tips. The body is derived only between two neck planes, producing one closed simple Polygon with equal directional emphasis in both directions.
-
-### Double-head route
-
-```text
-0      route origin
-1..n-2 optional path controls
-n-1    exact primary objective/tip
-```
-
-The primary body retains ordinary route-arrow semantics. A second same-direction emphasis head is derived behind the primary neck and rendered as an additional Polygon component. It is never stored as a control point.
-
-## Route and corridor group
-
-`arrow.route` and `arrow.corridor` share a pure path-ribbon foundation while keeping independent public semantics.
-
-### Route arrow
-
-```text
-0      route origin
-1..n-2 optional path controls
-n-1    exact objective/tip
-```
-
-The shaft is a constant-width derived ribbon. The terminal path segment is trimmed at a derived neck plane and completed by an exact-tip arrow head.
-
-### Corridor arrow
-
-```text
-0      corridor endpoint A
-1..n-2 optional path controls
-n-1    corridor endpoint B
-```
-
-The output is an undirected constant-width ribbon with flat end caps and no arrow head. It is not a route arrow with a hidden or zero-sized head.
-
-## Squad combat arrow
-
-`arrow.squad-combat@1.0.0` stores a centre action path:
-
-```text
-0      tail centre
-1..n-2 optional path controls
-n-1    exact objective/tip
-```
-
-The two temporary tail edges are derived symmetrically in local metres and never enter Store, handles, History or PlotJSON. This differs from `arrow.attack`, whose two tail edges are explicit controls.
-
-## Pincer arrow
-
-`arrow.pincer@1.1.0` stores exactly five canonical controls:
-
-```text
-0 outer tail A
-1 outer tail B
-2 objective A
-3 objective B
-4 shared inner junction
-```
-
-Users may click the objectives in either left/right order. When swapping controls 2/3 is the only valid authored pairing, the Definition applies a permutation-only canonicalization. No coordinate is inserted, removed, moved or mirrored. Rejected fifth-point candidates remain editable and expose structured validation guidance without entering Store, History or PlotJSON.
+Every Arrow Definition preserves its authored semantic roles while heads, necks, widths, notches, bridges, mirrored points and sampled vertices remain derived.
 
 ## Why semantic plotting
 
-A tactical graphic may render as many polygon vertices, but its canonical model remains compact:
+A rendered graphic may contain many vertices, but its canonical model remains compact:
 
 ```text
 plotType
@@ -182,15 +166,15 @@ style
 metadata
 ```
 
-PlotLibre preserves this model so geometry can be regenerated after editing, projection changes, algorithm upgrades, style reloads or export to another engine.
+PlotLibre preserves this model so geometry can be regenerated after control editing, parameter changes, projection-policy upgrades, MapLibre style reloads or export to another engine.
 
 ## Workspace packages
 
 | Package | Responsibility |
 |---|---|
 | `@plotlibre/core` | Domain types, Registry, Store, commands, history and PlotJSON |
-| `@plotlibre/geometry` | Pure planar, closed-area and geodesic geometry |
+| `@plotlibre/geometry` | Pure planar, circular, closed-area and geodesic geometry |
 | `@plotlibre/symbols` | Built-in parametric Definitions |
-| `@plotlibre/interaction` | Engine-independent draw sessions and completion rejection state |
-| `@plotlibre/maplibre` | MapLibre rendering, event adapter and draw-rejection exposure |
+| `@plotlibre/interaction` | Engine-independent draw sessions and rejection state |
+| `@plotlibre/maplibre` | MapLibre rendering, semantic handles/guides and event adapter |
 | `@plotlibre/playground` | Browser demo, E2E and GitHub Pages site |

@@ -1,6 +1,8 @@
 export * from "./assault-direction.js";
 export * from "./attack-arrow.js";
 export * from "./catalog.js";
+export * from "./circular-arc.js";
+export * from "./circular-segment.js";
 export * from "./closed-curve.js";
 export * from "./corridor.js";
 export * from "./curved-arrow.js";
@@ -11,6 +13,7 @@ export * from "./pincer-arrow.js";
 export * from "./route-arrow.js";
 export * from "./route-bidirectional.js";
 export * from "./route-double-head.js";
+export * from "./sector.js";
 export * from "./squad-combat.js";
 export * from "./straight-arrow.js";
 export * from "./style.js";

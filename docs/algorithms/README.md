@@ -2,7 +2,7 @@
 
 本目录记录复杂参数化符号和共享几何组的独立算法说明、来源边界、退化输入策略与测试要求。
 
-每份记录至少应包含：
+每份记录至少包含：
 
 ```text
 public Definition or shared algorithm
@@ -15,7 +15,7 @@ failure policy
 clean-room references and revisions
 license review
 code reuse declaration
-tests and golden fixtures
+tests and deterministic fixtures
 ```
 
 目录中的公式和行为说明用于解释 PlotLibre 的独立实现，不代表允许复制参考项目源码。通用政策见 `../ALGORITHM_POLICY.md`。
@@ -28,15 +28,15 @@ tests and golden fixtures
 | `arrow-fine-tailed.md` | `arrow.fine.tailed` | 已实现 |
 | `arrow-assault-direction.md` | `arrow.assault-direction` | 已实现 |
 | `arrow-curved.md` | `arrow.curved` | 已实现 |
-| `arrow-attack.md` | `arrow.attack` 与共享 AttackArrow frame | 已实现 |
+| `arrow-attack.md` | AttackArrow frame | 已实现 |
 | `arrow-attack-tailed.md` | `arrow.attack.tailed` | 已实现 |
 | `arrow-double.md` | `arrow.double` | 已实现 |
 | `arrow-pincer.md` | `arrow.pincer` | 已实现 |
 | `arrow-squad-combat.md` | `arrow.squad-combat` | 已实现 |
-| `arrow-route-corridor.md` | `arrow.route`、`arrow.corridor` 与 PathRibbon frame | 已实现 |
-| `arrow-route-multihead.md` | `arrow.route.bidirectional`、`arrow.route.double-head` | 已实现 |
-| `closed-action-area.md` | `area.closed-curve`、`area.gathering-place` 与 cyclic closed interpolation | 已实现 |
-| `circular-arc-foundation.md` | `line.circular-arc`、`area.sector`、`area.circular-segment` 与共享三点圆弧 frame | 006J 设计冻结候选 |
+| `arrow-route-corridor.md` | route/corridor PathRibbon | 已实现 |
+| `arrow-route-multihead.md` | bidirectional/double-head route | 已实现 |
+| `closed-action-area.md` | closed curve/gathering place | 已实现 |
+| `circular-arc-foundation.md` | circular arc/segment/sector shared frame | 已实现于 PR #34，最终验证阶段 |
 
 基础通用几何另见：
 
@@ -45,46 +45,95 @@ tests and golden fixtures
 ../ALGORITHM_POLICY.md
 ```
 
-## Milestone 006I 算法边界
+## Milestone 006J 实现状态
 
-`closed-action-area.md` 已实现并通过 PR #31 合并：
+`packages/geometry/src/circular-arc.ts` 已按照 `circular-arc-foundation.md` 独立实现：
 
-- 周期 Hermite/Catmull-Rom 数学表达；
-- local-metre projection；
-- authored control interpolation；
-- automatic closure；
-- gathering-place derived rear anchor；
-- counterclockwise ring normalization；
-- duplicate、degenerate 和 self-intersection fail-closed policy；
-- gathering flank-only canonical permutation；
-- 参数隔离；
-- antimeridian/high-latitude 限制；
-- 两个固定 revision 的 clean-room 行为参考；
-- Node、PlotJSON、interaction 和 browser 测试要求。
+- order-independent local projection origin；
+- scale-aware three-point circumcentre；
+- finite radius policy；
+- exact start/through/end directed sweep；
+- minor/major 和 clockwise/counterclockwise selection；
+- crossing-0° normalization；
+- two-sub-arc exact-through sampling；
+- `segmentsPerCircle` density-only parameter；
+- circular arc LineString；
+- circular-segment arc+chord ring；
+- directed sector frame/ring；
+- end-bearing distance isolation；
+- counterclockwise/simple Polygon validation；
+- local-only coordinate-mode rejection。
 
-不得把最终 Polygon ring 保存为 authored controls，也不得通过静默 ring repair 改变用户控制点语义。
+Public Definitions：
 
-## Milestone 006J 算法冻结候选
+```text
+line.circular-arc@1.0.0
+area.circular-segment@1.0.0
+area.sector@1.0.0
+```
 
-`circular-arc-foundation.md` 已记录：
+Deferred：
 
-- fixed revisions：
-  - `sakitam-fdd/ol-plot@c919e60b4edeaeca53c08f9552f793b2ae9537f0`；
-  - `sakitam-fdd/maptalks.plot@37dab8d0dd31650540146e1e0f03f54982f01799`；
-- 两个参考仓库均为 MIT License；
-- code reuse 为 `none`；
-- 三点 circumcircle 的 determinant 公式；
-- exact `start / through / end` sweep selection；
-- minor/major、clockwise/counterclockwise 和 crossing 0°；
-- 分段采样并 exact 保留 through-point；
-- `line.circular-arc` LineString 边界；
-- `area.circular-segment` arc + chord Polygon；
-- `area.sector` centre/radius-start/end-bearing 与显式 sweepDirection；
-- local-only 1.0 coordinate policy；
-- near-collinear、excessive radius 和 unsupported extent fail closed；
-- no two-point fallback、no triangle degradation、no hidden geodesic switch；
-- deterministic fixtures 和 browser requirements。
+```text
+area.lune
+```
 
-`area.lune` 未进入 006J public scope。参考实现的 `Lune/弓形` 实际是 circular segment；真正由两条圆弧围成的 lune 需要独立设计。
+## Clean-room provenance
 
-在设计 PR 合并前，不创建 circular-arc geometry 或 Definition。实现必须以合并后的固定数学记录和测试 fixture 为约束。
+固定 references：
+
+```text
+sakitam-fdd/ol-plot@c919e60b4edeaeca53c08f9552f793b2ae9537f0
+sakitam-fdd/maptalks.plot@37dab8d0dd31650540146e1e0f03f54982f01799
+```
+
+两者均已核对 MIT License。用途只限 observable behavior、traditional terminology 和 independent test expectations。Code reuse：`none`。
+
+PlotLibre 不采用参考实现的：
+
+- two-point committed fallback；
+- collinear polyline fallback；
+- circular-segment triangle degradation；
+- implicit positive-only sweep helper；
+- hidden control movement；
+- engine-specific class structure。
+
+## Semantic guide extension
+
+Sector 的 end-bearing handle 通常不在 rendered endpoint 上。006J 因此增加通用 Core hook：
+
+```text
+deriveSemanticGuidePaths(feature)
+```
+
+MapLibre 将该纯 WGS84 path 作为 transient dashed guide 渲染。该机制不属于 circular geometry 本身，不进入 Store、History、PlotJSON 或 committed RenderBundle。
+
+## 006J fixture coverage
+
+Node target 184：
+
+- minor/major arcs；
+- clockwise/counterclockwise；
+- crossing 0°；
+- exact through-point；
+- reversed traversal；
+- density isolation；
+- minor/major circular-segment area；
+- sector derived endpoint；
+- end-bearing distance isolation；
+- duplicate/collinear/excessive-radius rejection；
+- antimeridian/high-latitude/large-extent rejection；
+- Registry/PlotJSON；
+- semantic guide and style reload；
+- historical regressions。
+
+Chromium target 28：
+
+- actual circular arc line；
+- actual circular-segment fill/outline；
+- actual sector fill/outline；
+- fixed-three draft/completion；
+- actual radial guide；
+- guide excluded from committed source；
+- 19-symbol production sample matrix；
+- historical interaction and rendering regressions。

@@ -26,6 +26,7 @@ export class MapLibrePlotRenderer {
   readonly #sourceIds: PlotLibreSourceIds;
   readonly #layerIds: PlotLibreLayerIds;
   readonly #beforeLayerId: string | undefined;
+  #registry: PlotRegistry | undefined;
 
   public constructor(
     map: MapLibreMapLike,
@@ -47,9 +48,15 @@ export class MapLibrePlotRenderer {
       draftFill: options.layerIds?.draftFill ?? "plotlibre-draft-fill",
       draftLine: options.layerIds?.draftLine ?? "plotlibre-draft-line",
       draftPoint: options.layerIds?.draftPoint ?? "plotlibre-draft-point",
+      handleGuide:
+        options.layerIds?.handleGuide ?? "plotlibre-handle-guide",
       handle: options.layerIds?.handle ?? "plotlibre-handle",
     };
     this.#beforeLayerId = options.beforeLayerId;
+  }
+
+  public setRegistry(registry: PlotRegistry): void {
+    this.#registry = registry;
   }
 
   public initialize(): void {
@@ -76,6 +83,23 @@ export class MapLibrePlotRenderer {
       },
       true,
     );
+
+    this.#addLayerIfMissing({
+      id: this.#layerIds.handleGuide,
+      type: "line",
+      source: this.#sourceIds.handles,
+      filter: [
+        "all",
+        ["==", ["get", "role"], "line"],
+        ["==", ["get", "handleKind"], "semantic-guide"],
+      ],
+      paint: {
+        "line-color": ["coalesce", ["get", "lineColor"], "#1976d2"],
+        "line-opacity": ["coalesce", ["get", "lineOpacity"], 0.85],
+        "line-width": ["coalesce", ["get", "lineWidth"], 2],
+        "line-dasharray": [2, 1],
+      },
+    });
 
     this.#addLayerIfMissing({
       id: this.#layerIds.handle,
@@ -107,7 +131,7 @@ export class MapLibrePlotRenderer {
   ): GeoJsonFeatureCollection<PlotGeometry, PlotRenderProperties> {
     this.initialize();
     const collection = feature
-      ? this.#createCollection([feature], registry)
+      ? this.#createCollection([feature], registry, true)
       : (EMPTY_COLLECTION as GeoJsonFeatureCollection<
           PlotGeometry,
           PlotRenderProperties
@@ -191,9 +215,12 @@ export class MapLibrePlotRenderer {
     const collection: GeoJsonFeatureCollection = feature
       ? {
           type: "FeatureCollection",
-          features: feature.controlPoints.map((position, index) =>
-            createHandleFeature(feature, position, index),
-          ),
+          features: [
+            ...this.#createSemanticGuideFeatures(feature, this.#registry),
+            ...feature.controlPoints.map((position, index) =>
+              createHandleFeature(feature, position, index),
+            ),
+          ],
         }
       : EMPTY_COLLECTION;
     this.#getSource(this.#sourceIds.handles).setData(collection);
@@ -217,6 +244,7 @@ export class MapLibrePlotRenderer {
   public destroy(): void {
     for (const layerId of [
       this.#layerIds.handle,
+      this.#layerIds.handleGuide,
       this.#layerIds.draftPoint,
       this.#layerIds.draftLine,
       this.#layerIds.draftFill,
@@ -255,6 +283,7 @@ export class MapLibrePlotRenderer {
   #createCollection(
     features: readonly PlotFeature[],
     registry: PlotRegistry,
+    includeSemanticGuides = false,
   ): GeoJsonFeatureCollection<PlotGeometry, PlotRenderProperties> {
     const rendered: GeoJsonFeature<PlotGeometry, PlotRenderProperties>[] = [];
 
@@ -266,6 +295,9 @@ export class MapLibrePlotRenderer {
         ...bundle.points,
         ...bundle.labels,
       );
+      if (includeSemanticGuides) {
+        rendered.push(...this.#createSemanticGuideFeatures(feature, registry));
+      }
     }
 
     return {
@@ -280,6 +312,49 @@ export class MapLibrePlotRenderer {
         },
       })),
     };
+  }
+
+  #createSemanticGuideFeatures(
+    feature: PlotFeature,
+    registry: PlotRegistry | undefined,
+  ): GeoJsonFeature<PlotGeometry, PlotRenderProperties>[] {
+    if (!registry) return [];
+    const definition = registry.get(feature.plotType);
+    const paths = definition.deriveSemanticGuidePaths?.(feature) ?? [];
+    const rendered: GeoJsonFeature<PlotGeometry, PlotRenderProperties>[] = [];
+
+    for (const [index, path] of paths.entries()) {
+      if (
+        path.length < 2 ||
+        path.some(
+          ([longitude, latitude]) =>
+            !Number.isFinite(longitude) || !Number.isFinite(latitude),
+        )
+      ) {
+        continue;
+      }
+      const id = `${feature.id}:semantic-guide:${index}`;
+      rendered.push({
+        type: "Feature",
+        id,
+        geometry: {
+          type: "LineString",
+          coordinates: path.map(clonePosition),
+        },
+        properties: {
+          plotId: feature.id,
+          plotType: feature.plotType,
+          role: "line",
+          handleKind: "semantic-guide",
+          lineColor: feature.style.lineColor ?? "#1976d2",
+          lineOpacity: Math.min(feature.style.lineOpacity ?? 1, 0.85),
+          lineWidth: Math.max(feature.style.lineWidth ?? 2, 2),
+          plotRenderId: id,
+        },
+      });
+    }
+
+    return rendered;
   }
 
   #addPlotLayers(

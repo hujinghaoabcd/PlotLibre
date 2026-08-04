@@ -7,6 +7,7 @@ import {
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { installCircularArcPlayground } from "./circular-arc-playground.js";
 import { installClosedActionAreaPlayground } from "./closed-action-area-playground.js";
 import { installDoubleArrowPlayground } from "./double-arrow-playground.js";
 import { installPathSymbolsPlayground } from "./path-symbols-playground.js";
@@ -31,6 +32,7 @@ const e2e = query.get("e2e") === "1";
 const squadCombatE2e = query.get("squad") === "1";
 const pathSymbolsE2e = query.get("paths") === "1";
 const closedActionAreaE2e = query.get("areas") === "1";
+const circularArcE2e = query.get("circular") === "1";
 const basemapDisabled = e2e || query.get("basemap") === "none";
 
 const bootstrapStyle = {
@@ -47,16 +49,10 @@ const bootstrapStyle = {
   ],
 } satisfies StyleSpecification;
 
-// MapLibre GL JS 6 ships its renderer worker as a sibling ESM file. Vite
-// bundles the main module but does not automatically emit that sibling file,
-// so the Playground copies it into public/assets during configuration and sets
-// the URL explicitly before the first Map is created.
 setWorkerUrl(`${import.meta.env.BASE_URL}assets/maplibre-gl-worker.mjs`);
 
 const map = new Map({
   container: "map",
-  // Always bootstrap from a local style. Remote basemap resources are optional
-  // enhancements and must never block PlotLibre initialization.
   style: bootstrapStyle,
   center: [118.7969, 32.0603],
   zoom: 11.2,
@@ -77,9 +73,6 @@ if (!e2e) {
 }
 
 map.once("load", () => {
-  // Add the optional basemap synchronously before PlotLibre creates its layers,
-  // so all plotting layers remain above it. Tile requests continue in the
-  // background and do not delay the application.
   if (!basemapDisabled) {
     installOptionalBasemap(map);
   }
@@ -90,9 +83,6 @@ map.once("load", () => {
   });
   const app = new PlaygroundApp(map, plot, { e2e });
 
-  // Bind the generic application lifecycle first. Symbol-group listeners are
-  // installed afterwards so their semantic guidance can refine generic status
-  // messages, including fixed-count completion rejection details.
   app.start();
   installDoubleArrowPlayground(app, plot, map, { e2e });
   installPincerArrowPlayground(app, plot, map, { e2e });
@@ -108,10 +98,11 @@ map.once("load", () => {
     e2e,
     enableInE2e: closedActionAreaE2e,
   });
+  installCircularArcPlayground(app, plot, map, {
+    e2e,
+    enableInE2e: circularArcE2e,
+  });
 
-  // `start()` loads the original base sample before the installers wrap
-  // `loadSample`. Reload once in production so the first visible document uses
-  // the complete current sixteen-symbol catalog. E2E starts empty by design.
   if (!e2e) {
     app.loadSample();
   }
