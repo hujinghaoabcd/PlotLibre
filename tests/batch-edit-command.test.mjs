@@ -35,7 +35,9 @@ test("batch delete undo restores exact document order and prior primary selectio
   const beforeOrder = store.list().map((item) => item.id);
   const removed = [store.get("b"), store.get("c")];
   const changes = [];
+  const selectionReasons = [];
   store.subscribe((change) => changes.push(change));
+  selection.subscribe((change) => selectionReasons.push(change.reason));
 
   const command = new BatchEditCommand(store, selection, {
     label: "delete-selection",
@@ -65,6 +67,11 @@ test("batch delete undo restores exact document order and prior primary selectio
     "batch",
     "batch",
     "batch",
+  ]);
+  assert.deepEqual(selectionReasons, [
+    "history-execute",
+    "history-undo",
+    "history-redo",
   ]);
 });
 
