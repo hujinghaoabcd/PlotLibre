@@ -28,6 +28,11 @@ export const sectorDefinition: PlotDefinition = {
     sweepDirection: "clockwise",
   },
   defaultStyle: DEFAULT_AREA_STYLE,
+  deriveSemanticGuidePaths(feature) {
+    const center = feature.controlPoints[0];
+    const bearingHandle = feature.controlPoints[2];
+    return center && bearingHandle ? [[center, bearingHandle]] : [];
+  },
   generate({ feature }) {
     return generateSector(feature);
   },
