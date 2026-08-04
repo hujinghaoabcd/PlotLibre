@@ -86,7 +86,7 @@ export interface MapContainerLike {
   appendChild?(child: unknown): unknown;
   removeChild?(child: unknown): unknown;
   contains?(child: unknown): boolean;
-  readonly style?: Readonly<Record<string, unknown>>;
+  readonly style?: unknown;
 }
 
 export interface MapInteractionHandlerLike {
