@@ -103,14 +103,21 @@ export function readPlotDocument(
       facts,
     ),
   );
-  const document = deepFreeze({
+  const candidate = {
     type: PLOTJSON_DOCUMENT_TYPE,
     schemaVersion: CURRENT_PLOTJSON_SCHEMA_VERSION,
     id: decoded.id,
     name: decoded.name,
     features,
     metadata: decoded.metadata,
-  } satisfies PlotDocument);
+  } satisfies PlotDocument;
+
+  // Definition migrations are scanned individually for generic JSON safety.
+  // Re-scan the complete current document so document-level semantic budgets,
+  // especially aggregate authored controls, are enforced after all migrations.
+  const document = deepFreeze(
+    clonePlotJsonValue(candidate, { limits }).value as unknown as PlotDocument,
+  );
   const report = createPlotJsonMigrationReport({
     sourceSchemaVersion,
     targetSchemaVersion: CURRENT_PLOTJSON_SCHEMA_VERSION,
@@ -273,7 +280,18 @@ function migrateDefinition(
     }));
   }
 
-  const migrated = decodeCurrentPlotJsonFeature(current, index, facts);
+  let migrated: PlotFeature;
+  try {
+    migrated = decodeCurrentPlotJsonFeature(current, index, facts);
+  } catch (cause) {
+    const lastStep = plan[plan.length - 1]!;
+    throw definitionMigrationOutputError(
+      lastStep,
+      `$.features[${index}]`,
+      sourceFeature.id,
+      cause,
+    );
+  }
   if (
     migrated.id !== sourceFeature.id ||
     migrated.plotType !== target.plotType ||
@@ -344,6 +362,7 @@ function executeDefinitionStep(
     featureId,
     step.from.plotType,
   );
+  assertDefinitionControlPointLimit(cloned, step, path, featureId, limits);
   if (
     cloned.id !== featureId ||
     cloned.plotType !== step.to.plotType ||
@@ -357,6 +376,35 @@ function executeDefinitionStep(
     );
   }
   return cloned;
+}
+
+function assertDefinitionControlPointLimit(
+  output: PlotJsonObject,
+  step: PlotJsonPlannedDefinitionStep,
+  path: string,
+  featureId: string,
+  limits: Readonly<PlotJsonLimits>,
+): void {
+  if (
+    Array.isArray(output.controlPoints) &&
+    output.controlPoints.length > limits.controlPointsPerFeature
+  ) {
+    throw definitionMigrationOutputError(
+      step,
+      path,
+      featureId,
+      new PlotJsonError(
+        "PLOTJSON_RESOURCE_LIMIT_EXCEEDED",
+        "PlotJSON Definition migration exceeded the authored-control limit.",
+        {
+          path: `${path}.controlPoints`,
+          limitName: "controlPointsPerFeature",
+          limit: limits.controlPointsPerFeature,
+          actual: output.controlPoints.length,
+        },
+      ),
+    );
+  }
 }
 
 function featureToJsonObject(feature: PlotFeature): unknown {
