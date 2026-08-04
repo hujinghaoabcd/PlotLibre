@@ -72,6 +72,26 @@ test("subtract and toggle maintain deterministic primary fallback", () => {
   });
 });
 
+test("normalized intents preserve sets, primary and empty-map modifier behavior", () => {
+  const controller = new SelectionController(createStore());
+  controller.applyIntent("a", "replace");
+  controller.applyIntent("b", "add");
+  assert.deepEqual(controller.selectedIds, ["a", "b"]);
+
+  controller.applyIntent("a", "replace");
+  assert.deepEqual(controller.selectedIds, ["b", "a"]);
+  assert.equal(controller.primaryId, "a");
+
+  controller.applyIntent("c", "toggle");
+  controller.applyIntent("b", "subtract");
+  assert.deepEqual(controller.selectedIds, ["a", "c"]);
+
+  controller.applyIntent(undefined, "add");
+  assert.deepEqual(controller.selectedIds, ["a", "c"]);
+  controller.applyIntent(undefined, "replace");
+  assert.deepEqual(controller.selectedIds, []);
+});
+
 test("makePrimary moves an existing selected id and rejects unselected ids", () => {
   const controller = new SelectionController(createStore());
   controller.replace(["a", "b", "c"]);
