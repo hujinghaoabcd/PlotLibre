@@ -33,23 +33,23 @@ public packages <- playground / wrappers
 ## 3. Existing merged baseline
 
 ```text
-main SHA:           4ce59d189b65c8257bf49beabc308a4020249cd0
+main SHA:           bebfac11b6728089b39668de424851e2f750b4fd
 workspace:          0.0.20
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 Node baseline:      184
 Chromium baseline:  28
 Sources:            3
 Layers:             8
-Milestone 006J:     implementation and finalization merged
+Milestone 007 design: merged through PR #36
 ```
 
-Current public Definitions remain unchanged during Milestone 007 design.
+Current public Definitions remain unchanged during Milestone 007A.
 
 ## 4. Professional editing state boundary
 
 Selection is transient interaction state, not PlotJSON document state.
 
-Frozen candidate:
+Frozen contract:
 
 ```ts
 interface SelectionSnapshot {
@@ -90,10 +90,10 @@ store-reconcile
 MapLibre modifier normalization:
 
 ```text
-plain click      → replace / make-primary
-Shift            → add
-Ctrl or Cmd      → toggle
-Alt              → subtract
+plain click       → replace / make-primary
+Shift             → add
+Ctrl or Cmd       → toggle
+Alt               → subtract
 empty plain click → clear
 ```
 
@@ -152,11 +152,11 @@ This prevents changed Store state without a history entry.
 
 ## 8. BatchEditCommand
 
-Engine-independent interaction command candidate stores:
+Engine-independent interaction command stores:
 
 ```text
 before features
- after features
+after features
 before document order
 after document order
 before selection
@@ -256,7 +256,7 @@ Do not put canonical editor state into arbitrary metadata. Formal PlotJSON schem
 
 ## 13. Required tests
 
-Design PR remains documentation-only but runs the merged baseline:
+Current merged baseline:
 
 ```text
 184 Node
@@ -309,23 +309,31 @@ Historical immutable handovers are not rewritten.
 
 ## 16. Current priority
 
+Current administrative slice:
+
 ```text
-Milestone: 007 professional editing semantic design
-branch:    agent/007-professional-editing-design
-scope:     documentation, references, transaction algorithms and test fixtures only
-runtime:   prohibited on this branch
+branch: agent/007-design-post-merge-finalization
+scope:  documentation-only actual-merge synchronization
+runtime: prohibited
+```
+
+Next runtime slice:
+
+```text
+Milestone: 007A selection + atomic batch transaction + local translation
+planned branch: agent/007a-selection-batch-translation
 ```
 
 Binding continuation order:
 
-1. complete design, transaction, reference and handover documents;
-2. create a documentation-only Draft PR;
-3. pass Node 20.19, Node 22, 184 Node, 28 Chromium, build and handover checks;
-4. resolve every design review thread;
-5. squash merge using the validated expected head;
-6. create `agent/007a-selection-batch-translation` from the new final `main`;
-7. implement SelectionController first;
-8. implement Store transaction and listener isolation second;
-9. implement BatchEditCommand and exact ordered undo third;
-10. only then add MapLibre overlays, batch delete and local translation;
+1. merge the design post-merge finalization without runtime changes;
+2. create 007A from the new final `main`;
+3. implement SelectionController first;
+4. implement Store transaction and listener isolation second;
+5. implement BatchEditCommand and exact ordered undo third;
+6. preserve backward-compatible single-selection APIs;
+7. add selection overlays and click multi-selection;
+8. add batch delete/undo;
+9. add local translation preview/commit;
+10. add style reload and measured performance fixtures;
 11. do not implement box/lasso, rotation/scale, groups, new symbols or snapping in 007A.
