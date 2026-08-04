@@ -37,138 +37,165 @@ tests and deterministic fixtures
 | `arrow-route-multihead.md` | bidirectional/double-head route | 已实现 |
 | `closed-action-area.md` | closed curve/gathering place | 已实现 |
 | `circular-arc-foundation.md` | circular arc/segment/sector shared frame | 已实现并合并 |
-| `batch-edit-transaction.md` | selection、Store transaction、batch commands、translation/transform | 007A transaction/translation 已实现并通过 PR #38 合并；007B–D 待后续设计 |
+| `batch-edit-transaction.md` | selection、Store transaction、batch commands、translation | 007A 已实现并合并 |
+| `screen-region-selection.md` | box/lasso capture、topology、screen intersection、batch intent | 007B 当前设计冻结候选；runtime 禁止 |
 
 ## 当前合并基线
 
 ```text
+main:               d08c56b6687ea64e0c599fd04fd77115d320d8f2
 workspace:          0.0.21
 public symbols:     19
 Node tests:         219 passed
 Chromium tests:     30 passed
 MapLibre Sources:   4
 MapLibre Layers:    10
-merged PR:          #38
-validated head:     2d499a1cb122abbf6fce7548ec32f1b0031dd8f2
-validated CI:       #409 / 30906467230
-squash SHA:         04dca0b120b1440afb49a300eeee92faf6644a7d
+007A runtime PR:    #38
+007A finalization:  #39
 ```
 
-## 007A transaction implementation
+## 007A transaction foundation
 
-### Selection representation
-
-```text
-ordered selectedIds
-Set membership index
-primaryId = final selected id
-monotonic interaction revision
-```
-
-Selection is transient and excluded from PlotJSON。Replace/add/subtract/toggle/reconcile/restore 每次有效变化只发一个 immutable event；no-op 不发 event。
-
-### Store transaction
-
-```text
-validate add/replace/remove id sets
-→ clone current ordered feature Map
-→ stage every operation
-→ validate optional exact orderedIds
-→ any error: no mutation and no event
-→ commit once
-→ emit one batch event
-```
-
-No listener observes partial state。
-
-### Listener failure isolation
-
-- validation errors throw before mutation；
-- post-commit listener errors are collected；
-- all listeners still run；
-- errors are reported through `onListenerError`；
-- they do not synchronously escape after commit；
-- CommandHistory records the committed edit consistently。
-
-### Ordered undo and BatchEditCommand
-
-Batch delete undo restores original document order through exact ordered ids。Appending restored features is invalid because it changes rendering/z-order semantics。
-
-The command captures exact before/after feature values, document order and selection snapshots. Execute/redo uses exact after-state; undo uses exact before-state. Redo reuses stored revisions. Selection reconciliation is suspended during Store mutation and followed by one explicit final restore。
-
-### Translation
-
-007A local-metre whole-selection translation：
-
-- all selected authored controls share one coordinate analysis, projection and metre delta；
-- projection origin is order-independent；
-- parameters/style/metadata remain unchanged；
-- Store remains unchanged during transient preview；
-- every candidate is canonicalized/generated before commit；
-- one invalid member rejects the complete batch；
-- Escape cancels；
-- zero/sub-threshold movement commits nothing；
-- one pointer gesture commits one command；
-- active handle drag has priority；
-- dragPan is disabled only during active translation。
-
-### MapLibre selection overlay
-
-```text
-plotlibre-selection source
-plotlibre-selection-line layer
-plotlibre-selection-point layer
-```
-
-Polygon becomes boundary highlight, LineString remains line and Point remains point。Only Primary exposes semantic handles/guides。Style reload regenerates transient resources from canonical state。
-
-### Shift and box zoom
-
-MapLibre box zoom conflicts with Shift additive selection。PlotLibre records and disables box zoom during its lifecycle, handles Shift through the MapLibre `mousedown` path, and restores the previous state on destroy。
-
-## Implemented fixture families
-
-- selection ordering, modifier intents and Primary fallback；
-- immutable snapshots, no-op and Store reconciliation；
-- transaction preconditions and no-partial-mutation；
-- listener exception isolation；
+- ordered transient SelectionController；
+- exact `PlotStore.applyTransaction()`；
+- listener failure isolation；
+- selection-aware `BatchEditCommand`；
 - exact document-order restoration；
-- batch delete execute/undo/redo；
-- local translation common metre delta；
-- invalid one-member atomic rejection；
-- exact revision replay；
-- selection overlay and Primary handles；
-- style reload recovery；
-- Shift/box-zoom lifecycle；
-- real MapLibre body drag、Escape and Delete flows；
-- all historical 219 Node / 30 Chromium regressions。
+- batch delete；
+- local-metre whole-selection translation；
+- one command per completed mutation gesture；
+- 219 Node / 30 Chromium baseline。
 
-Performance measurements at 100/1,000/10,000 features remain a separate measured benchmark task and must not be claimed from functional tests alone。
+Detailed record: `batch-edit-transaction.md`.
 
-## Next algorithm design: 007B
+## 007B screen-region algorithm freeze
 
-Freeze before runtime：
+Detailed record: `screen-region-selection.md`.
 
-- box gesture and screen-space rectangle；
-- default intersection policy；
-- candidate layer/source set；
-- `plotId` de-duplication；
-- deterministic Store/document ordering；
-- empty-result and Primary policy；
-- lasso closure and simple-ring validation；
-- self-intersection fail closed；
-- simplification and tolerance boundary；
-- spatial-index ownership and invalidation；
-- benchmark hardware、browser、feature mix and viewport reporting。
+### Coordinate domain
 
-007B must not include rotation/scale、groups/locks、snapping or new symbols。
+```text
+CSS-pixel ScreenPoint relative to map container
+```
+
+Core and PlotJSON remain free of screen coordinates。
+
+### Frozen numeric policy
+
+```text
+box activation threshold: 4 CSS px
+lasso sample spacing:     2 CSS px
+lasso RDP tolerance:      1.5 CSS px
+minimum lasso area:       16 CSS px²
+```
+
+### Lasso validation
+
+```text
+raw path
+→ remove consecutive duplicates
+→ reject repeated non-consecutive vertices
+→ reject non-adjacent segment crossing/touch/overlap
+→ RDP simplify
+→ validate simplified ring again
+```
+
+Simplification cannot hide an invalid raw loop。
+
+### Candidate resolution
+
+```text
+screen region bounds
+→ MapLibre queryRenderedFeatures on committed fill/line/point layers
+→ plotId de-duplication
+→ Store/document-order normalization
+→ Registry.generate once per unique candidate
+→ map.project generated fills/lines/points
+→ exact screen intersection
+→ one SelectionController.applyMany event
+```
+
+Broad-phase MapLibre return order and tile duplicates never determine selection order。
+
+### Exact geometry policy
+
+- Point center only；
+- LineString/MultiLineString segment intersection；
+- Polygon/MultiPolygon crossing、containment and hole-aware fill；
+- boundary inclusive；
+- compound feature selected once when any component intersects；
+- CSS line width、point radius、selection overlay、draft、guides and labels ignored；
+- generated sampled vertices are authoritative for curved paths；
+- any query、generation or projection failure rejects the whole completion。
+
+### Multi-id intent
+
+`SelectionController.applyMany(ids,intent,reason)` must apply replace/add/subtract/toggle in one immutable event。
+
+- replace uses candidate Store order；
+- add appends only new ids；
+- subtract preserves survivors；
+- toggle removes current candidates then appends newly selected candidates in Store order；
+- valid empty replace clears；other empty intents no-op；
+- region selection never creates History entries。
+
+### Overlay and lifecycle
+
+- box/lasso overlay uses DOM/SVG screen UI；
+- no new GeoJSON Source/Layer in 007B v1；
+- active gesture cancels on camera、resize、style、Store or external selection change；
+- pointer capture and dragPan state restore exactly once；
+- boxZoom ownership moves from immediate Shift capture to unified region adapter；
+- synthetic post-drag click is suppressed。
+
+## Required 007B fixture families
+
+### Pure Node
+
+- all box drag quadrants and thresholds；
+- lasso sampling、area、RDP and topology；
+- bow-tie、repeat、touch、overlap rejection；
+- Point/Line/MultiLine intersection；
+- Polygon containment/crossing/hole exclusion；
+- MultiPolygon/compound any-component hit；
+- broad-phase duplicate/query-order normalization；
+- applyMany intent ordering and Primary behavior；
+- one event/no-op；
+- fail-closed generation/projection。
+
+### Adapter and Chromium
+
+- Shift click still adds after immediate mousedown mutation is removed；
+- Shift-empty drag performs one additive box；
+- explicit box replace and modifier overrides；
+- lasso exact rejection of bbox false positives；
+- invalid lasso changes nothing；
+- DOM overlay cleanup；
+- pointer capture、dragPan、boxZoom and synthetic click lifecycle；
+- region selection followed by translation and batch delete；
+- no History mutation from selection alone；
+- all historical 219/30 regressions。
+
+## Performance boundary
+
+Functional runtime must generate only unique broad-phase candidates, not every Store feature when candidate count is smaller than document size。
+
+Measured fixtures：
+
+```text
+100
+1,000
+10,000 features
+```
+
+Record hardware、OS、browser、viewport、camera、feature mix、generated vertices、candidate count、query time、projection/intersection time、total latency、median and p95。No public latency guarantee before measured evidence。
 
 ## Later algorithms
 
 - 007C：local rotation and positive uniform scale around authored-control bounds center；
 - 007D：canonical groups/locks/visibility/z-order after PlotJSON migration design。
 
-## Clean-room references for 007
+## Clean-room references
 
 ```text
 JamesLMilner/terra-draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
@@ -176,4 +203,4 @@ geoman-io/maplibre-geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
 mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
 ```
 
-Studied only for observable mode separation、selection lifecycle、keyboard configuration、whole-feature/direct editing and test organization。Code reuse：`none`。
+007B specifically studies observable Mapbox GL Draw box-select lifecycle、DOM rectangle、dragPan ownership、bounding-box candidate query and id de-duplication。Code reuse：`none`。
