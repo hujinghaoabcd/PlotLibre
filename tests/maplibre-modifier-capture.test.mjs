@@ -28,17 +28,6 @@ class FakeCanvas {
     this.listeners.get(type)?.delete(listener);
   }
 
-  fire(type, event) {
-    for (const listener of this.listeners.get(type) ?? []) {
-      listener(event);
-      if (event.immediateStopped === true) break;
-    }
-  }
-
-  getBoundingClientRect() {
-    return { left: 100, top: 50 };
-  }
-
   focus() {}
 }
 
@@ -104,6 +93,10 @@ class FakeMap {
     this.listeners.get(type)?.delete(listener);
   }
 
+  fire(type, event = {}) {
+    for (const listener of this.listeners.get(type) ?? []) listener(event);
+  }
+
   getCanvas() {
     return this.canvas;
   }
@@ -127,24 +120,25 @@ function addArrow(plot, id, offset) {
   });
 }
 
-function modifierEvent(modifiers) {
+function mouseEvent(modifiers) {
   return {
-    clientX: 110,
-    clientY: 70,
-    ...modifiers,
-    prevented: false,
-    immediateStopped: false,
-    preventDefault() {
-      this.prevented = true;
-    },
-    stopPropagation() {},
-    stopImmediatePropagation() {
-      this.immediateStopped = true;
+    lngLat: { lng: 118.8, lat: 32 },
+    point: { x: 10, y: 20 },
+    originalEvent: {
+      ...modifiers,
+      prevented: false,
+      stopped: false,
+      preventDefault() {
+        this.prevented = true;
+      },
+      stopPropagation() {
+        this.stopped = true;
+      },
     },
   };
 }
 
-test("canvas capture reserves Shift and restores box zoom on destroy", () => {
+test("MapLibre mousedown reserves Shift and restores box zoom on destroy", () => {
   const map = new FakeMap();
   const plot = new PlotLibre(map, {
     definitions: [straightArrowDefinition],
@@ -156,24 +150,25 @@ test("canvas capture reserves Shift and restores box zoom on destroy", () => {
   plot.select("a");
   map.targetId = "b";
 
-  const pointerEvent = modifierEvent({ shiftKey: true });
-  const mouseEvent = modifierEvent({ shiftKey: true });
-  map.canvas.fire("pointerdown", pointerEvent);
-  map.canvas.fire("mousedown", mouseEvent);
+  const event = mouseEvent({ shiftKey: true });
+  map.fire("mousedown", event);
 
   assert.deepEqual(map.queryPoint, { x: 10, y: 20 });
   assert.deepEqual(plot.selectedIds, ["a", "b"]);
   assert.equal(plot.selectedId, "b");
-  assert.equal(pointerEvent.prevented, true);
-  assert.equal(mouseEvent.prevented, true);
+  assert.equal(event.originalEvent.prevented, true);
+  assert.equal(event.originalEvent.stopped, true);
+
+  // A later Shift click remains idempotent.
+  map.fire("click", mouseEvent({ shiftKey: true }));
+  assert.deepEqual(plot.selectedIds, ["a", "b"]);
 
   plot.destroy();
   assert.equal(map.boxZoomEnabled, true);
-  assert.equal(map.canvas.listeners.get("pointerdown")?.size ?? 0, 0);
-  assert.equal(map.canvas.listeners.get("mousedown")?.size ?? 0, 0);
+  assert.equal(map.listeners.get("mousedown")?.size ?? 0, 0);
 });
 
-test("compatibility mousedown is deduplicated while mouse-only toggle still works", () => {
+test("Ctrl remains click-driven and is not double-toggled on mousedown", () => {
   const map = new FakeMap();
   const plot = new PlotLibre(map, {
     definitions: [straightArrowDefinition],
@@ -183,12 +178,10 @@ test("compatibility mousedown is deduplicated while mouse-only toggle still work
   plot.select("a");
   map.targetId = "b";
 
-  map.canvas.fire("pointerdown", modifierEvent({ ctrlKey: true }));
-  map.canvas.fire("mousedown", modifierEvent({ ctrlKey: true }));
-  assert.deepEqual(plot.selectedIds, ["a", "b"]);
-
-  map.canvas.fire("mousedown", modifierEvent({ ctrlKey: true }));
+  map.fire("mousedown", mouseEvent({ ctrlKey: true }));
   assert.deepEqual(plot.selectedIds, ["a"]);
+  map.fire("click", mouseEvent({ ctrlKey: true }));
+  assert.deepEqual(plot.selectedIds, ["a", "b"]);
 
   plot.destroy();
 });
