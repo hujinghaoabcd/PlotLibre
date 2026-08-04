@@ -6,13 +6,13 @@ This file defines mandatory rules for every developer, coding agent and future c
 
 PlotLibre is a semantic parametric plotting framework, not a generic GeoJSON toolbar.
 
-Canonical state:
+Canonical feature state:
 
 ```text
 plot definition + authored control points + parameters + style + metadata
 ```
 
-Rendered LineString/Polygon coordinates, samples, inferred frames and semantic guides are derived output and must never replace canonical state.
+Rendered geometry, samples, inferred frames, selection overlays and transform guides are derived output and must never replace authored state.
 
 ## 2. Dependency direction
 
@@ -23,203 +23,279 @@ core + interaction <- maplibre
 public packages <- playground / wrappers
 ```
 
-- `core` cannot depend on MapLibre or DOM;
-- `geometry` cannot depend on Store, UI, events or map engines;
-- `symbols` register behavior through `PlotDefinition`;
-- `interaction` remains engine-independent;
-- `maplibre` translates semantic state to Sources/Layers/events;
+- Core cannot depend on MapLibre or DOM;
+- geometry cannot depend on Store, UI, events or map engines;
+- interaction state remains engine-independent;
+- MapLibre translates semantic state and gestures;
 - Playground consumes public APIs only;
 - circular dependencies are prohibited.
 
-## 3. Geometry rules
-
-- Never run undocumented Euclidean geometry directly on longitude/latitude.
-- Use local-metre projection for short symbols and explicit geodesic policies for large symbols.
-- Validate non-finite, duplicate, collinear, antimeridian, high-latitude and excessive-extent inputs.
-- Rings must be finite, closed, oriented and topologically validated.
-- Shared primitives and frames remain pure and worker-ready.
-- A public symbol needs a real semantic or structural distinction, not only new defaults.
-- Authored controls remain separate from centers, radii, bearings, samples, offsets, heads, notches, closure anchors and final vertices.
-- Topology checks must not be removed merely to make difficult input render.
-- Complete Registry generation occurs before Store mutation.
-
-### Circular geometry
-
-- `line.circular-arc`, `area.circular-segment` and `area.sector` are local-metre-only in version 1.0.
-- Three-point circular frames reject duplicate, collinear, near-collinear, unstable and excessive-radius input.
-- Circular sampling preserves exact authored start/through/end controls where those roles exist.
-- Minor/major sweep and crossing 0° must be deterministic.
-- No two-point committed fallback, hidden control movement, singular degradation or silent geodesic switch.
-- The legacy `Lune/弓形` arc-plus-chord geometry is named `area.circular-segment`; true `area.lune` remains deferred.
-
-## 4. Public semantic groups
-
-Current Definitions:
+## 3. Existing merged baseline
 
 ```text
-arrow.straight
-arrow.fine
-arrow.fine.tailed
-arrow.assault-direction
-arrow.curved
-arrow.attack
-arrow.attack.tailed
-arrow.double
-arrow.pincer
-arrow.squad-combat
-arrow.route
-arrow.corridor
-arrow.route.bidirectional
-arrow.route.double-head
-line.circular-arc
-area.closed-curve
-area.gathering-place
-area.circular-segment
-area.sector
+main SHA:           4ce59d189b65c8257bf49beabc308a4020249cd0
+workspace:          0.0.20
+public symbols:     19 (14 Arrow + 1 Line + 4 Area)
+Node baseline:      184
+Chromium baseline:  28
+Sources:            3
+Layers:             8
+Milestone 006J:     implementation and finalization merged
 ```
 
-Catalog contract:
+Current public Definitions remain unchanged during Milestone 007 design.
+
+## 4. Professional editing state boundary
+
+Selection is transient interaction state, not PlotJSON document state.
+
+Frozen candidate:
+
+```ts
+interface SelectionSnapshot {
+  readonly selectedIds: readonly string[];
+  readonly primaryId?: string;
+  readonly revision: number;
+}
+```
+
+Invariants:
+
+- ids are unique existing feature ids;
+- order is acquisition order;
+- `primaryId`, when present, is the final selected id;
+- empty selection has no primary;
+- one effective operation emits one immutable change;
+- no-op emits nothing;
+- Store removal/clear reconciles the set once;
+- only the primary feature exposes authored handles and Definition guides;
+- all selected features may expose lightweight derived overlays;
+- selection never increments PlotFeature revision;
+- selection is excluded from PlotJSON.
+
+## 5. Selection operations
+
+Engine-independent intent values:
 
 ```text
-14 Arrow + 1 Line + 4 Area = 19 public symbols
+replace
+add
+subtract
+toggle
+clear
+make-primary
+store-reconcile
 ```
 
-Existing compatibility arrays must remain meaningful:
+MapLibre modifier normalization:
 
 ```text
-arrowSymbols = 14
-lineSymbols  = 1
-areaSymbols  = 4
-builtInSymbols = 19
+plain click      → replace / make-primary
+Shift            → add
+Ctrl or Cmd      → toggle
+Alt              → subtract
+empty plain click → clear
 ```
 
-## 5. Circular canonical controls
+The SelectionController must not inspect browser-specific keyboard events directly.
 
-### Circular arc
+Backward compatibility:
 
 ```text
-0 exact start
-1 exact through-point
-2 exact end
+plot.select(id | undefined)
+interaction.selectedId
 ```
 
-Output is one open LineString. The through-point selects the directed minor or major arc. No control canonicalization is allowed.
+remain aliases for single selection / primary selection.
 
-### Circular segment
+## 6. Atomic Store transactions
+
+Milestone 007A requires a staged batch transaction over:
 
 ```text
-0 arc/chord start
-1 exact through-point on the selected arc
-2 arc/chord end
+add
+replace
+remove
+optional exact orderedIds
 ```
 
-Output is one simple Polygon formed by the selected arc and exact straight chord. Winding normalization cannot rewrite controls.
+Rules:
 
-### Sector
+1. validate duplicate/cross-category ids before mutation;
+2. added ids must not exist;
+3. replaced and removed ids must exist;
+4. clone current ordered feature state;
+5. apply all changes to the staged state;
+6. any error means no mutation;
+7. commit once;
+8. emit one batch event;
+9. no listener observes partial state;
+10. exact feature order can be restored on undo.
+
+Appending deleted features during undo is prohibited because it changes render/z-order order.
+
+## 7. Listener failure isolation
+
+Current Store listeners are synchronous. Post-commit listener errors cannot safely trigger rollback after other listeners have observed the state.
+
+Frozen policy:
+
+- mutation validation errors throw before commit;
+- after commit, all listeners are invoked;
+- listener errors are collected;
+- errors are reported through `onListenerError`;
+- they do not synchronously escape the committed transaction;
+- CommandHistory still records the committed command;
+- renderer recovery can occur through explicit render or style reload.
+
+This prevents changed Store state without a history entry.
+
+## 8. BatchEditCommand
+
+Engine-independent interaction command candidate stores:
 
 ```text
-0 center
-1 exact radius and start-boundary point
-2 end-bearing handle
+before features
+ after features
+before document order
+after document order
+before selection
+after selection
+label
 ```
 
-Control `2` defines bearing only. Its distance from the center does not define a second radius. The rendered end-boundary point is derived at the radius established by control `1`.
+Execute/redo applies exact after-state then after-selection. Undo applies exact before-state then before-selection. Redo must not increment revisions again.
+
+One command represents one completed gesture or batch action.
+
+## 9. Whole-object translation
+
+Milestone 007A supports local-metre translation only.
+
+Algorithm:
 
 ```text
-sweepDirection: "clockwise" | "counterclockwise"
+selected authored controls
+→ analyze one selection coordinate frame
+→ derive one order-independent projection origin
+→ pointer meter delta
+→ add same delta to every authored control
+→ revision = original + 1
+→ canonicalize/generate every candidate
+→ all valid: preview/commit batch
+→ any invalid: no Store mutation
 ```
 
-The center-to-bearing guide is transient and Definition-driven.
+Rules:
 
-## 6. API, PlotJSON and semantic guides
+- parameters/style/metadata remain unchanged;
+- one selection uses one projection and delta;
+- antimeridian/high-latitude/large-extent selections reject before drag;
+- preview is transient;
+- Escape cancels;
+- movement below 4 CSS pixels remains a click;
+- zero local movement creates no command;
+- one pointer gesture creates one history entry;
+- control-handle drag has priority over object translation;
+- dragPan is disabled only during an active transform.
 
-- Public identifiers are stable dotted names aligned with output category.
-- Every authored semantic control survives PlotJSON round trip.
-- Derived centers, radii, normalized angles, sweeps, endpoints, samples, closure coordinates and guides are not serialized.
-- `canonicalizeControlPoints` may only return a deterministic permutation of exact authored coordinates.
-- `deriveDraftControlPoints` and `deriveSemanticGuidePaths` are transient-only hooks.
-- Semantic guides never enter committed RenderBundles, Store, History or PlotJSON.
-- MapLibre renders Definition-driven guide paths in draft and selected/drag states.
-- Create, replace and import persist only canonicalized controls after full generation preflight.
+## 10. Batch delete
 
-## 7. Interaction and rejection
+Delete selected features through one batch command.
 
-- Exact two-point schemas use `TwoPointDrawSession`; all others use `MultiPointDrawSession`.
-- Session selection comes from `controlSchema`, never hard-coded identifiers.
-- Fixed-count symbols complete on the maximum valid authored click.
-- Variable-count symbols complete explicitly by double-click or Enter.
-- A rejected maximum candidate keeps the session active and replaceable.
-- Rejection, last-valid drafts and guides are transient.
-- One successful handle drag creates one `ReplacePlotCommand`; invalid previews never mutate Store or History.
-- All three circular Definitions are fixed-three: the third pointer can show a complete draft and the third valid click automatically completes.
-- Sector draft/selection exposes the center-to-bearing radial guide because the authored bearing handle usually differs from the rendered endpoint.
+- after selection is empty;
+- undo restores exact feature values, document order and previous selection/primary;
+- redo restores exact after-state;
+- locked-object behavior is deferred until lock semantics exist;
+- active draw/control edit retains existing key behavior and has priority.
 
-## 8. Testing requirements
+## 11. Selection overlay
 
-Required before merge:
-
-```bash
-npm run typecheck
-npm test
-npm run playground:typecheck
-npm run playground:build
-npm run handover:check
-```
-
-Browser-facing changes also require:
-
-```bash
-npm run playground:e2e
-```
-
-Current merged baseline:
+Candidate MapLibre resources:
 
 ```text
-184 Node tests
-28 Chromium tests
-19 public symbols
+plotlibre-selection source
+plotlibre-selection-line layer
+plotlibre-selection-point layer
+plotlibre-transform-guide layer
 ```
 
-Circular tests prove exact controls, directed minor/major sweeps, crossing 0°, reversal, density isolation, failure policy, Registry, PlotJSON, semantic guides and style reload.
+Overlay is transient and derived from selected Registry outputs. It must not regenerate every document feature for selection-only changes.
 
-## 9. Playground and Pages
+- Polygon: boundary highlight;
+- LineString: line highlight;
+- Point: point highlight;
+- compound output: semantic `plotId` de-duplication;
+- primary state is explicit overlay metadata;
+- only primary handles remain in `plotlibre-handles`.
 
-- Pages base is `/PlotLibre/` and deploys only from `main`.
-- Basemap failure cannot block plotting or change the semantic catalog.
-- E2E cannot depend on remote tiles.
-- Production exposes nineteen selectors and nineteen samples.
-- Base compatibility E2E `?e2e=1` intentionally retains the original nine-selector surface.
-- Full current E2E uses:
+## 12. Later professional-editing slices
+
+### 007B — box/lasso selection
+
+- screen-space intersection selection first;
+- candidate ids de-duplicated by `plotId`;
+- deterministic Store/document ordering;
+- contain policy deferred until exact projected containment exists;
+- lasso must be simple; self-intersection rejects completion;
+- spatial index required before large-document support.
+
+### 007C — rotation and scale
+
+- local-metre only initially;
+- pivot = selection authored-control bounds center;
+- clockwise user rotation with documented Cartesian conversion;
+- positive uniform scale only, factor `[0.01, 100]`;
+- no reflection or non-uniform scale;
+- all candidates preflight atomically;
+- parameters remain unchanged unless a Definition explicitly opts into a future pure transform hook.
+
+### 007D — groups, locks, visibility and z-order
+
+Do not put canonical editor state into arbitrary metadata. Formal PlotJSON schema and migration must precede runtime fields.
+
+## 13. Required tests
+
+Design PR remains documentation-only but runs the merged baseline:
 
 ```text
-?e2e=1&squad=1&paths=1&areas=1&circular=1
+184 Node
+28 Chromium
 ```
 
-- Every new public Definition receives a selector, sample, instruction and actual-rendered browser test in the same milestone.
-- Generic status listeners bind before specialized group listeners.
+007A implementation must add tests for:
 
-## 10. Clean-room and licensing
+- selection order, primary fallback and modifiers;
+- Store transaction preconditions and no partial mutation;
+- one batch event;
+- listener-error isolation;
+- exact order restoration;
+- batch delete/undo/redo selection restoration;
+- mixed Arrow/Line/Area translation;
+- common meter delta and unchanged parameters;
+- invalid one-member atomic rejection;
+- revision execute/undo/redo;
+- actual selection overlays and batch preview;
+- style reload;
+- one gesture / one command;
+- performance at 100, 1,000 and 10,000 features;
+- all historical regressions.
 
-006J references:
+## 14. Clean-room references
 
 ```text
-sakitam-fdd/ol-plot@c919e60b4edeaeca53c08f9552f793b2ae9537f0
-sakitam-fdd/maptalks.plot@37dab8d0dd31650540146e1e0f03f54982f01799
+JamesLMilner/terra-draw@26d7ec91f071ab5d2bdeab774d14763746cd798b — MIT
+geoman-io/maplibre-geoman@b177748cac826fc820ff7ea068186f8eb6e0fc3c — MIT
+mapbox/mapbox-gl-draw@cb0ca464872d8468f0b912a2321f2e0503718c52 — ISC-style
 ```
 
-Both were reviewed as MIT-licensed. Code reuse is `none`; only observable behavior, terminology and independent test expectations were studied.
+Only observable selection/mode/transform behavior and test organization were studied. Code reuse: `none`.
 
-Current PlotLibre packages remain `UNLICENSED` until the owner selects a project license.
+## 15. Documentation and handover
 
-## 11. Documentation and handover
+Every completed design or implementation milestone updates `docs/handover/LATEST.md` and adds an immutable handover.
 
-Every completed milestone updates `docs/handover/LATEST.md` and adds an immutable record:
-
-```text
-docs/handover/YYYY-MM-DD-milestone-NNN-description.md
-```
-
-`LATEST.md` must contain:
+Required `LATEST.md` headings:
 
 ```text
 ## Current state
@@ -229,46 +305,27 @@ docs/handover/YYYY-MM-DD-milestone-NNN-description.md
 ## Risks and decisions
 ```
 
-Never rewrite earlier immutable handovers to falsify historical state.
+Historical immutable handovers are not rewritten.
 
-## 12. Current priority
-
-Merged implementation baseline:
+## 16. Current priority
 
 ```text
-main SHA:           297d0a644eaa3427f8fd59b82b7bc3582221d49e
-workspace:          0.0.20
-public symbols:     19 (14 Arrow + 1 Line + 4 Area)
-Node baseline:      184
-Chromium baseline:  28
-Milestone 006J:     merged through PR #34
-```
-
-Current administrative slice:
-
-```text
-branch: agent/006j-post-merge-finalization
-scope:  documentation-only merged-state synchronization
-```
-
-Next development milestone:
-
-```text
-Milestone 007 professional editing semantic design
-planned branch: agent/007-professional-editing-design
-runtime implementation: prohibited until design freeze
+Milestone: 007 professional editing semantic design
+branch:    agent/007-professional-editing-design
+scope:     documentation, references, transaction algorithms and test fixtures only
+runtime:   prohibited on this branch
 ```
 
 Binding continuation order:
 
-1. finish and merge the 006J post-merge finalization without runtime changes;
-2. create Milestone 007 design from the final `main`;
-3. freeze multi-selection canonical state and selection ownership;
-4. freeze box/lasso hit testing and additive/subtractive selection gestures;
-5. define whole-object translation as authored-control transformation;
-6. define rotation/scale pivot and coordinate-mode policy;
-7. define group, lock and z-order semantics without duplicating feature state;
-8. define multi-object commands, atomic validation and rollback;
-9. define keyboard, touch, undo/redo, performance and browser fixtures;
-10. merge a documentation-only design PR before writing runtime;
-11. do not add true lune, geodesic circular fallback, pincer hardening or route-head variants during Milestone 007 design.
+1. complete design, transaction, reference and handover documents;
+2. create a documentation-only Draft PR;
+3. pass Node 20.19, Node 22, 184 Node, 28 Chromium, build and handover checks;
+4. resolve every design review thread;
+5. squash merge using the validated expected head;
+6. create `agent/007a-selection-batch-translation` from the new final `main`;
+7. implement SelectionController first;
+8. implement Store transaction and listener isolation second;
+9. implement BatchEditCommand and exact ordered undo third;
+10. only then add MapLibre overlays, batch delete and local translation;
+11. do not implement box/lasso, rotation/scale, groups, new symbols or snapping in 007A.
