@@ -172,7 +172,7 @@ Browser-facing changes also require:
 npm run playground:e2e
 ```
 
-Milestone 006J target:
+Current merged baseline:
 
 ```text
 184 Node tests
@@ -180,20 +180,7 @@ Milestone 006J target:
 19 public symbols
 ```
 
-Circular tests must prove:
-
-- exact start/through/end interpolation;
-- minor/major and clockwise/counterclockwise sweeps;
-- crossing 0° and reversed traversal;
-- density-only sampling parameters;
-- duplicate, collinear, excessive-radius and unsupported-coordinate rejection;
-- LineString-only circular arc output;
-- simple minor/major circular-segment Polygon;
-- sector end-bearing distance isolation and direction isolation;
-- authored-only PlotJSON round trip;
-- fixed-three drawing, actual rendered output and semantic guide visibility;
-- guide absence from committed output and serialization;
-- style reload restores guide layers and selected guides.
+Circular tests prove exact controls, directed minor/major sweeps, crossing 0°, reversal, density isolation, failure policy, Registry, PlotJSON, semantic guides and style reload.
 
 ## 9. Playground and Pages
 
@@ -246,34 +233,42 @@ Never rewrite earlier immutable handovers to falsify historical state.
 
 ## 12. Current priority
 
-Merged design baseline:
+Merged implementation baseline:
 
 ```text
-main SHA:           0cae0efe7e4877ade23028a7224c6c6daee16b9b
-workspace before implementation: 0.0.19
-Milestone 006J design: merged through PR #33
+main SHA:           297d0a644eaa3427f8fd59b82b7bc3582221d49e
+workspace:          0.0.20
+public symbols:     19 (14 Arrow + 1 Line + 4 Area)
+Node baseline:      184
+Chromium baseline:  28
+Milestone 006J:     merged through PR #34
 ```
 
-Active implementation:
+Current administrative slice:
 
 ```text
-branch:     agent/006j-circular-arc-family
-PR:         #34 Add circular arc family
-workspace:  0.0.20
-symbols:    19 (14 Arrow + 1 Line + 4 Area)
-Node target: 184
-Chromium target: 28
+branch: agent/006j-post-merge-finalization
+scope:  documentation-only merged-state synchronization
 ```
 
-Binding completion order:
+Next development milestone:
 
-1. keep all three frozen public semantic contracts stable;
-2. retain local-only and fail-closed geometry policy;
-3. retain the Definition-driven transient sector guide;
-4. update README, Playground, interaction, roadmap and handover consistently;
-5. pass final current-head Node 20.19, Node 22, 184 Node and 28 Chromium checks;
-6. confirm zero unresolved review threads;
-7. mark PR #34 Ready and squash merge using the validated expected head SHA;
-8. create a documentation-only post-merge finalization if the actual squash SHA must be recorded;
-9. then begin Milestone 007 professional editing design from final `main`;
-10. do not add `area.lune`, geodesic circular fallback, pincer hardening or new route-head variants in PR #34.
+```text
+Milestone 007 professional editing semantic design
+planned branch: agent/007-professional-editing-design
+runtime implementation: prohibited until design freeze
+```
+
+Binding continuation order:
+
+1. finish and merge the 006J post-merge finalization without runtime changes;
+2. create Milestone 007 design from the final `main`;
+3. freeze multi-selection canonical state and selection ownership;
+4. freeze box/lasso hit testing and additive/subtractive selection gestures;
+5. define whole-object translation as authored-control transformation;
+6. define rotation/scale pivot and coordinate-mode policy;
+7. define group, lock and z-order semantics without duplicating feature state;
+8. define multi-object commands, atomic validation and rollback;
+9. define keyboard, touch, undo/redo, performance and browser fixtures;
+10. merge a documentation-only design PR before writing runtime;
+11. do not add true lune, geodesic circular fallback, pincer hardening or route-head variants during Milestone 007 design.
