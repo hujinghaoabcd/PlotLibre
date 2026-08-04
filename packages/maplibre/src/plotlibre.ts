@@ -14,6 +14,7 @@ import {
   type PlotFeature,
   type PlotFeatureInput,
 } from "@plotlibre/core";
+import { SelectionController } from "@plotlibre/interaction";
 import {
   MapLibrePlotInteraction,
   type MapLibrePlotInteractionOptions,
@@ -34,6 +35,7 @@ export class PlotLibre {
   public readonly registry: PlotRegistry;
   public readonly store: PlotStore;
   public readonly history: CommandHistory;
+  public readonly selection: SelectionController;
   public readonly renderer: MapLibrePlotRenderer;
   public readonly interaction: MapLibrePlotInteraction;
   readonly #unsubscribe: () => void;
@@ -42,6 +44,7 @@ export class PlotLibre {
     this.registry = new PlotRegistry();
     this.store = new PlotStore();
     this.history = new CommandHistory({ maxSize: options.historySize ?? 200 });
+    this.selection = new SelectionController(this.store);
     this.renderer = new MapLibrePlotRenderer(map, options);
     this.renderer.setRegistry(this.registry);
 
@@ -68,6 +71,7 @@ export class PlotLibre {
       options.idFactory !== undefined
         ? { idFactory: options.idFactory }
         : {},
+      this.selection,
     );
   }
 
@@ -127,8 +131,17 @@ export class PlotLibre {
     return this.interaction.cancelDraw();
   }
 
+  /** Replaces the current selection with one feature for API compatibility. */
   public select(id: string | undefined): void {
     this.interaction.select(id);
+  }
+
+  public get selectedId(): string | undefined {
+    return this.selection.primaryId;
+  }
+
+  public get selectedIds(): readonly string[] {
+    return this.selection.selectedIds;
   }
 
   public undo(): boolean {
@@ -191,6 +204,7 @@ export class PlotLibre {
 
   public destroy(): void {
     this.interaction.destroy();
+    this.selection.destroy();
     this.#unsubscribe();
     this.renderer.destroy();
   }
