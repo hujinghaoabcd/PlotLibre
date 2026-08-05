@@ -15,18 +15,19 @@ Generated GeoJSON, samples, local frames, pivots, handles, guides, selection ove
 Current baseline:
 
 ```text
-main:               409786f6a55aeab6e810651410954d78123e32d3
-workspace:          0.0.22
-PlotJSON:           PlotLibreDocument / 1.0.0
+main:                9d5b8dc23ad0e5b4ae6be3d1d1656f6d84f6adbe
+workspace:           0.0.22
+PlotJSON:            PlotLibreDocument / 1.0.0
 production migrations: none
-public Definitions: 19 (14 Arrow + 1 Line + 4 Area)
-Node:               20.19+
-merged tests:       348 Node / 34 Chromium
-MapLibre:           6.0.0 in Playground
-renderer:           4 Sources / 10 Layers
-008A:               merged PR #53/#54
-008B:               merged PR #55
-next:               008C safe reader and migration execution
+public Definitions:  19 (14 Arrow + 1 Line + 4 Area)
+Node:                20.19+
+merged tests:        375 Node / 34 Chromium
+MapLibre:            6.0.0 in Playground
+renderer:            4 Sources / 10 Layers
+008A:                merged PR #53/#54
+008B:                merged PR #55/#56
+008C:                merged PR #57
+next:                008D Registry-aware atomic import
 ```
 
 ## 2. Dependency direction
@@ -57,11 +58,11 @@ Responsibilities:
 - `PlotRegistry` canonicalization, validation and generation;
 - transactional `PlotStore`;
 - reversible commands and `CommandHistory`;
-- current PlotJSON parser/serializer;
+- PlotJSON serializer and report-bearing reader;
 - persisted-version parsing and comparison;
 - descriptor-safe JSON cloning and resource limits;
-- migration graph registration and deterministic planning;
-- immutable migration report record types;
+- migration graph registration, deterministic planning and execution;
+- immutable migration report records;
 - engine-independent errors and invariants.
 
 Current key modules:
@@ -77,12 +78,14 @@ plotjson-version.ts
 plotjson-migration-types.ts
 plotjson-migration-registry.ts
 plotjson-migration-report.ts
+plotjson-current-decoder.ts
+plotjson-reader.ts
 registry.ts
 store.ts
 types.ts
 ```
 
-008A safety and 008B planning remain disconnected from the historical parser until 008C. Store and MapLibre import remain unchanged until 008D.
+008C connects safety and migration planning into a pure reader. Store and MapLibre import remain unchanged until 008D.
 
 ### 3.2 `@plotlibre/geometry`
 
@@ -126,7 +129,7 @@ Derived renderer, Source/Layer lifecycle, broad-phase queries, exact projected r
 
 ### 3.6 `@plotlibre/playground`
 
-Browser demonstration, Nanjing samples, PlotJSON UI, real Chromium E2E and GitHub Pages deployment. It is a consumer rather than a second implementation.
+Browser demonstration, Nanjing samples, PlotJSON UI, Chromium E2E and GitHub Pages deployment. It is a consumer rather than a second implementation.
 
 ## 4. Canonical data model
 
@@ -163,7 +166,7 @@ PlotFeature input
 → RenderBundle
 ```
 
-`RenderBundle` may contain fills, lines, points, labels and hit areas. Every create, replace, draw completion, handle edit and selection transform performs complete Registry generation before Store mutation.
+Every create, replace, draw completion, handle edit and selection transform performs complete Registry generation before Store mutation.
 
 ## 6. Store and History
 
@@ -243,7 +246,7 @@ Document `schemaVersion` owns document structure, fields, order, references, ext
 
 Feature `definitionVersion` owns one symbol's control roles, parameters and authored semantics.
 
-They migrate independently and in order:
+Complete import order:
 
 ```text
 JSON boundary
@@ -255,11 +258,13 @@ JSON boundary
 → atomic Store replacement
 ```
 
-## 10. Merged 008A safety foundation
+008C implements the pure reader stages. 008D will bind them to the live Registry and Store.
+
+## 10. 008A safety foundation
 
 Persisted versions use canonical numeric `MAJOR.MINOR.PATCH` triples and numeric tuple comparison.
 
-Direct-object input accepts only JSON primitives, dense arrays and plain/null-prototype objects. Iterative descriptor inspection rejects accessors, hidden/symbol properties, custom prototypes, sparse/custom arrays, non-finite values and cycles without invoking getters.
+Direct-object input accepts JSON primitives, dense arrays and plain/null-prototype objects. Iterative descriptor inspection rejects accessors, hidden/symbol properties, custom prototypes, sparse/custom arrays, non-finite values and cycles without invoking getters.
 
 Default finite ceilings:
 
@@ -276,114 +281,77 @@ Default finite ceilings:
 
 They are security limits, not performance SLAs.
 
-## 11. Merged 008B migration registry
-
-### 11.1 Separate graph domains
+## 11. 008B migration graph
 
 ```text
 Document graph node:   schemaVersion
 Definition graph node: (plotType, definitionVersion)
 ```
 
-A Definition type rename is explicit:
-
-```text
-arrow.legacy@1.0.0
-→ arrow.bridge@1.1.0
-→ arrow.current@2.0.0
-```
-
-It is not a `PlotRegistry` alias.
-
-### 11.2 Descriptor model
-
-```ts
-interface PlotJsonDocumentMigration {
-  fromVersion: string;
-  toVersion: string;
-  migrate: PlotJsonMigrationFunction;
-}
-
-interface PlotJsonDefinitionMigration {
-  from: PlotJsonDefinitionReference;
-  to: PlotJsonDefinitionReference;
-  migrate: PlotJsonMigrationFunction;
-}
-```
-
-Migration functions are trusted application-installed synchronous code. 008B stores references but never executes them.
-
-### 11.3 Registration
-
-```text
-validate descriptor/function
-→ parse canonical versions
-→ require strict version increase
-→ copy and freeze descriptor/references
-→ require one outgoing edge per source node
-→ validate graph
-→ commit registration or roll back
-```
-
-Duplicate and branch are the same invariant violation. Registration order cannot alter a valid plan.
-
-### 11.4 Planner
-
-```text
-validate exact source/target
-→ equal: frozen empty plan
-→ reject downgrade
-→ follow unique outgoing edge
-→ reject missing edge or target overshoot
-→ require exact target node
-→ return frozen ordered plan
-```
-
-No shortest path, nearest version, alias inference or best effort exists. Planning never invokes migration functions.
-
-### 11.5 Immutability and reports
-
-Registry snapshots are fresh frozen sorted arrays containing stable frozen step objects. Definition references are copied and frozen. Caller mutation after registration cannot alter stored history.
-
-`PlotJsonMigrationReport` contains source/target schema versions, document steps, per-feature Definition steps, normalizations and warnings. `createPlotJsonMigrationReport()` copies and deeply freezes the structural envelope and stores no complete document or executable function.
+A Definition type rename is an explicit edge, not a Registry alias. Registration requires a canonical strictly increasing single outgoing edge per source. Planning follows only the exact unique chain and does not execute functions.
 
 ## 12. 008C reader architecture
 
-008C is the next runtime slice. It will connect the existing safety and planning layers without touching Store or MapLibre.
+Public API:
 
-Required pure read pipeline:
+```ts
+readPlotDocument(input, options?): ReadPlotDocumentResult
+parsePlotDocument(input, options?): PlotDocument
+```
+
+Pure reader pipeline:
 
 ```text
 string byte guard or direct-object clone
 → JSON syntax parse when needed
-→ JSON safety/resource scan
-→ minimal type/schema envelope
-→ document plan and execution
+→ document type/schema envelope
+→ exact document migration plan and execution
 → safety/resource scan after every step
-→ current 1.0.0 decode and compatibility normalization records
+→ current 1.0 compatibility decode and report facts
 → document invariants and duplicate ids
-→ Definition plan and execution for every feature
-→ final Definition-version equality
-→ immutable document + report result
+→ explicit Definition target and migration execution
+→ per-step controlPointsPerFeature enforcement
+→ exact feature identity/type/version
+→ final complete-document semantic scan
+→ immutable document + report
 ```
 
-`readPlotDocument()` becomes the report-bearing API. `parsePlotDocument()` remains a compatibility wrapper returning only the document.
+### 12.1 Migration execution
 
-Every expected failure exposes no partial result and does not mutate caller input.
+Every trusted migration receives frozen cloned JSON and must return a new synchronous JSON object. Same-object, Promise, malformed, accessor, cycle, custom-prototype and resource-exceeding outputs reject. Successful step facts are appended only after validation.
+
+### 12.2 Current decoding
+
+Historical 1.0 defaults remain compatible and are represented as report facts. Unknown fields are dropped in deterministic sorted order. Duplicate feature ids reject before external state can be touched.
+
+### 12.3 Definition migration
+
+`definitionTargets` explicitly maps a source plotType to the exact final `(plotType, definitionVersion)`. Type renames are audited. Omitting the map preserves parser-only 1.0 compatibility and does not claim live Registry equality.
+
+### 12.4 Semantic budgets
+
+A feature-root scan cannot infer aggregate document controls. The reader therefore checks `controlPointsPerFeature` after each Definition step and scans the rebuilt final document to enforce `totalControlPoints` and all complete-document limits.
+
+### 12.5 Immutability
+
+The result, document, feature arrays/records, control arrays, parameter/style/metadata trees and report are detached and deeply frozen.
 
 ## 13. 008D atomic import target
 
-Current import performs complete Registry generation before mutation, then uses `store.clear()` and repeated `store.add()`. Duplicate ids can fail after partial replacement.
+Current high-level import performs Registry preflight followed by `store.clear()` and repeated `store.add()`. This is not atomic under every later failure.
 
 008D target:
 
 ```text
 read and migrate completely in memory
-→ Registry canonicalize/generate every feature
+→ derive final targets from live PlotRegistry
+→ require Definition-version equality
+→ canonicalize/generate every feature
 → validate complete ordered candidate
 → stage one Store replacement transaction
 → one Store batch event
-→ clear selection and History only after success
+→ clear transient state only after success
+→ rebuild derived MapLibre state
 ```
 
 Every expected failure must preserve old Store, order, selection, History and active interaction state.
@@ -393,8 +361,8 @@ Every expected failure must preserve old Store, order, selection, History and ac
 ```text
 008A version / errors / JSON safety / limits — merged
 008B migration registry / planner / report records — merged
-008C safe reader / execution / 1.0 compatibility / invariants — next
-008D Registry-aware preparation / atomic Store import
+008C safe reader / execution / 1.0 compatibility / invariants — merged
+008D Registry-aware preparation / atomic Store import — next
 008E compatibility fixtures / docs / finalization
 ```
 
@@ -413,14 +381,14 @@ selection-transform benchmark
 zero unresolved review threads
 ```
 
-Current merged baseline is 348 Node and 34 Chromium tests. PR #55 validated head `c86bcc02…` in CI #541 and squash-merged as `409786f6…`.
+Current merged baseline is 375 Node and 34 Chromium tests. PR #57 validated head `ecd14daa…` in CI #559 and squash-merged as `9d5b8dc2…`.
 
 ## 16. Deferred work
 
 ```text
-safe reader and migration execution
+live Registry target derivation and Definition equality
+atomic Store/MapLibre import
 production schema and Definition migrations
-atomic import
 PlotJSON 1.1.0 shape
 groups / locks / visibility / z-order
 snapping and constraints
@@ -431,7 +399,7 @@ downgrade and future-version best effort
 coordinated npm release
 ```
 
-007D remains blocked until 008D/E establishes real migration, reference validation and atomic import.
+007D remains blocked until 008D/E establishes atomic import and production migration discipline.
 
 ## 17. Authority documents
 
@@ -446,16 +414,10 @@ docs/design/plotjson-migrations.md
 docs/design/plotjson-compatibility-matrix.md
 docs/design/plotjson-version-json-safety-runtime.md
 docs/design/plotjson-migration-registry-runtime.md
+docs/design/plotjson-reader-runtime.md
 docs/algorithms/plotjson-migration-pipeline.md
 
-docs/design/region-selection.md
-docs/design/rotation-uniform-scale.md
-docs/design/rotation-uniform-scale-runtime.md
-docs/algorithms/selection-local-transform.md
-
-docs/performance/region-selection-benchmark.md
-docs/performance/selection-transform-benchmark.md
-
 docs/handover/LATEST.md
-docs/handover/2026-08-05-milestone-008b-post-merge-finalization.md
+docs/handover/2026-08-05-milestone-008c-reader-runtime.md
+docs/handover/2026-08-05-milestone-008c-post-merge-finalization.md
 ```
