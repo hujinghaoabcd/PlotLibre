@@ -77,36 +77,45 @@ docs/handover/LATEST.md
 
 ## Validation status
 
-The structured reader head passed 364 Node tests and 34 Chromium tests. A later 372-test head passed the runtime gate before semantic-budget review. The current 375-test semantic-budget candidate requires its own exact-head CI; old-head evidence must not be reused.
-
-Required final gate:
+The complete 375-test semantic-budget runtime head passed every gate:
 
 ```text
-Node 20.19
-Node 22
-375 Node tests
-Playground typecheck/build
-handover check
-region-selection benchmark
-selection-transform benchmark
-34 Chromium tests
-0 unresolved review threads
+validated head:        75b0f8128840ad466370b71e71a96d45f8daea31
+CI:                    30961836496 / #557
+Node 20.19:            passed
+Node 22:               passed
+Node tests:            375 passed
+Playground typecheck:  passed
+Playground build:      passed
+handover check:        passed
+region benchmark:      passed / artifact 8913228055
+transform benchmark:   passed / artifact 8913229013
+Chromium:              34 passed (2.5m)
+review threads:        0
 ```
+
+Artifact digests:
+
+```text
+region:    sha256:adf82c983c48ed056dd8a38f92472d5dcae4a0352d8bcc8b304ac7a615e0311d
+transform: sha256:6772df551d5e6a860afa69f21c5ef064b5bb96ad76811c5e266698ba0f1f1076
+```
+
+Those documentation facts create a new final branch head. The final evidence-synchronization head must independently pass the same full gate before Ready/merge. Old-head evidence cannot substitute for it.
 
 ## Next tasks
 
-1. verify the current 375-test exact head and changed-file scope;
-2. run exact-head CI and capture both benchmark artifacts;
+1. verify the final evidence-synchronization head and nine-file scope;
+2. run exact-head CI and capture its two benchmark artifacts;
 3. confirm 375 Node and 34 Chromium tests;
 4. confirm zero unresolved review threads;
-5. write exact head/run/artifact evidence into both handover files;
-6. run one final exact-head CI after evidence synchronization;
-7. mark PR #57 Ready without changing its head;
-8. squash merge with expected head;
-9. verify the returned squash SHA as current `main`;
-10. create a Markdown-only 008C post-merge finalization branch;
-11. synchronize README, AGENTS, architecture, PlotJSON spec and roadmap;
-12. merge finalization and create `agent/008d-plotjson-atomic-import-runtime` from synchronized main.
+5. update PR #57 body without changing branch head;
+6. mark PR #57 Ready;
+7. squash merge with expected head;
+8. verify the returned squash SHA as current `main`;
+9. create a Markdown-only 008C post-merge finalization branch;
+10. synchronize README, AGENTS, architecture, PlotJSON spec and roadmap;
+11. merge finalization and create `agent/008d-plotjson-atomic-import-runtime` from synchronized main.
 
 ## 008D frozen boundary
 
