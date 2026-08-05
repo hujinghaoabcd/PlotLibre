@@ -6,6 +6,7 @@ export * from "./plotjson-error.js";
 export * from "./plotjson-migration-registry.js";
 export * from "./plotjson-migration-report.js";
 export * from "./plotjson-migration-types.js";
+export * from "./plotjson-reader.js";
 export * from "./plotjson-safety.js";
 export * from "./plotjson-version.js";
 export * from "./registry.js";
