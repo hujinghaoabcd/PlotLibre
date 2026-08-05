@@ -15,8 +15,8 @@ workspace:             0.0.22
 persisted schema:      PlotLibreDocument / 1.0.0
 production migrations: none
 public Definitions:    19
-candidate Node tests:  375
-Chromium baseline:     34
+Node tests:            375
+Chromium tests:        34
 Store mutation:        excluded
 MapLibre mutation:     excluded
 next milestone:        008D atomic import
@@ -236,25 +236,33 @@ The runtime was hardened to:
 2. attribute malformed final feature decoding to `PLOTJSON_DEFINITION_MIGRATION_OUTPUT_INVALID`;
 3. rebuild and scan the complete final document after all Definition migrations;
 4. enforce aggregate `totalControlPoints` and all other complete-document limits;
-5. add three regression tests, raising the candidate total from 372 to 375.
+5. add three regression tests, raising the total from 372 to 375.
 
-### Final exact-head validation
-
-Pending after the semantic-budget code and documentation commits. The PR must not become Ready until the final head passes:
+### Validated semantic-budget head
 
 ```text
-Node 20.19
-Node 22
-375 Node tests
-Playground typecheck/build
-handover check
-region-selection benchmark
-selection-transform benchmark
-34 Chromium tests
-0 unresolved review threads
+head:                  75b0f8128840ad466370b71e71a96d45f8daea31
+CI:                    30961836496 / #557
+Node 20.19:            passed
+Node 22:               passed
+Node tests:            375 passed
+Playground typecheck:  passed
+Playground build:      passed
+handover check:        passed
+region benchmark:      passed / artifact 8913228055
+transform benchmark:   passed / artifact 8913229013
+Chromium:              34 passed (2.5m)
+review threads:        0
 ```
 
-The final PR body must record exact head, run id, artifact ids/digests and review-thread count. This handover will be updated with that evidence before Ready/merge, followed by one final exact-head CI run.
+Artifact digests:
+
+```text
+region:    sha256:adf82c983c48ed056dd8a38f92472d5dcae4a0352d8bcc8b304ac7a615e0311d
+transform: sha256:6772df551d5e6a860afa69f21c5ef064b5bb96ad76811c5e266698ba0f1f1076
+```
+
+This evidence is bound to the pre-evidence-synchronization runtime head. The documentation commits that record it create a new final PR head. That final head must independently pass the same complete gate before Ready/merge; no old-head evidence may substitute for it.
 
 ## 12. 008D frozen boundary
 
@@ -288,12 +296,12 @@ Create `agent/008d-plotjson-atomic-import-runtime` only after PR #57 and a Markd
 
 ## 14. Merge discipline
 
-1. update this handover with final exact-head evidence;
-2. update `LATEST.md` to the same head/run/artifacts;
-3. compare against `dead641a40852758bcdecbfad99cbf2215024916` and verify expected scope;
-4. run full exact-head CI;
-5. verify zero unresolved review threads;
-6. mark PR #57 Ready without changing head;
+1. verify the final evidence-synchronization head and expected nine-file scope;
+2. run full exact-head CI;
+3. verify 375 Node and 34 Chromium tests;
+4. verify both benchmark artifacts and zero unresolved review threads;
+5. update PR #57 body only, without changing branch head;
+6. mark Ready without changing head;
 7. squash merge with expected head;
 8. verify returned squash SHA as current `main`;
 9. create Markdown-only 008C post-merge finalization from that SHA;
