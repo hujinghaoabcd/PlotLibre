@@ -4,7 +4,8 @@ import {
   createPlotDocument,
   createPlotFeature,
   DeletePlotCommand,
-  parsePlotDocument,
+  preparePlotDocumentImport,
+  PlotJsonMigrationRegistry,
   PlotRegistry,
   PlotStore,
   ReplacePlotCommand,
@@ -13,6 +14,8 @@ import {
   type PlotDocument,
   type PlotFeature,
   type PlotFeatureInput,
+  type PlotJsonLimits,
+  type ReadPlotDocumentResult,
 } from "@plotlibre/core";
 import {
   BatchEditCommand,
@@ -50,12 +53,15 @@ export interface PlotLibreOptions
   extends PlotLibreRendererOptions,
     MapLibrePlotInteractionOptions {
   readonly definitions?: readonly PlotDefinition[];
+  readonly migrations?: PlotJsonMigrationRegistry;
+  readonly plotJsonLimits?: Partial<PlotJsonLimits>;
   readonly historySize?: number;
   readonly autoInitialize?: boolean;
 }
 
 export class PlotLibre {
   public readonly registry: PlotRegistry;
+  public readonly migrations: PlotJsonMigrationRegistry;
   public readonly store: PlotStore;
   public readonly history: CommandHistory;
   public readonly selection: SelectionController;
@@ -66,10 +72,15 @@ export class PlotLibre {
   public readonly selectionModifiers: MapLibreSelectionRegionInteraction;
   public readonly translation: MapLibreSelectionTranslation;
   public readonly interaction: MapLibrePlotInteraction;
+  readonly #plotJsonLimits: Partial<PlotJsonLimits> | undefined;
   readonly #unsubscribe: () => void;
 
   public constructor(map: MapLibreMapLike, options: PlotLibreOptions = {}) {
     this.registry = new PlotRegistry();
+    this.migrations = options.migrations ?? new PlotJsonMigrationRegistry();
+    this.#plotJsonLimits = options.plotJsonLimits === undefined
+      ? undefined
+      : Object.freeze({ ...options.plotJsonLimits });
     this.store = new PlotStore();
     this.history = new CommandHistory({ maxSize: options.historySize ?? 200 });
     this.selection = new SelectionController(this.store);
@@ -418,30 +429,38 @@ export class PlotLibre {
     return serializePlotDocument(this.exportDocument(id, name));
   }
 
+  /**
+   * Fully reads, migrates and Registry-preflights a document before one atomic
+   * Store replacement. Transient application state is cleared only after the
+   * Store commit succeeds. Cleanup listener failures are isolated because a
+   * committed import must not be reported to its caller as a failed import.
+   */
+  public importDocumentWithReport(
+    value: PlotDocument | string | unknown,
+  ): ReadPlotDocumentResult {
+    const prepared = preparePlotDocumentImport(value, this.registry, {
+      migrations: this.migrations,
+      ...(this.#plotJsonLimits === undefined
+        ? {}
+        : { limits: this.#plotJsonLimits }),
+    });
+
+    this.store.replaceDocument(prepared.document.features);
+
+    runPostImportCleanup([
+      ["selection transform", () => this.selectionTransform.cancel()],
+      ["region selection", () => this.regionSelection.cancel()],
+      ["selection translation", () => this.translation.cancel()],
+      ["drawing", () => this.interaction.cancelDraw()],
+      ["selection", () => this.selection.clear()],
+      ["history", () => this.history.clear()],
+    ]);
+    return prepared;
+  }
+
+  /** Compatibility wrapper returning the imported current PlotDocument only. */
   public importDocument(value: PlotDocument | string | unknown): PlotDocument {
-    const parsed = parsePlotDocument(value);
-    const document: PlotDocument = {
-      ...parsed,
-      features: parsed.features.map((feature) =>
-        this.registry.canonicalize(feature),
-      ),
-    };
-
-    for (const feature of document.features) {
-      this.registry.generate(feature);
-    }
-
-    this.selectionTransform.cancel();
-    this.regionSelection.cancel();
-    this.translation.cancel();
-    this.interaction.cancelDraw();
-    this.interaction.select(undefined);
-    this.store.clear();
-    for (const feature of document.features) {
-      this.store.add(feature);
-    }
-    this.history.clear();
-    return document;
+    return this.importDocumentWithReport(value).document;
   }
 
   public render(): void {
@@ -456,6 +475,28 @@ export class PlotLibre {
     this.selection.destroy();
     this.#unsubscribe();
     this.renderer.destroy();
+  }
+}
+
+function runPostImportCleanup(
+  operations: readonly (readonly [label: string, operation: () => unknown])[],
+): void {
+  const failures: { readonly label: string; readonly error: unknown }[] = [];
+  for (const [label, operation] of operations) {
+    try {
+      operation();
+    } catch (error) {
+      failures.push(Object.freeze({ label, error }));
+    }
+  }
+  if (failures.length === 0) return;
+  try {
+    globalThis.console?.error(
+      `[PlotLibre] ${failures.length} post-import cleanup error(s) after atomic Store commit.`,
+      ...failures,
+    );
+  } catch {
+    // A logging failure cannot turn an already committed import into failure.
   }
 }
 

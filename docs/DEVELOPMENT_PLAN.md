@@ -17,23 +17,21 @@
 ## 当前基线
 
 ```text
-main SHA:             9d5b8dc23ad0e5b4ae6be3d1d1656f6d84f6adbe
+base main SHA:        b1c394f93a0a685d291fba54207dad9f9d020cb2
 workspace:            0.0.22
 PlotJSON schema:      1.0.0
 production migrations: none
 public symbols:       19 (14 Arrow + 1 Line + 4 Area)
 merged Node tests:    375
+008D candidate:       400 Node
 Chromium tests:       34
 MapLibre Sources:     4
 MapLibre Layers:      10
-benchmark jobs:       region selection + selection transform
-completed:            007A + 007B + 007B-P + 007C + 008 Design + 008A + 008B + 008C
-current slice:        008C post-merge authority synchronization
-current branch:       agent/008c-plotjson-post-merge-finalization
-next branch:          agent/008d-plotjson-atomic-import-runtime
+current slice:        008D Registry-aware atomic import
+current branch:       agent/008d-plotjson-atomic-import-runtime
+current PR:           #59 Draft
+next milestone:       008E compatibility closure
 ```
-
-PR #57 validated head `ecd14daa1b83f6702027aca785e326f510e267cf` in CI #559 and squash-merged as `9d5b8dc23ad0e5b4ae6be3d1d1656f6d84f6adbe`.
 
 ## Milestones
 
@@ -47,220 +45,198 @@ PR #57 validated head `ecd14daa1b83f6702027aca785e326f510e267cf` in CI #559 and 
 | 008 Design | PlotJSON versioning、migration、compatibility、atomic import | PR #51/#52，已完成 |
 | 008A | version / JSON safety / limits / errors | PR #53/#54，已完成 |
 | 008B | migration registry / deterministic planner / report records | PR #55/#56，已完成 |
-| 008C | safe reader / migration execution / current compatibility / invariants | PR #57，已完成 |
-| 008C Finalization | merge-state authority synchronization | 当前 Markdown-only 分支 |
-| 008D | Registry-aware preparation / atomic Store and MapLibre import | 下一阶段 |
-| 008E | compatibility fixtures / docs / finalization | runtime 收尾 |
-| 007D | groups / locks / visibility / z-order + production schema migration | 008D/E 后解除阻塞 |
+| 008C | safe reader / migration execution / compatibility / invariants | PR #57/#58，已完成 |
+| 008D | live Registry preparation / exact-order atomic Store import | PR #59，当前阶段 |
+| 008D Finalization | merge-state authority synchronization | 008D merge 后 |
+| 008E | compatibility fixtures / examples / matrix / closure | 下一阶段 |
+| 007D | groups / locks / visibility / z-order + production migration | 008E 后解除阻塞 |
 
-## Authority
+## 008A–008C 已完成基础
 
-PlotJSON design/runtime:
+### 008A
 
-```text
-docs/PLOTJSON_SPEC.md
-docs/design/plotjson-migrations.md
-docs/design/plotjson-compatibility-matrix.md
-docs/design/plotjson-version-json-safety-runtime.md
-docs/design/plotjson-migration-registry-runtime.md
-docs/design/plotjson-reader-runtime.md
-docs/algorithms/plotjson-migration-pipeline.md
-```
+- canonical numeric persisted versions;
+- getter-free direct-object clone;
+- finite JSON and semantic limits;
+- structured scalar-context errors.
 
-008A runtime:
+### 008B
 
-```text
-packages/core/src/plotjson-version.ts
-packages/core/src/plotjson-error.ts
-packages/core/src/plotjson-safety.ts
-```
+- separate document and Definition migration graphs;
+- one exact outgoing chain per source;
+- explicit plotType rename edges;
+- immutable plans and report records.
 
-008B runtime:
-
-```text
-packages/core/src/plotjson-migration-types.ts
-packages/core/src/plotjson-migration-registry.ts
-packages/core/src/plotjson-migration-report.ts
-```
-
-008C runtime:
-
-```text
-packages/core/src/plotjson-reader.ts
-packages/core/src/plotjson-current-decoder.ts
-packages/core/src/plotjson.ts
-packages/core/src/index.ts
-docs/handover/2026-08-05-milestone-008c-reader-runtime.md
-docs/handover/2026-08-05-milestone-008c-post-merge-finalization.md
-```
-
-## Merged 008A foundation
-
-### Version and error boundary
-
-```ts
-PLOTJSON_DOCUMENT_TYPE
-CURRENT_PLOTJSON_SCHEMA_VERSION
-parsePlotJsonVersion(...)
-comparePlotJsonVersions(...)
-isCanonicalPlotJsonVersion(...)
-PlotJsonError
-```
-
-Versions are canonical numeric `MAJOR.MINOR.PATCH`; comparison is numeric. Parsed records are frozen, forged records reject, and malformed messages do not echo untrusted payloads.
-
-### JSON safety and limits
-
-Accepted direct values are JSON primitives, dense arrays and plain/null-prototype objects. Iterative descriptor inspection rejects non-JSON values, custom prototypes, accessors, hidden/symbol properties, sparse/custom arrays and cycles without invoking getters.
-
-```text
-inputBytes:                16 MiB UTF-8
-maximum depth:             128
-value nodes:               1,000,000
-object keys:               250,000
-string/key length:         1,000,000 UTF-16 code units
-features:                  100,000
-controls per feature:      10,000
-total authored controls:   1,000,000
-```
-
-## Merged 008B runtime
-
-Document nodes are schema versions; Definition nodes are exact `(plotType, definitionVersion)` references. Registration requires canonical strictly increasing single outgoing edges. Planning is exact, deterministic, immutable and never executes migration functions.
-
-The report factory copies and deeply freezes structural records, omits absent optional scalar fields and stores no complete document, metadata or executable migration function.
-
-## Merged 008C runtime
-
-### Public API
+### 008C
 
 ```ts
 readPlotDocument(input, options?): ReadPlotDocumentResult
 parsePlotDocument(input, options?): PlotDocument
 ```
 
-### Pure reader pipeline
+- string/direct-object safe boundary;
+- document and Definition migration execution;
+- current 1.0 compatibility normalization report;
+- duplicate-id and current-schema validation;
+- per-feature and final aggregate semantic-limit checks;
+- detached deeply frozen document/report.
 
-```text
-UTF-8 guard or direct-object safe clone
-→ document envelope
-→ exact document migration execution
-→ output scan after every step
-→ current 1.0 compatibility decode and report facts
-→ duplicate-id validation
-→ explicit Definition migration
-→ per-step controlPointsPerFeature check
-→ final whole-document totalControlPoints scan
-→ detached deeply frozen document/report
+## 008D 当前实现
+
+### Core preparation
+
+```ts
+preparePlotDocumentImport(input, registry, options?)
+deriveRegistryDefinitionTargets(features, registry, migrations)
 ```
 
-### Compatibility behavior
+Three-pass pure preparation:
 
 ```text
-missing/non-string definitionVersion → 1.0.0 + report
-missing/non-record parameters        → {} + report
-missing/non-record style             → {} + report
-missing/non-record feature metadata  → {} + report
-missing/invalid revision             → 0 + report
-unknown root/feature fields          → dropped + report
+Pass 1: document history/current decode
+Pass 2: live-target Definition migration
+Pass 3: Registry-canonical final detach/scan
 ```
 
-### Migration execution rules
+Document migrations execute once. Definition migrations execute once per required edge. Pass 3 executes no migration.
 
-- input is a frozen safe clone;
-- migration is trusted synchronous code;
-- output must be a new JSON object;
-- Promise/async, same-object and malformed output reject;
-- every output is rescanned;
-- document output must match exact target envelope;
-- Definition output must preserve feature id and exact target reference;
-- malformed final Definition decode is attributed to migration output;
-- caller input is never mutated;
-- no partial result is exposed.
-
-### Semantic-budget hardening
-
-A standalone feature scan cannot infer aggregate document roles. Therefore:
-
-1. every Definition step explicitly enforces `controlPointsPerFeature`;
-2. the rebuilt final document is scanned to enforce `totalControlPoints` and all complete-document limits.
-
-### Validation evidence
+### Live target resolution
 
 ```text
-head:                  ecd14daa1b83f6702027aca785e326f510e267cf
-CI:                    30962224541 / #559
-Node 20.19 / 22:       passed
-Node tests:            375
-Playground build:      passed
-handover:              passed
-region artifact:       8913362065
-transform artifact:    8913357021
-Chromium:              34 passed
-review threads:        0
-squash/main:           9d5b8dc23ad0e5b4ae6be3d1d1656f6d84f6adbe
+exact live source → no migration
+otherwise → unique outgoing chain → first exact live Definition
 ```
 
-## Current gap: high-level import is not atomic
+No aliases, nearest versions or best effort.
 
-`PlotLibre.importDocument()` still performs complete Registry preflight followed by:
+Multiple historical versions of one source type may converge to one live target. Conflicting final targets for the same source plotType reject.
+
+### Registry preflight
+
+Every feature must exactly match a live Definition version and pass:
 
 ```text
-store.clear()
-→ repeated store.add()
+registry.canonicalize
+registry.generate
 ```
 
-A later failure can occur after partial replacement. The pure 008C reader prevents malformed documents from reaching that stage, but it does not make application-state replacement atomic.
+before Store mutation.
 
-## 008D — Registry-aware preparation and atomic import
+### Store replacement
 
-Create only after this Markdown-only finalization is squash-merged:
+```ts
+store.replaceDocument(features)
+```
+
+- clone and duplicate-id validation before commit;
+- new ids add;
+- reused ids replace;
+- old-only ids remove;
+- exact imported order;
+- one staged transaction;
+- one Store batch event;
+- imported revisions preserved.
+
+### High-level import
+
+```ts
+plot.importDocumentWithReport(input)
+plot.importDocument(input)
+```
+
+`PlotLibreOptions` accepts a trusted migration registry and copied/frozen PlotJSON limits.
 
 ```text
-agent/008d-plotjson-atomic-import-runtime
+pure prepare
+→ one Store commit
+→ post-success cleanup
 ```
 
-Scope:
+No transient state changes before commit.
 
-1. derive exact Definition targets from live `PlotRegistry`;
-2. require final Definition-version equality;
-3. call `readPlotDocument()` before mutation;
-4. canonicalize/generate every feature completely in memory;
-5. validate all ids and exact document order;
-6. add a dedicated exact-order Store replacement transaction;
-7. emit one Store batch event;
-8. preserve old Store/order/selection/History/interactions on expected failure;
-9. clear selection, History and incompatible interactions only after successful commit;
-10. integrate `PlotLibre.importDocument()`;
-11. rebuild MapLibre derived state from the successful event;
-12. add Node and Chromium rollback/success regressions.
+### Atomicity guarantee
 
-### Required atomicity
+Precommit failure preserves:
 
 ```text
-untrusted input
-→ pure read/migration
-→ live Registry target/equality check
-→ complete canonicalize/generate preflight
-→ stage exact ordered replacement
-→ one atomic Store commit
-→ post-success transient-state cleanup
-→ derived renderer refresh
+Store contents/order
+selection/Primary
+History stacks
+active drawing/draft
+armed region selection
+armed rotation/scale
+active translation
+committed rendering
 ```
 
-Failure before commit must preserve all application state.
+After commit, transform/region/translation/drawing/selection/History cleanup runs operation-by-operation. External cleanup-listener failures are logged and cannot turn a committed import into caller-visible failure.
 
-## 008E — closure
+## 008D test matrix
 
-- real compatibility fixtures and completed matrix;
-- public docs and examples;
-- exact-head CI and artifacts;
-- immutable runtime handover;
-- post-merge synchronization.
+New coverage includes:
+
+- exact live and migrated Definition targets;
+- document/Definition migrations execute once;
+- historical-version convergence and conflict rejection;
+- unknown/incomplete/future/invalid live Definition cases;
+- Registry canonicalization/generation failures;
+- exact-order Store replacement and one batch event;
+- duplicate-id, empty-document and listener behavior;
+- report-bearing and compatibility imports;
+- resource-limit snapshots;
+- failure preservation of Store/order/selection/History;
+- active drawing, region and transform rollback;
+- success-only cleanup;
+- external cleanup listener isolation.
+
+Candidate total: 400 Node tests plus 34 Chromium tests.
+
+## 008D closure tasks
+
+1. complete all authority documents;
+2. compare against base and verify expected runtime/test/docs scope;
+3. run exact-head Node 20.19/22 and 400 Node tests;
+4. run Playground typecheck/build and handover check;
+5. run both benchmark jobs and capture artifacts;
+6. run 34 Chromium tests;
+7. verify zero unresolved review threads;
+8. synchronize immutable handover with exact evidence;
+9. run one final evidence-head CI;
+10. update PR #59 body only;
+11. Ready and expected-head squash merge;
+12. verify `main`;
+13. create Markdown-only 008D finalization;
+14. create 008E from synchronized main.
+
+## 008E — compatibility closure
+
+Planned scope:
+
+```text
+fixtures/plotjson/current
+fixtures/plotjson/historical
+fixtures/plotjson/rename
+fixtures/plotjson/invalid
+fixtures/plotjson/future
+```
+
+008E should provide:
+
+- current exact round-trip golden files;
+- historical 1.0 normalization fixtures;
+- document and Definition migration fixtures;
+- explicit type-rename fixtures;
+- invalid/future/missing-chain fixtures;
+- atomic import rollback fixtures;
+- public reader/import examples;
+- completed compatibility matrix;
+- final documentation and handover synchronization.
+
+008E is closure, not a schema bump.
 
 ## 007D unblock condition
 
-007D begins only after 008D/E. Future schema must define feature-array z-order, schema-owned lock/visibility, stable group ids, validated references, deterministic effective state, production old-to-new migration and golden fixtures.
+Groups、locks、visibility 和 z-order begin only after 008E. A future schema must define stable group ids, validated references, exact z-order semantics, schema-owned locks/visibility, production migration and golden fixtures.
 
 ## Validation gate
 
@@ -268,7 +244,7 @@ Every runtime exact head:
 
 ```text
 Node 20.19 and 22
-all Node tests (current baseline 375)
+all Node tests
 Playground typecheck/build
 handover contract
 both observational benchmarks
@@ -279,22 +255,17 @@ immutable runtime handover
 
 Post-merge finalization additionally proves Markdown-only scope.
 
-## Cross-stage tasks
-
-Open-source license、coordinated release、docs/test consistency automation、real-browser performance、Playground code splitting、npm boundaries、source/build/deploy/live verification、branch cleanup documentation。
-
-## Non-goals for the current 008 sequence
+## Non-goals
 
 ```text
-schema 1.1 production shape before 007D design
-groups/locks/visibility/z-order runtime
+schema 1.1 before a real persisted-state change
+groups/locks/visibility/z-order in 008D/E
 downgrade or future-version best effort
 unresolved feature mode
 async/network migration
 arbitrary migration DAG
 canonical signed JSON
 collaboration version vectors
-derived geometry cache
 new symbols
 reflection/non-uniform scale/snapping/touch transforms
 ```

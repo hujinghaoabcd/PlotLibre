@@ -119,6 +119,30 @@ export class PlotStore {
   }
 
   /**
+   * Atomically replaces the complete ordered document.
+   *
+   * Reused ids are exact replacements rather than remove/add pairs, new ids are
+   * additions and old-only ids are removals. The full candidate and order are
+   * validated before one existing transaction commit and one batch event.
+   */
+  public replaceDocument(
+    features: readonly PlotFeature[],
+  ): PlotStoreBatchChange {
+    const next = features.map((feature) => clonePlotFeature(feature));
+    const nextIds = next.map((feature) => feature.id);
+    assertUniqueDocumentIds(nextIds);
+
+    const nextIdSet = new Set(nextIds);
+    const currentIds = [...this.#features.keys()];
+    return this.applyTransaction({
+      add: next.filter((feature) => !this.#features.has(feature.id)),
+      replace: next.filter((feature) => this.#features.has(feature.id)),
+      remove: currentIds.filter((id) => !nextIdSet.has(id)),
+      orderedIds: nextIds,
+    });
+  }
+
+  /**
    * Atomically applies a validated document transaction.
    *
    * All feature and ordering preconditions are checked against a staged Map.
@@ -276,6 +300,14 @@ function createBatchChange(
     updatedIds: frozenUpdatedIds,
     removedIds: frozenRemovedIds,
   });
+}
+
+function assertUniqueDocumentIds(ids: readonly string[]): void {
+  const seen = new Set<string>();
+  for (const id of ids) {
+    if (seen.has(id)) throw new DuplicatePlotFeatureError(id);
+    seen.add(id);
+  }
 }
 
 function assertUniqueTransactionIds(
