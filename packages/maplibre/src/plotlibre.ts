@@ -4,7 +4,8 @@ import {
   createPlotDocument,
   createPlotFeature,
   DeletePlotCommand,
-  parsePlotDocument,
+  preparePlotDocumentImport,
+  PlotJsonMigrationRegistry,
   PlotRegistry,
   PlotStore,
   ReplacePlotCommand,
@@ -13,6 +14,8 @@ import {
   type PlotDocument,
   type PlotFeature,
   type PlotFeatureInput,
+  type PlotJsonLimits,
+  type ReadPlotDocumentResult,
 } from "@plotlibre/core";
 import {
   BatchEditCommand,
@@ -50,12 +53,15 @@ export interface PlotLibreOptions
   extends PlotLibreRendererOptions,
     MapLibrePlotInteractionOptions {
   readonly definitions?: readonly PlotDefinition[];
+  readonly migrations?: PlotJsonMigrationRegistry;
+  readonly plotJsonLimits?: Partial<PlotJsonLimits>;
   readonly historySize?: number;
   readonly autoInitialize?: boolean;
 }
 
 export class PlotLibre {
   public readonly registry: PlotRegistry;
+  public readonly migrations: PlotJsonMigrationRegistry;
   public readonly store: PlotStore;
   public readonly history: CommandHistory;
   public readonly selection: SelectionController;
@@ -66,10 +72,13 @@ export class PlotLibre {
   public readonly selectionModifiers: MapLibreSelectionRegionInteraction;
   public readonly translation: MapLibreSelectionTranslation;
   public readonly interaction: MapLibrePlotInteraction;
+  readonly #plotJsonLimits: Partial<PlotJsonLimits> | undefined;
   readonly #unsubscribe: () => void;
 
   public constructor(map: MapLibreMapLike, options: PlotLibreOptions = {}) {
     this.registry = new PlotRegistry();
+    this.migrations = options.migrations ?? new PlotJsonMigrationRegistry();
+    this.#plotJsonLimits = options.plotJsonLimits;
     this.store = new PlotStore();
     this.history = new CommandHistory({ maxSize: options.historySize ?? 200 });
     this.selection = new SelectionController(this.store);
@@ -418,30 +427,35 @@ export class PlotLibre {
     return serializePlotDocument(this.exportDocument(id, name));
   }
 
-  public importDocument(value: PlotDocument | string | unknown): PlotDocument {
-    const parsed = parsePlotDocument(value);
-    const document: PlotDocument = {
-      ...parsed,
-      features: parsed.features.map((feature) =>
-        this.registry.canonicalize(feature),
-      ),
-    };
+  /**
+   * Fully reads, migrates and Registry-preflights a document before one atomic
+   * Store replacement. Transient application state is cleared only after the
+   * Store commit succeeds.
+   */
+  public importDocumentWithReport(
+    value: PlotDocument | string | unknown,
+  ): ReadPlotDocumentResult {
+    const prepared = preparePlotDocumentImport(value, this.registry, {
+      migrations: this.migrations,
+      ...(this.#plotJsonLimits === undefined
+        ? {}
+        : { limits: this.#plotJsonLimits }),
+    });
 
-    for (const feature of document.features) {
-      this.registry.generate(feature);
-    }
+    this.store.replaceDocument(prepared.document.features);
 
     this.selectionTransform.cancel();
     this.regionSelection.cancel();
     this.translation.cancel();
     this.interaction.cancelDraw();
-    this.interaction.select(undefined);
-    this.store.clear();
-    for (const feature of document.features) {
-      this.store.add(feature);
-    }
+    this.selection.clear();
     this.history.clear();
-    return document;
+    return prepared;
+  }
+
+  /** Compatibility wrapper returning the imported current PlotDocument only. */
+  public importDocument(value: PlotDocument | string | unknown): PlotDocument {
+    return this.importDocumentWithReport(value).document;
   }
 
   public render(): void {
