@@ -1,146 +1,126 @@
-# PlotLibre Development Handover — Milestone 008C Reader Runtime
+# PlotLibre Development Handover — Milestone 008C Merged
 
 日期：2026-08-05  
 仓库：`hujinghaoabcd/PlotLibre`  
-Runtime PR：#57  
-分支：`agent/008c-plotjson-reader-runtime`  
-完整设计：`docs/design/plotjson-reader-runtime.md`  
-最终交接：`docs/handover/2026-08-05-milestone-008c-reader-runtime.md`
+完整交接：`docs/handover/2026-08-05-milestone-008c-post-merge-finalization.md`
 
 ## Current state
 
 ```text
-base main:            dead641a40852758bcdecbfad99cbf2215024916
-workspace:            0.0.22
-PlotJSON schema:      1.0.0
+main:                9d5b8dc23ad0e5b4ae6be3d1d1656f6d84f6adbe
+workspace:           0.0.22
+PlotJSON schema:     1.0.0
 production migrations: none
-public symbols:       19 (14 Arrow + 1 Line + 4 Area)
-merged Node baseline: 348
-008C candidate:       375 Node tests
-Chromium baseline:    34
-MapLibre Sources:     4
-MapLibre Layers:      10
-008A runtime:         merged PR #53/#54
-008B runtime:         merged PR #55/#56
-008C runtime:         Draft PR #57
-next milestone:       008D atomic import
+public symbols:      19 (14 Arrow + 1 Line + 4 Area)
+Node tests:          375
+Chromium tests:      34
+MapLibre Sources:    4
+MapLibre Layers:     10
+008A runtime:        merged PR #53/#54
+008B runtime:        merged PR #55/#56
+008C runtime:        merged PR #57
+current branch:      agent/008c-plotjson-post-merge-finalization
+next branch:         agent/008d-plotjson-atomic-import-runtime
+```
+
+## Validation
+
+```text
+PR:                    #57
+validated head:        ecd14daa1b83f6702027aca785e326f510e267cf
+CI:                    30962224541 / #559
+Node 20.19 / 22:       success
+Node tests:            375 passed
+Playground typecheck:  success
+Playground build:      success
+handover check:        success
+region benchmark:      success / artifact 8913362065
+transform benchmark:   success / artifact 8913357021
+Chromium tests:        34 passed
+review threads:        0
+changed files:         9 expected files
+merge method:          squash with expected head
+squash/main SHA:       9d5b8dc23ad0e5b4ae6be3d1d1656f6d84f6adbe
+```
+
+Artifact digests:
+
+```text
+region:    sha256:efceaac29fd9f9093fe3de4ca8cb184db3d516b8a32f2cc3630ab768495a023f
+transform: sha256:356ed2ba3a6b30674d9e991a2d3b093dcb104ff62e476d9e8329474685b79013
 ```
 
 ## Completed in this milestone
 
-- added `readPlotDocument()` as the report-bearing safe reader;
+- added report-bearing `readPlotDocument()`;
 - retained `parsePlotDocument()` as a compatibility wrapper;
-- guarded string input by UTF-8 byte count before JSON parsing;
-- wrapped syntax failures in structured `PlotJsonError` values;
-- cloned direct objects through the descriptor-safe 008A boundary;
-- planned and executed exact document migration chains;
-- froze every migration input and rejected same-object returns;
-- rejected asynchronous migration results;
-- rescanned every migration result against JSON-safety and resource limits;
-- required every document step to produce its exact target envelope;
-- extracted current 1.0 decoding into a dedicated pure module;
-- preserved historical defaults while recording normalizations and warnings;
+- guarded string input by UTF-8 bytes before parsing;
+- cloned direct objects through the getter-free descriptor-safe boundary;
+- executed exact document migration chains on frozen cloned JSON;
+- rejected same-object, Promise, malformed and unsafe migration outputs;
+- rescanned every migration output against JSON and resource limits;
+- preserved historical PlotJSON 1.0 defaults while reporting them;
 - dropped unknown fields in deterministic sorted order;
-- enforced document-wide unique feature ids;
-- supported explicit Definition target maps and plotType rename chains;
-- required Definition outputs to preserve feature id and exact target reference;
-- enforced `controlPointsPerFeature` after each Definition step;
-- attributed malformed final Definition structures to migration output failure;
-- rebuilt and scanned the complete final document for aggregate semantic limits;
-- enforced final `totalControlPoints` after all Definition migrations;
-- produced deeply frozen detached documents and migration reports;
+- rejected document-wide duplicate feature ids;
+- executed explicit Definition migration and plotType rename chains;
+- required stable feature id and exact target Definition reference;
+- enforced `controlPointsPerFeature` after every Definition step;
+- attributed malformed final Definition decode to migration output;
+- rebuilt and scanned the complete final document;
+- enforced aggregate `totalControlPoints` after all migrations;
+- returned detached deeply frozen documents and migration reports;
 - kept Store, Registry generation, History, selection and MapLibre mutation out of scope.
 
-Runtime authority:
+Authority:
 
 ```text
 packages/core/src/plotjson-reader.ts
 packages/core/src/plotjson-current-decoder.ts
 packages/core/src/plotjson.ts
 packages/core/src/index.ts
-```
 
-Tests:
-
-```text
-tests/plotjson-reader.test.mjs
-tests/plotjson-reader-hardening.test.mjs
-```
-
-Documentation:
-
-```text
 docs/design/plotjson-reader-runtime.md
 docs/handover/2026-08-05-milestone-008c-reader-runtime.md
-docs/handover/LATEST.md
+docs/handover/2026-08-05-milestone-008c-post-merge-finalization.md
 ```
-
-## Validation status
-
-The complete 375-test semantic-budget runtime head passed every gate:
-
-```text
-validated head:        75b0f8128840ad466370b71e71a96d45f8daea31
-CI:                    30961836496 / #557
-Node 20.19:            passed
-Node 22:               passed
-Node tests:            375 passed
-Playground typecheck:  passed
-Playground build:      passed
-handover check:        passed
-region benchmark:      passed / artifact 8913228055
-transform benchmark:   passed / artifact 8913229013
-Chromium:              34 passed (2.5m)
-review threads:        0
-```
-
-Artifact digests:
-
-```text
-region:    sha256:adf82c983c48ed056dd8a38f92472d5dcae4a0352d8bcc8b304ac7a615e0311d
-transform: sha256:6772df551d5e6a860afa69f21c5ef064b5bb96ad76811c5e266698ba0f1f1076
-```
-
-Those documentation facts create a new final branch head. The final evidence-synchronization head must independently pass the same full gate before Ready/merge. Old-head evidence cannot substitute for it.
 
 ## Next tasks
 
-1. verify the final evidence-synchronization head and nine-file scope;
-2. run exact-head CI and capture its two benchmark artifacts;
-3. confirm 375 Node and 34 Chromium tests;
-4. confirm zero unresolved review threads;
-5. update PR #57 body without changing branch head;
-6. mark PR #57 Ready;
-7. squash merge with expected head;
-8. verify the returned squash SHA as current `main`;
-9. create a Markdown-only 008C post-merge finalization branch;
-10. synchronize README, AGENTS, architecture, PlotJSON spec and roadmap;
-11. merge finalization and create `agent/008d-plotjson-atomic-import-runtime` from synchronized main.
+1. compare this branch against `9d5b8dc23ad0e5b4ae6be3d1d1656f6d84f6adbe` and prove Markdown-only scope;
+2. open a Draft post-merge finalization PR;
+3. run exact-head Node 20.19/22 and 375 Node tests;
+4. run Playground typecheck/build and handover check;
+5. run both benchmark jobs and capture artifacts;
+6. run 34 Chromium tests;
+7. confirm zero review threads;
+8. mark the finalization PR Ready without changing head;
+9. squash merge with expected head;
+10. verify synchronized `main`;
+11. create `agent/008d-plotjson-atomic-import-runtime` from synchronized main.
 
 ## 008D frozen boundary
 
-008D must derive final Definition targets from the live `PlotRegistry`, require exact Definition-version equality, canonicalize/generate every feature, validate the complete ordered candidate and replace Store state in one atomic transaction.
+008D must:
 
-Any expected failure must preserve:
+- derive final Definition targets from live `PlotRegistry`;
+- require final Definition-version equality;
+- call the pure reader before application mutation;
+- canonicalize/generate every feature in memory;
+- validate complete ids and exact order;
+- replace Store state in one atomic transaction and one event;
+- preserve Store/order/selection/History/interactions on expected failure;
+- clear transient state only after successful commit;
+- integrate `PlotLibre.importDocument()` and derived MapLibre refresh;
+- add Node and Chromium rollback/success regressions.
 
-```text
-old Store contents and order
-selection and Primary
-CommandHistory
-active drawing/region/transform interaction state
-MapLibre derived rendering
-```
-
-008D cannot introduce a schema bump, production group/lock/visibility/z-order fields, downgrade migration or future-version best effort.
+008D cannot introduce schema changes, groups, locks, visibility, z-order, downgrade migration, unresolved-feature mode or future-version best effort.
 
 ## Risks and decisions
 
-- migration functions are trusted synchronous application code; JavaScript execution cannot be sandboxed by this runtime;
-- frozen inputs, same-object rejection, Promise rejection and output rescanning limit accidental or malformed behavior;
-- a standalone Definition feature scan cannot infer document aggregate semantic roles, so the final whole-document scan is mandatory;
-- `definitionTargets` is explicit application configuration until 008D binds the reader to `PlotRegistry`;
-- omitting `definitionTargets` preserves parser-only 1.0 compatibility and does not claim live Definition equality;
-- normalizations are compatibility facts, not silent undocumented coercions;
-- complete document and metadata payloads are not retained in errors or reports;
-- the existing `PlotLibre.importDocument()` remains non-atomic until 008D;
+- migration functions are trusted synchronous application code and cannot be sandboxed by JavaScript runtime checks;
+- frozen inputs, new-object/Promise rejection and output rescanning limit accidental or malformed behavior;
+- per-feature scans cannot enforce aggregate document controls, so the final whole-document scan is mandatory;
+- explicit `definitionTargets` is temporary application configuration until 008D binds to live Registry;
+- omitting targets preserves parser-only 1.0 compatibility and does not claim live Definition equality;
+- the existing high-level import remains non-atomic until 008D;
 - groups, locks, visibility and z-order remain blocked through 008D/E.
