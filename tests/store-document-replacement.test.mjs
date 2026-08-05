@@ -52,15 +52,16 @@ test("replaceDocument commits reused, new and removed ids in one exact-order bat
   assert.equal(Object.isFrozen(change.ids), true);
 });
 
-test("replaceDocument clones caller features before the atomic commit", () => {
+test("replaceDocument clones caller feature containers before commit", () => {
   const store = new PlotStore();
-  const input = feature("a", { metadata: { nested: { value: 1 } } });
+  const input = feature("a", { metadata: { source: "before" } });
   store.replaceDocument([input]);
 
   input.controlPoints[0][0] = 0;
-  input.metadata.nested.value = 9;
+  input.metadata.source = "after";
+  input.metadata.extra = true;
   assert.deepEqual(store.get("a").controlPoints[0], [118.7, 32.0]);
-  assert.equal(store.get("a").metadata.nested.value, 1);
+  assert.deepEqual(store.get("a").metadata, { source: "before" });
 });
 
 test("duplicate replacement ids reject before Store mutation or events", () => {
