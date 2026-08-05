@@ -28,11 +28,12 @@ It supports fixed/variable-point drawing, live preview, semantic handles, ordere
 ## Current baseline
 
 ```text
-main SHA:           9d5b8dc23ad0e5b4ae6be3d1d1656f6d84f6adbe
+base main SHA:      b1c394f93a0a685d291fba54207dad9f9d020cb2
 workspace version:  0.0.22
 MapLibre GL JS:     6.0.0
 Node.js:            20.19+
 merged tests:       375 Node / 34 Chromium
+008D candidate:     400 Node / 34 Chromium
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 MapLibre resources: 4 Sources / 10 Layers
 benchmark jobs:     region selection + selection transform
@@ -40,8 +41,9 @@ benchmark jobs:     region selection + selection transform
 008 design:         merged PR #51/#52
 008A runtime:       merged PR #53/#54
 008B runtime:       merged PR #55/#56
-008C runtime:       merged PR #57
-next runtime:       008D Registry-aware atomic import
+008C runtime:       merged PR #57/#58
+008D runtime:       Draft PR #59
+next milestone:     008E compatibility closure
 ```
 
 The root version is a development baseline, not yet a coordinated npm release across all public packages.
@@ -61,11 +63,11 @@ core + interaction <- maplibre
 public packages <- playground / wrappers
 ```
 
-- `@plotlibre/core`: domain types, safe PlotJSON reader/migrations, Registry, transactional Store, commands and History;
+- `@plotlibre/core`: domain types, PlotJSON safety/migrations/reader/import preparation, Registry, transactional Store, commands and History;
 - `@plotlibre/geometry`: pure planar, circular, closed-area and geodesic geometry;
 - `@plotlibre/symbols`: nineteen built-in parametric Definitions;
 - `@plotlibre/interaction`: drawing, ordered selection, region algorithms, batch commands and local transforms;
-- `@plotlibre/maplibre`: rendering, projected hit resolution, handles and DOM/SVG interaction overlays;
+- `@plotlibre/maplibre`: rendering, projected hit resolution, semantic handles, interaction overlays and atomic high-level import;
 - `@plotlibre/playground`: browser demo, E2E and GitHub Pages site.
 
 ## Professional editing
@@ -183,24 +185,11 @@ Document graph nodes are schema versions. Definition graph nodes are exact `(plo
 ### 008C: safe reader and migration execution
 
 ```ts
-interface ReadPlotDocumentOptions {
-  readonly migrations?: PlotJsonMigrationRegistry;
-  readonly definitionTargets?: Readonly<
-    Record<string, PlotJsonDefinitionReference>
-  >;
-  readonly limits?: Partial<PlotJsonLimits>;
-}
-
-interface ReadPlotDocumentResult {
-  readonly document: PlotDocument;
-  readonly report: PlotJsonMigrationReport;
-}
-
-readPlotDocument(input, options?)
-parsePlotDocument(input, options?)
+readPlotDocument(input, options?): ReadPlotDocumentResult
+parsePlotDocument(input, options?): PlotDocument
 ```
 
-The pure reader now performs:
+The pure reader performs:
 
 ```text
 UTF-8 guard or descriptor-safe direct-object clone
@@ -217,18 +206,45 @@ UTF-8 guard or descriptor-safe direct-object clone
 
 Historical defaults remain compatible but are no longer silent: missing Definition version, parameters, style, feature metadata, revision and dropped unknown fields are represented in the migration report.
 
-`definitionTargets` remains explicit application configuration. Live `PlotRegistry` target derivation, Definition generation and atomic application-state replacement are 008D work.
+### 008D: Registry-aware atomic import
 
-## Current import limitation
+Core preparation:
 
-The current high-level import path still performs Registry preflight followed by:
-
-```text
-store.clear()
-→ repeated store.add(feature)
+```ts
+preparePlotDocumentImport(input, registry, options?)
+deriveRegistryDefinitionTargets(features, registry, migrations)
+store.replaceDocument(features)
 ```
 
-008D will replace this with one prepared exact-order Store document transaction. Any expected failure must preserve Store, order, selection, History and active interaction state.
+High-level import:
+
+```ts
+plot.importDocumentWithReport(input): ReadPlotDocumentResult
+plot.importDocument(input): PlotDocument
+```
+
+`PlotLibreOptions` accepts an application-installed `PlotJsonMigrationRegistry` and a copied/frozen PlotJSON limit snapshot.
+
+The import pipeline is:
+
+```text
+pure document read/migration
+→ derive exact live Definition targets
+→ pure Definition migration
+→ Registry canonicalize/generate every feature
+→ final detached document scan
+→ one exact-order Store replacement
+→ one Store batch event
+→ post-success transient-state cleanup
+```
+
+Definition resolution uses an exact live source when available; otherwise it follows the unique migration chain until the first exact live Definition. It never guesses aliases or nearest versions. Multiple historical versions of one source type may converge to one live target; conflicting final targets reject.
+
+Every expected failure before Store commit preserves Store contents/order, selection/Primary, History and active drawing, region, rotation/scale or translation state. Successful import clears incompatible transient state only after commit.
+
+External post-commit cleanup listener failures are isolated and logged. They cannot turn an already committed import into a caller-visible failure.
+
+`PlotStore.replaceDocument()` clones and validates the complete candidate, reuses matching ids as replacements, adds new ids, removes old-only ids, restores exact imported order and emits one immutable batch event.
 
 ## Rendering resources
 
@@ -252,7 +268,7 @@ Layers
   plotlibre-handle
 ```
 
-Region and transform DOM/SVG overlays are outside these resources. Style reload rebuilds derived map state from canonical Store and selection state.
+Atomic import adds no renderer resource. The existing Store subscription regenerates the complete derived map state from the single successful Store event.
 
 ## Validation
 
@@ -280,11 +296,11 @@ docs/design/plotjson-compatibility-matrix.md
 docs/design/plotjson-version-json-safety-runtime.md
 docs/design/plotjson-migration-registry-runtime.md
 docs/design/plotjson-reader-runtime.md
+docs/design/plotjson-atomic-import-runtime.md
 docs/algorithms/plotjson-migration-pipeline.md
 
 docs/handover/LATEST.md
-docs/handover/2026-08-05-milestone-008c-reader-runtime.md
-docs/handover/2026-08-05-milestone-008c-post-merge-finalization.md
+docs/handover/2026-08-05-milestone-008d-atomic-import.md
 ```
 
-The next runtime branch is `agent/008d-plotjson-atomic-import-runtime`, created only after this Markdown-only finalization reaches synchronized `main`.
+The next milestone is 008E compatibility closure: golden fixtures, completed compatibility matrices, public examples and final synchronization. Schema 1.1 and groups/locks/visibility/z-order remain deferred until a real persisted-state feature requires them.
