@@ -3,6 +3,7 @@ export * from "./errors.js";
 export * from "./history.js";
 export * from "./plotjson.js";
 export * from "./plotjson-error.js";
+export * from "./plotjson-import.js";
 export * from "./plotjson-migration-registry.js";
 export * from "./plotjson-migration-report.js";
 export * from "./plotjson-migration-types.js";
