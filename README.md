@@ -2,7 +2,7 @@
 
 **PlotLibre** is a MapLibre-native, engine-independent framework for drawing, editing, rendering and exchanging semantic parametric situation plots and tactical graphics.
 
-> PlotLibre 保存“符号类型 + authored controls + 参数 + 样式 + 元数据”。地图中的 LineString、Polygon、采样点、选择轮廓、平移/旋转/缩放预览和交互框均为可重新生成的派生结果。
+> PlotLibre 保存“符号类型 + authored controls + 参数 + 样式 + 元数据”。地图中的 LineString、Polygon、采样点、选择轮廓、变换预览和交互框均为可重新生成的派生结果。
 
 ## Live Playground
 
@@ -28,19 +28,20 @@ It supports fixed/variable-point drawing, live preview, semantic handles, ordere
 ## Current baseline
 
 ```text
-main SHA:           409786f6a55aeab6e810651410954d78123e32d3
+main SHA:           9d5b8dc23ad0e5b4ae6be3d1d1656f6d84f6adbe
 workspace version:  0.0.22
 MapLibre GL JS:     6.0.0
 Node.js:            20.19+
-merged tests:       348 Node / 34 Chromium
+merged tests:       375 Node / 34 Chromium
 public symbols:     19 (14 Arrow + 1 Line + 4 Area)
 MapLibre resources: 4 Sources / 10 Layers
 benchmark jobs:     region selection + selection transform
 007C:               merged PR #47–#50
 008 design:         merged PR #51/#52
 008A runtime:       merged PR #53/#54
-008B runtime:       merged PR #55
-next runtime:       008C safe reader and migration execution
+008B runtime:       merged PR #55/#56
+008C runtime:       merged PR #57
+next runtime:       008D Registry-aware atomic import
 ```
 
 The root version is a development baseline, not yet a coordinated npm release across all public packages.
@@ -60,11 +61,11 @@ core + interaction <- maplibre
 public packages <- playground / wrappers
 ```
 
-- `@plotlibre/core`: domain types, PlotJSON foundations, migration planning, Registry, transactional Store, commands and History;
+- `@plotlibre/core`: domain types, safe PlotJSON reader/migrations, Registry, transactional Store, commands and History;
 - `@plotlibre/geometry`: pure planar, circular, closed-area and geodesic geometry;
 - `@plotlibre/symbols`: nineteen built-in parametric Definitions;
 - `@plotlibre/interaction`: drawing, ordered selection, region algorithms, batch commands and local transforms;
-- `@plotlibre/maplibre`: rendering, exact projected hit resolution, handles and DOM/SVG interaction overlays;
+- `@plotlibre/maplibre`: rendering, projected hit resolution, handles and DOM/SVG interaction overlays;
 - `@plotlibre/playground`: browser demo, E2E and GitHub Pages site.
 
 ## Professional editing
@@ -103,11 +104,9 @@ plot.cancelRegionSelection()
 
 Intent is `replace | add | toggle | subtract`; pointer modifier priority is `Alt > Ctrl/Cmd > Shift > configured intent`.
 
-Region coordinates use CSS pixels. MapLibre's rendered query is broad phase only; candidates are normalized to Store order, regenerated through the Registry, projected and tested against exact semantic point/line/polygon geometry. Labels, hit areas, handles and overlays are not selectable semantic geometry.
+MapLibre rendered queries are broad phase only. Candidates are normalized to Store order, regenerated through the Registry, projected and tested against exact semantic point/line/polygon geometry. Labels, hit areas, handles and overlays are not selectable semantic geometry.
 
-Invalid region completion preserves selection and explicit mode can retry. Region selection creates no History entry and adds no MapLibre Source or Layer.
-
-### Atomic Store and commands
+### Atomic editing commands
 
 `PlotStore.applyTransaction()` stages complete mutations before one commit. `BatchEditCommand` captures exact before/after features, document order and selection.
 
@@ -124,24 +123,11 @@ ordered authored controls
 → one atomic command
 ```
 
-Uniform scale accepts `[0.01, 100]`; reflection and non-uniform scale are excluded. Store is unchanged during preview, and one invalid member rejects the complete batch.
-
-Public transform APIs:
-
-```ts
-plot.selectionTransform
-plot.selectionTransformSnapshot
-plot.selectionTransformRejection
-plot.startSelectionRotation()
-plot.startSelectionScale()
-plot.cancelSelectionTransform()
-```
-
-The derived DOM/SVG overlay uses a 4 CSS-pixel minimum start radius and a 24 CSS-pixel minimum visual frame for tiny selections. It adds no MapLibre resource.
+Uniform scale accepts `[0.01,100]`; reflection and non-uniform scale are excluded. Store is unchanged during preview, and one invalid member rejects the complete batch.
 
 ## PlotJSON
 
-Current production envelope:
+Current persisted envelope:
 
 ```text
 PlotLibreDocument / schemaVersion 1.0.0
@@ -149,7 +135,7 @@ PlotLibreDocument / schemaVersion 1.0.0
 
 Document `schemaVersion` owns document structure. Feature `definitionVersion` owns one symbol's authored semantics. They are independent migration domains.
 
-### Merged 008A foundations
+### 008A: version and JSON-safety foundation
 
 ```ts
 PLOTJSON_DOCUMENT_TYPE
@@ -157,7 +143,6 @@ CURRENT_PLOTJSON_SCHEMA_VERSION
 parsePlotJsonVersion(...)
 comparePlotJsonVersions(...)
 isCanonicalPlotJsonVersion(...)
-
 PlotJsonError
 DEFAULT_PLOTJSON_LIMITS
 resolvePlotJsonLimits(...)
@@ -166,13 +151,9 @@ clonePlotJsonValue(...)
 scanPlotJsonValue(...)
 ```
 
-Persisted versions use canonical numeric `MAJOR.MINOR.PATCH` triples. Components are non-negative safe integers. Prefixes, missing components, leading zeros, prerelease/build suffixes and unsafe numbers reject. Comparison is numeric rather than lexical.
+Persisted versions are canonical numeric `MAJOR.MINOR.PATCH` triples. Direct-object safety accepts JSON primitives, dense arrays and plain/null-prototype objects only, while rejecting accessors, hidden/symbol properties, custom prototypes, sparse arrays, non-finite values and cycles without invoking getters.
 
-Direct-object JSON safety accepts only null, strings, booleans, finite numbers, dense arrays and plain/null-prototype objects. It rejects non-JSON values, custom prototypes, accessors, hidden/symbol properties, sparse/custom arrays and cycles without invoking getters.
-
-Traversal is iterative and deterministic. Repeated non-cyclic references are cloned independently. Own `__proto__` and `constructor` keys remain safe data properties and cannot pollute prototypes.
-
-Default finite safety ceilings:
+Default untrusted-input ceilings:
 
 ```text
 UTF-8 input:             16 MiB
@@ -185,61 +166,69 @@ controls per feature:    10,000
 total authored controls: 1,000,000
 ```
 
-These are untrusted-input ceilings, not recommended document sizes, memory guarantees or latency SLAs.
-
-### Merged 008B migration planning
-
-008B adds descriptors, separate document/Definition graphs, deterministic planning and immutable report records:
+### 008B: deterministic migration planning
 
 ```ts
 PlotJsonMigrationRegistry
 PlotJsonMigrationRegistryError
-
 PlotJsonDocumentMigration
 PlotJsonDefinitionReference
 PlotJsonDefinitionMigration
-PlotJsonPlannedDocumentStep
-PlotJsonPlannedDefinitionStep
-
 PlotJsonMigrationReport
 createPlotJsonMigrationReport(...)
 ```
 
-Document graph nodes are schema versions. Definition graph nodes are exact `(plotType, definitionVersion)` pairs, allowing explicit type-renaming chains.
+Document graph nodes are schema versions. Definition graph nodes are exact `(plotType, definitionVersion)` pairs, allowing explicit type-renaming chains. A source node has at most one strictly increasing outgoing edge; duplicate, branch, downgrade, self and cycle configurations reject. Planning never executes migration functions.
+
+### 008C: safe reader and migration execution
 
 ```ts
-const migrations = new PlotJsonMigrationRegistry()
-  .registerDocument({
-    fromVersion: "1.0.0",
-    toVersion: "1.1.0",
-    migrate: migrateDocument,
-  })
-  .registerDefinition({
-    from: { plotType: "arrow.legacy", definitionVersion: "1.0.0" },
-    to: { plotType: "arrow.current", definitionVersion: "2.0.0" },
-    migrate: migrateArrow,
-  });
+interface ReadPlotDocumentOptions {
+  readonly migrations?: PlotJsonMigrationRegistry;
+  readonly definitionTargets?: Readonly<
+    Record<string, PlotJsonDefinitionReference>
+  >;
+  readonly limits?: Partial<PlotJsonLimits>;
+}
 
-const documentPlan = migrations.planDocument("1.0.0", "1.1.0");
-const featurePlan = migrations.planDefinition(
-  { plotType: "arrow.legacy", definitionVersion: "1.0.0" },
-  { plotType: "arrow.current", definitionVersion: "2.0.0" },
-);
+interface ReadPlotDocumentResult {
+  readonly document: PlotDocument;
+  readonly report: PlotJsonMigrationReport;
+}
+
+readPlotDocument(input, options?)
+parsePlotDocument(input, options?)
 ```
 
-Registry rules:
+The pure reader now performs:
 
 ```text
-canonical versions only
-strictly increasing edges
-one outgoing edge per source node
-no duplicates, branches, self edges, downgrade or cycles
-registration order cannot change a plan
-plans and snapshots are frozen
-planning never invokes migration functions
+UTF-8 guard or descriptor-safe direct-object clone
+→ document envelope and exact migration execution
+→ frozen migration input + new synchronous output
+→ JSON/resource scan after every step
+→ current 1.0 compatibility decode and report facts
+→ duplicate feature-id rejection
+→ explicit Definition migration and plotType rename
+→ per-step controlPointsPerFeature enforcement
+→ final whole-document totalControlPoints scan
+→ deeply frozen document and report
 ```
 
-008B does **not** execute migrations and does not connect to the current parser or import path. `readPlotDocument()`, historical `1.0.0` normalization reporting and document invariants are 008C work; atomic Store/MapLibre import is 008D.
+Historical defaults remain compatible but are no longer silent: missing Definition version, parameters, style, feature metadata, revision and dropped unknown fields are represented in the migration report.
+
+`definitionTargets` remains explicit application configuration. Live `PlotRegistry` target derivation, Definition generation and atomic application-state replacement are 008D work.
+
+## Current import limitation
+
+The current high-level import path still performs Registry preflight followed by:
+
+```text
+store.clear()
+→ repeated store.add(feature)
+```
+
+008D will replace this with one prepared exact-order Store document transaction. Any expected failure must preserve Store, order, selection, History and active interaction state.
 
 ## Rendering resources
 
@@ -290,20 +279,12 @@ docs/design/plotjson-migrations.md
 docs/design/plotjson-compatibility-matrix.md
 docs/design/plotjson-version-json-safety-runtime.md
 docs/design/plotjson-migration-registry-runtime.md
+docs/design/plotjson-reader-runtime.md
 docs/algorithms/plotjson-migration-pipeline.md
 
-docs/design/region-selection.md
-docs/design/rotation-uniform-scale.md
-docs/design/rotation-uniform-scale-runtime.md
-docs/algorithms/selection-local-transform.md
-
-docs/performance/region-selection-benchmark.md
-docs/performance/selection-transform-benchmark.md
-
 docs/handover/LATEST.md
-docs/handover/2026-08-05-milestone-008a-post-merge-finalization.md
-docs/handover/2026-08-05-milestone-008b-migration-planning.md
-docs/handover/2026-08-05-milestone-008b-post-merge-finalization.md
+docs/handover/2026-08-05-milestone-008c-reader-runtime.md
+docs/handover/2026-08-05-milestone-008c-post-merge-finalization.md
 ```
 
-The next runtime slice is `agent/008c-plotjson-reader-runtime`, created only after this Markdown-only post-merge synchronization reaches `main`. Parser/reader and Definition execution belong there; Store and MapLibre integration remain 008D work.
+The next runtime branch is `agent/008d-plotjson-atomic-import-runtime`, created only after this Markdown-only finalization reaches synchronized `main`.
