@@ -4,13 +4,15 @@
 
 ```text
 current persisted schema: 1.0.0
-current parser: exact-version historical parser
+public reader: readPlotDocument()
+compatibility wrapper: parsePlotDocument()
 008A runtime: version / errors / JSON safety / resource limits merged
 008B runtime: migration registry / deterministic planner / report records merged
-008B squash/main: 409786f6a55aeab6e810651410954d78123e32d3
+008C runtime: safe reader / migration execution / compatibility report merged
+008C squash/main: 9d5b8dc23ad0e5b4ae6be3d1d1656f6d84f6adbe
 production migrations: none
-reader migration execution: not yet connected
-next runtime: 008C safe reader and migration execution
+atomic Store/MapLibre import: not yet connected
+next runtime: 008D Registry-aware atomic import
 future schema bump: deferred until a production persisted-state change
 ```
 
@@ -21,6 +23,7 @@ docs/design/plotjson-migrations.md
 docs/design/plotjson-compatibility-matrix.md
 docs/design/plotjson-version-json-safety-runtime.md
 docs/design/plotjson-migration-registry-runtime.md
+docs/design/plotjson-reader-runtime.md
 docs/algorithms/plotjson-migration-pipeline.md
 ```
 
@@ -58,7 +61,7 @@ PlotJSON 不把派生 Polygon、LineString、采样点、选择轮廓、变换�
 | `schemaVersion` | 是 | 当前固定为 `1.0.0` |
 | `id` | 是 | 文档稳定标识符 |
 | `name` | 是 | 文档显示名称 |
-| `features` | 是 | 参数化标绘对象数组；当前数组顺序就是文档顺序 |
+| `features` | 是 | 参数化标绘对象数组；数组顺序即当前文档顺序 |
 | `metadata` | 是 | 文档级 JSON 属性，不控制核心运行时行为 |
 
 `metadata.schema` 等信息性字段不是版本权威；读取器只认根级 `schemaVersion`。
@@ -70,10 +73,7 @@ PlotJSON 不把派生 Polygon、LineString、采样点、选择轮廓、变换�
   "id": "main-direction",
   "plotType": "arrow.straight",
   "definitionVersion": "1.0.0",
-  "controlPoints": [
-    [118.78, 32.04],
-    [118.86, 32.1]
-  ],
+  "controlPoints": [[118.78, 32.04], [118.86, 32.1]],
   "parameters": {},
   "style": {},
   "metadata": {},
@@ -83,7 +83,7 @@ PlotJSON 不把派生 Polygon、LineString、采样点、选择轮廓、变换�
 
 ### 3.1 `id`
 
-文档内必须唯一。重复 ID 必须在 Store 发生任何变化前拒绝。当前 parser 尚未执行文档级重复检查；008C 必须补齐，008D 必须证明失败不修改 Store。
+文档内必须唯一。008C 已在纯读取阶段执行文档级重复检查，并以 `PLOTJSON_FEATURE_ID_DUPLICATE` 拒绝。008D 仍必须证明该失败不会修改 Store 或其他应用状态。
 
 ### 3.2 `plotType`
 
@@ -93,13 +93,13 @@ PlotJSON 不把派生 Polygon、LineString、采样点、选择轮廓、变换�
 
 Definition 版本与文档 `schemaVersion` 相互独立。它表示 authored control 角色、参数名称/类型/默认值/单位和会改变旧 authored data 含义的 Definition 语义。
 
-未来读取完成后必须满足：
+完整导入在 Store mutation 前必须满足：
 
 ```text
 feature.definitionVersion === registry.get(feature.plotType).version
 ```
 
-当前 Registry 还未在通用生成路径强制该等式。008C/008D 必须在 Store mutation 前完成迁移或拒绝。
+008C 可以通过显式 `definitionTargets` 完成迁移；008D 负责从 live `PlotRegistry` 派生目标并强制该等式。
 
 ### 3.4 `controlPoints`
 
@@ -111,7 +111,7 @@ WGS84 `[longitude, latitude]` 数组。坐标必须有限、纬度位于 `[-90,9
 
 ### 3.6 `style`
 
-样式是 authored state；MapLibre 图层表达是派生结果。当前核心字段包括填充、线、点和文字颜色、透明度、宽度、半径、字号和虚线配置。
+样式是 authored state；MapLibre 图层表达是派生结果。
 
 ### 3.7 `metadata`
 
@@ -119,7 +119,7 @@ WGS84 `[longitude, latitude]` 数组。坐标必须有限、纬度位于 `[-90,9
 
 ### 3.8 `revision`
 
-对象本地修订号。它不是 schema version、Definition version 或协作版本向量。最终值必须是非负安全整数。
+对象本地修订号。它不是 schema version、Definition version 或协作版本向量。最终保留值必须是非负安全整数。
 
 ## 4. 两类版本的职责
 
@@ -131,7 +131,7 @@ WGS84 `[longitude, latitude]` 数组。坐标必须有限、纬度位于 `[-90,9
 
 负责一个 `plotType` 的控制点角色、参数语义和 authored Definition behavior。
 
-### 4.3 必须采用的顺序
+### 4.3 完整顺序
 
 ```text
 input byte guard / direct-object boundary
@@ -142,17 +142,18 @@ input byte guard / direct-object boundary
 → current document decode
 → document invariants
 → Definition migration for every feature
-→ final Definition-version equality
+→ final complete-document semantic scan
+→ final live Definition-version equality
 → Registry canonicalize/generate every feature
 → immutable report
 → atomic Store replacement
 ```
 
+008C 实现到 immutable current document/report。008D 实现 live Registry equality、generation 和 atomic Store replacement。
+
 禁止先按当前结构解释旧文档，再猜测迁移。
 
 ## 5. 持久化版本语法
-
-公共常量：
 
 ```text
 PLOTJSON_DOCUMENT_TYPE = PlotLibreDocument
@@ -165,39 +166,52 @@ CURRENT_PLOTJSON_SCHEMA_VERSION = 1.0.0
 MAJOR.MINOR.PATCH
 ```
 
-每个组件必须是非负安全整数。禁止前缀、缺少组件、前导零、prerelease、build metadata、指数或非安全整数。
+每个组件必须是非负安全整数。禁止前缀、缺少组件、前导零、prerelease、build metadata、指数或非安全整数。比较必须使用数值 tuple，不能使用字符串字典序。
 
-比较必须使用数值 tuple，不能使用字符串字典序。
-
-008A 已提供：
+## 6. 公共读取 API
 
 ```ts
-parsePlotJsonVersion(...)
-comparePlotJsonVersions(...)
-isCanonicalPlotJsonVersion(...)
+interface ReadPlotDocumentOptions {
+  readonly migrations?: PlotJsonMigrationRegistry;
+  readonly definitionTargets?: Readonly<
+    Record<string, PlotJsonDefinitionReference>
+  >;
+  readonly limits?: Partial<PlotJsonLimits>;
+}
+
+interface ReadPlotDocumentResult {
+  readonly document: PlotDocument;
+  readonly report: PlotJsonMigrationReport;
+}
+
+readPlotDocument(input, options?): ReadPlotDocumentResult
+parsePlotDocument(input, options?): PlotDocument
 ```
 
-## 6. 当前 `1.0.0` 实际兼容行为
+`readPlotDocument()` 是权威 evidence-bearing API。`parsePlotDocument()` 是兼容 wrapper，仅返回 `result.document`。
 
-现有 parser 的真实行为属于兼容基线：
+## 7. 当前 `1.0.0` 兼容行为
+
+008C 保留历史解释结果，并将默认化和丢弃行为写入报告：
 
 | 条件 | 当前结果 |
 |---|---|
-| `type` 或 `schemaVersion` 不精确匹配 | 拒绝 |
+| `type` 不匹配 | 拒绝 |
+| schema version 无效/未来/缺链 | 结构化拒绝 |
 | 缺少文档 id/name/features/metadata | 拒绝 |
-| 未知根或 feature 字段 | 忽略并丢弃 |
-| 缺少 `definitionVersion` | 使用 `1.0.0` |
-| 缺少或非对象 parameters/style/feature metadata | 使用 `{}` |
-| 缺少或非整数 revision | 使用 `0` |
+| 未知根或 feature 字段 | 丢弃并报告 |
+| 缺少或非字符串 `definitionVersion` | 使用 `1.0.0` 并报告 |
+| 缺少或非对象 parameters/style/feature metadata | 使用 `{}` 并报告 |
+| 缺少或无效 revision | 使用 `0` 并报告 |
 | control point 不是两个 number | 拒绝 |
+| 纬度不在 `[-90,90]` | 拒绝 |
+| feature id 重复 | 拒绝 |
 
-008A/008B 没有接入 parser，因此没有静默改变这些输入的解释。
-
-008C 的 report-bearing API 必须保留兼容结果，并记录默认值、无效 record 默认化和未知字段丢弃。
+未知字段按排序后的 key 顺序处理，保证报告顺序确定。
 
 非 JSON 值、循环引用、非有限数值和资源限制违规不属于兼容承诺，必须拒绝。
 
-## 7. JSON 安全边界
+## 8. JSON 安全边界
 
 直接对象输入只接受：
 
@@ -226,17 +240,17 @@ sparse/custom array
 cycle
 ```
 
-008A 实现要求：
+要求：
 
 - 迭代遍历，不依赖 JavaScript 调用栈；
 - descriptor 检查，不调用 getter；
-- 对象 key 按字典序访问，错误路径确定；
-- 重复但无环的引用复制成独立 JSON tree；
+- 对象 key 按字典序访问；
+- 重复但无环的引用复制为独立 JSON tree；
 - `__proto__`、`constructor`、`prototype` 保持安全 data property；
 - 不修改调用方输入；
 - clone 与输入不共享 nested containers。
 
-## 8. 资源限制
+## 9. 资源限制
 
 当前默认有限上限：
 
@@ -251,42 +265,23 @@ controls per feature:    10,000
 total authored controls: 1,000,000
 ```
 
-这些是处理不可信输入的安全 ceiling，不是推荐文档规模、内存保证或延迟 SLA。覆盖值必须是有限正安全整数，字符串限制同时作用于 value 和 object key。
+这些是处理不可信输入的安全 ceiling，不是推荐文档规模、内存保证或延迟 SLA。
 
-## 9. Merged 008B migration registry
+## 10. Migration registry 与 planner
 
-008B 已增加独立于 `PlotDefinition` 和 `PlotRegistry` 的历史图。
+Document node：
 
-### 9.1 Document edge
-
-```ts
-interface PlotJsonDocumentMigration {
-  fromVersion: string;
-  toVersion: string;
-  migrate: PlotJsonMigrationFunction;
-}
+```text
+schemaVersion
 ```
 
-节点是 document schema version。
+Definition node：
 
-### 9.2 Definition edge
-
-```ts
-interface PlotJsonDefinitionReference {
-  plotType: string;
-  definitionVersion: string;
-}
-
-interface PlotJsonDefinitionMigration {
-  from: PlotJsonDefinitionReference;
-  to: PlotJsonDefinitionReference;
-  migrate: PlotJsonMigrationFunction;
-}
+```text
+(plotType, definitionVersion)
 ```
 
-节点是 `(plotType, definitionVersion)`。
-
-显式 rename：
+Definition rename 必须是显式 edge，例如：
 
 ```text
 arrow.legacy@1.0.0
@@ -294,75 +289,80 @@ arrow.legacy@1.0.0
 → arrow.current@2.0.0
 ```
 
-### 9.3 注册约束
+注册约束：
 
-- descriptor 必须包含 function；
+- migration function 必须存在；
 - 版本必须 canonical；
 - target version 严格大于 source version；
 - Definition plotType 非空；
 - descriptor/reference 复制并冻结；
 - 每个 source node 最多一条 outgoing edge；
-- exact duplicate 和 branch 都拒绝；
+- duplicate、branch、self、decreasing、cycle 均拒绝；
 - invalid insertion 回滚；
-- registration order 不能影响 valid plan；
-- graph 不允许 cycle 或 branch ambiguity。
+- registration order 不影响 valid plan。
 
-Developer configuration errors：
+Planner 只沿唯一 outgoing edge，要求 exact target，不执行 migration function，不选择 shortest、nearest 或 best-effort path。
 
-```text
-PLOTJSON_MIGRATION_REGISTRATION_INVALID
-PLOTJSON_MIGRATION_SOURCE_DUPLICATE
-PLOTJSON_MIGRATION_GRAPH_CYCLE
-```
+## 11. Document migration execution
 
-### 9.4 规划约束
-
-```ts
-registry.planDocument(source, target)
-registry.planDefinition(sourceReference, targetReference)
-```
-
-Planner：
-
-- 首先验证 source/target；
-- exact equality 返回共享 frozen empty plan；
-- downgrade 拒绝；
-- 只沿唯一 outgoing edge；
-- missing edge 和 overshoot 拒绝；
-- Definition 必须到达 exact version + exact plotType；
-- 返回 frozen ordered plan；
-- 不执行 migration function；
-- 不选择 shortest、nearest 或 best-effort path。
-
-008B exact-head evidence：
+每一步：
 
 ```text
-validated head: c86bcc02d2b85bb1495d8a3e659d2e3d5ff18335
-CI:             30957964547 / #541
-Node:           348 passed
-Chromium:       34 passed
-squash/main:    409786f6a55aeab6e810651410954d78123e32d3
+safe cloned JSON object
+→ freeze input
+→ trusted synchronous migration function
+→ require new object
+→ reject Promise/async output
+→ descriptor-safe clone and resource scan
+→ exact target type/schema envelope
+→ append report fact only after success
 ```
 
-## 10. Migration function purity
+Thrown、same-object、Promise、accessor、cycle、custom prototype、resource violation 和错误 envelope 统一转换为带 source/target scalar context 的 `PLOTJSON_MIGRATION_OUTPUT_INVALID`。
 
-Migration 是应用安装的 trusted synchronous code。文档不能指定模块或可执行代码。
+Migration function 是应用安装的 trusted synchronous code。文档不能指定模块或可执行代码。函数不得读取 clock、random、network、DOM、MapLibre、Store 或 History。
 
-008B 只保存 function reference，不执行。
+## 12. Definition migration execution
 
-008C 执行时必须：
+`definitionTargets` 以 document decode 后的 source plotType 为 key，值为 exact final reference。
 
-- 输入为安全 clone；
-- 不修改旧输入；
-- 返回新的 JSON object；
-- 不读取 clock、random、network、DOM、MapLibre、Store、History；
-- 每一步输出重新扫描；
-- 输出和报告确定；
-- 失败时不泄漏 partial result。
+当 map 省略时，读取器保留 parser-only 1.0 兼容，不声明 live Registry equality。
 
-## 11. Migration report
+当 map 提供时：
 
-008B 已定义不可变记录：
+- 每个 source plotType 必须有 own target；
+- exact source/target 不执行 migration；
+- 其他目标必须存在 exact migration chain；
+- 每步输入为 frozen cloned feature；
+- 每步输出必须是新的同步 JSON object；
+- 每步输出重新扫描；
+- 每步显式检查 `controlPointsPerFeature`；
+- feature id 不变；
+- plotType/version 等于 step target；
+- 最终 feature decode 必须成功并等于 requested target；
+- malformed final feature 归因于 `PLOTJSON_DEFINITION_MIGRATION_OUTPUT_INVALID`。
+
+## 13. 最终整文档语义扫描
+
+独立 feature root 无法推断 `features[i].controlPoints` 角色，也无法累计 document-wide controls。因此 008C 在所有 Definition migrations 后重建并扫描完整 current document。
+
+最终扫描再次执行：
+
+```text
+features
+controlPointsPerFeature
+totalControlPoints
+depth
+totalNodes
+objectKeys
+stringLength
+```
+
+该步骤是安全与资源语义的一部分，不得因“每个 feature 已扫描”而删除。
+
+## 14. Migration report
+
+报告包含：
 
 ```text
 source schema version
@@ -370,11 +370,9 @@ target schema version
 document applied steps
 per-feature Definition records
 explicit plotType rename facts
-1.0.0 normalization facts
+1.0 normalization facts
 warnings with stable code and JSON path
 ```
-
-`createPlotJsonMigrationReport()` 复制并深度冻结结构，不保留完整文档、业务 metadata 或 migration function。
 
 Normalization codes：
 
@@ -395,38 +393,9 @@ PLOTJSON_INVALID_REVISION_DEFAULTED
 PLOTJSON_UNKNOWN_FIELD_DROPPED
 ```
 
-008C 将从实际 successful read/execution 生成这些记录。
+报告结构复制并深度冻结，不保留完整文档、业务 metadata 或 migration function。
 
-## 12. 008C reader contract
-
-008C 是下一个 runtime slice。它只负责纯读取和迁移执行，不修改 Store 或 MapLibre。
-
-必须实现：
-
-```text
-string byte guard or direct-object safe clone
-→ syntax parse
-→ JSON safety/resource scan
-→ minimal envelope
-→ document plan + execution
-→ output scan after every step
-→ current 1.0.0 decode + compatibility report facts
-→ duplicate ids and document invariants
-→ Definition plan + execution
-→ final Definition-version equality
-→ immutable document/report result
-```
-
-Public API 目标：
-
-```ts
-readPlotDocument(...): ReadPlotDocumentResult
-parsePlotDocument(...): PlotDocument
-```
-
-`parsePlotDocument()` 是兼容 wrapper；报告由 `readPlotDocument()` 提供。
-
-## 13. 结构化错误
+## 15. 结构化错误
 
 `PlotJsonError` 可携带 scalar context：
 
@@ -444,75 +413,52 @@ cause
 
 不能保留或打印完整文档或 metadata。
 
-稳定代码包括 syntax、non-JSON、resource、root/type/version、migration path/output、current schema、duplicate id、Definition lookup/version/migration、reference 和 import transaction 错误。
+稳定代码覆盖 syntax、non-JSON、resource、root/type/version、migration path/output、current schema、duplicate id、Definition lookup/version/migration 和 import transaction 等类别。
 
-## 14. 原子导入
+## 16. 当前导入限制
 
-当前 `PlotLibre.importDocument()` 在 Registry preflight 后执行：
+当前 `PlotLibre.importDocument()` 仍在 Registry preflight 后执行：
 
 ```text
 store.clear()
-→ store.add(feature) repeatedly
+→ repeated store.add(feature)
 ```
 
-这不能满足重复 ID 等中途失败下的原子性。
+这不能满足所有中途失败下的原子性。
 
-008D 必须替换为：
+## 17. 008D 原子导入目标
 
 ```text
-prepare complete canonical document in memory
-→ stage complete Store replacement
-→ validate ids and exact order
+readPlotDocument
+→ derive exact final Definition targets from live PlotRegistry
+→ require final Definition-version equality
+→ canonicalize/generate every feature
+→ validate complete ids and order
+→ stage one Store document replacement
 → one Store commit / one batch event
-→ clear selection and History only after success
+→ clear transient state only after success
+→ rebuild derived MapLibre state
 ```
 
 失败时必须保持旧 Store/order、selection/Primary、History 和 active interaction state。
 
-## 15. Golden fixtures
-
-008C/008D 至少需要：
-
-```text
-current exact round trip
-historical 1.0.0 defaults
-unknown fields normalization
-malformed JSON / non-JSON direct object
-old/current/future versions
-complete/missing document chain
-complete/missing Definition chain
-explicit plotType rename
-unknown Definition
-duplicate feature ids
-resource-limit boundaries
-invalid migration output
-Registry generation failure
-atomic import rollback
-exact document order after success
-repeat-read idempotence
-```
-
-所有 migration 必须证明确定性和不修改输入。
-
-## 16. Runtime 分阶段
+## 18. Runtime 分阶段
 
 ```text
 008A version / errors / JSON safety / limits — merged
 008B migration registry / planner / report records — merged
-008C report-bearing reader / execution / 1.0 compatibility / invariants — next
-008D Registry-aware preparation / atomic Store and MapLibre import
+008C report-bearing reader / execution / compatibility / invariants — merged
+008D Registry-aware preparation / atomic Store and MapLibre import — next
 008E fixtures / public docs / finalization
 ```
 
-008C 明确不包含 Store 和 MapLibre mutation。008D 之前不得把读取成功等同于导入提交。
-
-## 17. 与 007D 的关系
+## 19. 与 007D 的关系
 
 Groups、locks、visibility 和 z-order 是核心持久状态，不能存入 metadata 或只存在于 UI。
 
 007D 必须等 008D/E 完成，并使用真实 production schema migration、引用验证、golden fixtures 和原子 import。
 
-## 18. 非目标
+## 20. 非目标
 
 ```text
 downgrade migration
